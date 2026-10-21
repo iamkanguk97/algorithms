@@ -13,6 +13,12 @@
   · 쓸 수 있는 요소: .goals  .callout(-key|-tip|-warn)  .fig + .cells(.vertical) + .cell(.is-hl|.is-ghost, data-i, data-ptr)
     pre[data-lang="python"][data-title] + pre.stdin(입력 예시, 선택) + pre.output  .table-wrap  .bigo(.b-const|.b-log|.b-linear|.b-nlogn|.b-quad)
     .problem + details.reveal  .recall  .summary-list  <mark>
+  · 그림 단계를 위아래로 쌓으려면 .fig-steps.stacked (화살표가 아래를 향한다).
+  · 연결 리스트 그림: <div class="nodes"><div class="node" data-ptr="head">1<span class="nxt"></span></div> … <div class="node is-null">None</div></div>
+    .node 에 .is-hl(바뀐 노드), .is-ghost(떼어 낸 노드)를 쓸 수 있고, data-ptr 는 "prev, cur" 처럼 여러 이름을 적어도 된다.
+  · 해시 테이블 그림: <div class="buckets"><div class="bucket" data-i="0"></div><div class="bucket" data-i="1"><div class="cell">17</div><div class="cell is-hl">33</div></div> …</div>
+    .cell 이 없는 .bucket 은 "비어 있음"으로 그려진다.
+  · 검사: python tools/check_chapter.py NN-slug.html  (코드 블록 실행 결과 대조 + 구조 린트)
 -->
 <body data-chapter="10">
 <a class="skip-link" href="#content">본문으로 건너뛰기</a>
