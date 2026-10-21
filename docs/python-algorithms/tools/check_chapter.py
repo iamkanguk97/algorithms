@@ -175,7 +175,7 @@ def run_code_blocks(blocks: list[CodeBlock], python: str, errors: list[str]) -> 
             script.write_text(block.source + '\n', encoding='utf-8')
             try:
                 result = subprocess.run(
-                    [python, '-I', script.name], cwd=workdir, input=block.stdin or '',
+                    [python, '-E', '-s', script.name], cwd=workdir, input=block.stdin or '',
                     capture_output=True, text=True, timeout=RUN_TIMEOUT_SEC,
                 )
             except subprocess.TimeoutExpired:
