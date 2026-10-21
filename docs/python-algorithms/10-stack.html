@@ -1,0 +1,615 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>10. 스택 — 파이썬 알고리즘 노트</title>
+<script src="assets/theme.js"></script>
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body data-chapter="10">
+<a class="skip-link" href="#content">본문으로 건너뛰기</a>
+<div class="progress" aria-hidden="true"><span></span></div>
+<header class="topbar" id="topbar"></header>
+
+<div class="shell">
+  <aside class="sidebar" id="sidebar" aria-label="책 목차"></aside>
+
+  <main class="main" id="content">
+    <article class="chapter">
+      <header class="chapter-head">
+        <a class="part-pill"></a>
+        <span class="chapter-label"></span>
+        <h1>스택</h1>
+        <p class="lede">접시를 쌓듯 맨 위에만 넣고 맨 위에서만 꺼내는 자료구조입니다. 파이썬에서는 리스트 하나로 바로 쓸 수 있고, 괄호 검사부터 재귀를 반복문으로 바꾸는 일까지 "가장 최근 것부터 처리하는" 문제에 두루 쓰입니다.</p>
+        <div class="chapter-meta">
+          <span class="chip">LIFO</span><span class="chip">append · pop</span><span class="chip">괄호 검사</span><span class="chip">호출 스택</span><span class="chip">단조 스택</span>
+        </div>
+      </header>
+
+      <div class="goals">
+        <p class="goals-title">이 장에서 배울 것</p>
+        <ul>
+          <li>스택이 왜 "나중에 넣은 것을 먼저 꺼내는" 구조인지 설명할 수 있다</li>
+          <li>파이썬 리스트로 push, pop, peek을 쓰고, 각 연산이 O(1)인 이유를 안다</li>
+          <li>문제에서 스택을 떠올려야 하는 신호(짝 맞추기, 되돌리기, 중첩)를 안다</li>
+          <li>호출 스택이 왜 스택인지 알고, 재귀 함수를 반복문과 스택으로 바꿀 수 있다</li>
+          <li>단조 스택으로 "다음 큰 수"를 O(n)에 구할 수 있다</li>
+        </ul>
+      </div>
+
+      <section id="what-is-stack">
+        <h2>스택이란</h2>
+        <div class="callout callout-key">
+          <span class="callout-title">핵심</span>
+          <p class="callout-big">스택은 <mark>마지막에 넣은 것이 가장 먼저 나오는</mark> 자료구조다. 이 성질을 LIFO(Last In, First Out)라고 부른다.</p>
+        </div>
+        <p>식당에서 접시를 쌓는 모습을 떠올리면 쉽다. 새 접시는 맨 위에 올리고, 꺼낼 때도 맨 위부터 집는다. 가운데 접시를 빼려면 그 위의 접시를 모두 먼저 치워야 한다. 이 제약이 불편해 보이지만, 거꾸로 말하면 <strong>"가장 최근 것"이 언제나 맨 위에 있다는 뜻</strong>이다. 스택이 유용한 이유는 전부 여기서 나온다.</p>
+        <p>그래서 스택이 하는 일은 사실상 세 가지뿐이다.</p>
+        <ul>
+          <li><strong>push</strong> — 맨 위에 넣는다</li>
+          <li><strong>pop</strong> — 맨 위에서 꺼낸다</li>
+          <li><strong>peek</strong> — 꺼내지 않고 맨 위만 본다</li>
+        </ul>
+
+        <figure class="fig">
+          <div class="fig-steps">
+            <div class="fig-state">
+              <div class="cells vertical">
+                <div class="cell">1</div>
+                <div class="cell" data-ptr="top">2</div>
+              </div>
+              <span class="fig-state-label">처음</span>
+            </div>
+            <div class="fig-arrow">push(3)</div>
+            <div class="fig-state">
+              <div class="cells vertical">
+                <div class="cell">1</div>
+                <div class="cell">2</div>
+                <div class="cell is-hl" data-ptr="top">3</div>
+              </div>
+              <span class="fig-state-label">push 후</span>
+            </div>
+            <div class="fig-arrow">pop()</div>
+            <div class="fig-state">
+              <div class="cells vertical">
+                <div class="cell">1</div>
+                <div class="cell" data-ptr="top">2</div>
+                <div class="cell is-ghost">3</div>
+              </div>
+              <span class="fig-state-label">pop 후</span>
+            </div>
+          </div>
+          <figcaption><b>그림 10-1</b> push는 맨 위에 쌓고, pop은 맨 위에서 꺼낸다. 맨 아래 1은 2와 3이 모두 나가야 꺼낼 수 있다.</figcaption>
+        </figure>
+
+        <p>7장의 큐와 비교하면 차이가 분명하다. 큐는 먼저 넣은 것을 먼저 꺼내고(FIFO), 스택은 나중에 넣은 것을 먼저 꺼낸다. 넣는 순서는 같아도 꺼내는 순서가 반대다. 큐는 11장에서 다룬다.</p>
+      </section>
+
+      <section id="python-stack">
+        <h2>파이썬 리스트로 스택 쓰기</h2>
+        <p>파이썬에는 스택 전용 자료형이 따로 없다. 리스트의 <strong>끝</strong>을 스택의 맨 위로 삼으면 그대로 스택이 된다. <code>append</code>가 push, <code>pop()</code>이 pop, <code>[-1]</code>이 peek이다.</p>
+
+<pre data-lang="python" data-title="stack_basic.py"><code>
+stack = []
+
+stack.append(1)        # push
+stack.append(2)
+stack.append(3)
+print(stack)
+
+top = stack[-1]        # peek: 꺼내지 않고 맨 위만 본다
+print(top)
+
+print(stack.pop())     # pop: 맨 위를 꺼내서 돌려준다
+print(stack)
+print(not stack)       # 비었는가
+</code></pre>
+<pre class="output">
+[1, 2, 3]
+3
+3
+[1, 2]
+False
+</pre>
+
+        <p>리스트를 출력하면 왼쪽이 바닥, 오른쪽이 맨 위다. 그림 10-1을 시계 방향으로 눕힌 모양이라고 생각하면 된다.</p>
+
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>스택 연산</th><th>리스트 코드</th><th>하는 일</th></tr></thead>
+            <tbody>
+              <tr><td>push</td><td><code>stack.append(x)</code></td><td>끝에 붙인다</td></tr>
+              <tr><td>pop</td><td><code>stack.pop()</code></td><td>끝 원소를 꺼내서 돌려준다</td></tr>
+              <tr><td>peek</td><td><code>stack[-1]</code></td><td>끝 원소를 보기만 한다</td></tr>
+              <tr><td>비었는지 확인</td><td><code>not stack</code></td><td>빈 리스트는 조건식에서 거짓이 된다</td></tr>
+              <tr><td>크기</td><td><code>len(stack)</code></td><td>쌓인 개수</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div class="callout callout-tip">
+          <span class="callout-title">팁</span>
+          <p>비었는지 확인할 때는 <code>len(stack) == 0</code>보다 <code>if not stack:</code>이 더 파이썬다운 표현이다. 빈 리스트는 조건식에서 <code>False</code>로 취급된다(2장).</p>
+        </div>
+
+        <h3>빌 때까지 꺼내기</h3>
+        <p>스택을 쓰는 코드는 대개 <code>while stack:</code>으로 시작한다. 비어 있지 않은 동안 하나씩 꺼내 처리하고, 처리하다 새로 생긴 일은 다시 쌓는다. 꺼낸 순서를 모아 보면 쌓은 순서의 정반대다. 이 "넣었다 빼면 뒤집힌다"는 성질은 뒤에서 여러 번 쓰인다.</p>
+
+<pre data-lang="python" data-title="stack_loop.py"><code>
+stack = []
+for ch in 'abc':
+    stack.append(ch)       # a, b, c 순서로 쌓인다
+
+popped = []
+while stack:               # 빌 때까지 하나씩 꺼낸다
+    popped.append(stack.pop())
+print(popped)              # 꺼낸 순서는 쌓은 순서의 반대
+print(''.join(popped))
+</code></pre>
+<pre class="output">
+['c', 'b', 'a']
+cba
+</pre>
+      </section>
+
+      <section id="complexity">
+        <h2>연산별 시간복잡도</h2>
+        <p>스택 연산은 모두 리스트의 끝에서만 일어난다. 끝에서 넣고 빼면 다른 원소를 옮길 필요가 없어서, 원소가 몇 개든 거의 같은 시간이 걸린다. 리스트의 앞을 맨 위로 삼으면 안 되는 이유도 같다. 맨 앞에 넣거나 맨 앞에서 빼면 뒤의 원소를 모두 한 칸씩 밀거나 당겨야 해서 O(n)이 된다(7장).</p>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>연산</th><th>코드</th><th>시간</th><th>이유</th></tr></thead>
+            <tbody>
+              <tr><td>push</td><td><code>append(x)</code></td><td><span class="bigo b-const">O(1)*</span></td><td>끝에 붙이기만 한다</td></tr>
+              <tr><td>pop</td><td><code>pop()</code></td><td><span class="bigo b-const">O(1)</span></td><td>끝에서 떼어 내기만 한다</td></tr>
+              <tr><td>peek</td><td><code>stack[-1]</code></td><td><span class="bigo b-const">O(1)</span></td><td>인덱스로 바로 찾아간다</td></tr>
+              <tr><td>비었는지 확인</td><td><code>not stack</code></td><td><span class="bigo b-const">O(1)</span></td><td>길이만 본다</td></tr>
+              <tr><td>값 찾기</td><td><code>x in stack</code></td><td><span class="bigo b-linear">O(n)</span></td><td>처음부터 하나씩 비교한다</td></tr>
+              <tr><td>맨 앞에 넣기 · 빼기</td><td><code>insert(0, x)</code>, <code>pop(0)</code></td><td><span class="bigo b-linear">O(n)</span></td><td>뒤의 원소를 모두 한 칸씩 옮긴다</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <p>* <code>append</code>는 가끔 내부 공간을 늘리느라 원소를 통째로 옮기지만, 여러 번에 걸쳐 나눠 보면 한 번에 평균 O(1)이다. 이렇게 평균 내어 따지는 방식을 <strong>분할 상환(amortized) 분석</strong>이라고 하며, 8장에서 다룬다.</p>
+        <p>표에서 눈여겨볼 곳은 <code>x in stack</code>이다. 스택 가운데를 뒤지는 일은 O(n)이고, 애초에 스택이 잘하는 일이 아니다. 풀이 도중 "스택 안에 이 값이 있나?"를 자주 묻게 된다면, 집합(4장)을 하나 더 두거나 스택이 맞는 도구인지 다시 생각해 본다.</p>
+      </section>
+
+      <section id="signals">
+        <h2>스택이 어울리는 신호</h2>
+        <p>문제를 읽다가 다음 세 가지 중 하나가 보이면 스택을 먼저 떠올린다. 셋 다 "가장 최근 것이 맨 위에 있다"는 성질을 쓴다.</p>
+        <ul>
+          <li><strong>가장 최근 것과 짝을 맞춘다</strong> — 닫는 괄호는 가장 최근에 연 괄호와 짝이다.</li>
+          <li><strong>되돌린다</strong> — 실행 취소, 뒤로 가기. 가장 최근 상태로 돌아간다.</li>
+          <li><strong>중첩을 안에서 밖으로 처리한다</strong> — 괄호 안의 괄호, 폴더 안의 폴더, 리스트 안의 리스트. 안쪽이 먼저 끝나야 바깥쪽이 끝난다.</li>
+        </ul>
+
+        <h3>짝 맞추기: 괄호 검사</h3>
+        <p>괄호 <code>(</code> <code>)</code> <code>[</code> <code>]</code> <code>{</code> <code>}</code>로 된 문자열이 올바른지 판단해 보자. 닫는 괄호는 언제나 <mark>가장 최근에 열렸고 아직 닫히지 않은 괄호</mark>와 짝이 맞아야 한다. "가장 최근에 열린 것"은 스택의 맨 위다. 그러니 여는 괄호는 쌓고, 닫는 괄호를 만나면 맨 위를 꺼내 짝인지 본다.</p>
+
+<pre data-lang="python" data-title="brackets.py"><code>
+def is_valid(s: str) -&gt; bool:
+    pairs = {')': '(', ']': '[', '}': '{'}
+    stack = []
+
+    for ch in s:
+        if ch in pairs:                       # 닫는 괄호
+            if not stack or stack.pop() != pairs[ch]:
+                return False
+        else:                                 # 여는 괄호
+            stack.append(ch)
+
+    return not stack                          # 남은 괄호가 없어야 한다
+
+
+print(is_valid('([]{})'))
+print(is_valid('([)]'))
+print(is_valid('(('))
+print(is_valid(''))
+</code></pre>
+<pre class="output">
+True
+False
+False
+True
+</pre>
+
+        <p>실패하는 길은 두 가지다. 닫는 괄호를 만났는데 스택이 비어 있거나(열지 않고 닫음) 맨 위가 짝이 아니면 그 자리에서 <code>False</code>다. 끝까지 읽었는데 스택에 무언가 남아 있으면(열고 닫지 않음) 마지막 <code>return not stack</code>이 <code>False</code>를 돌려준다. 빈 문자열은 열지도 닫지도 않았으니 <code>True</code>다.</p>
+        <p>괄호가 <code>(</code> <code>)</code> 한 종류뿐이라면 스택 대신 "열린 개수"를 세는 변수 하나로 충분하다. 종류가 둘 이상이면 개수만으로는 <code>([)]</code>를 걸러내지 못한다. <strong>무엇을 열었는지</strong>, 그것도 <strong>어떤 순서로</strong> 열었는지 기억해야 하므로 스택이 필요해진다.</p>
+
+        <h3>되돌리기: 뒤로 가기</h3>
+        <p>브라우저의 뒤로 가기 버튼은 "바로 직전에 보던 페이지"로 돌아간다. 새 페이지로 갈 때 떠나는 페이지를 쌓아 두고, 뒤로 가기는 맨 위를 꺼내 그리로 간다. 두 번 누르면 그 전 페이지, 곧 가장 최근 것부터 차례로 되돌아간다.</p>
+
+<pre data-lang="python" data-title="browser_back.py"><code>
+back = []                  # 지나온 페이지. 맨 위가 바로 직전 페이지
+page = 'home'
+
+for action in ['news', 'sports', 'back', 'weather', 'back', 'back']:
+    if action == 'back':
+        if back:                       # 돌아갈 곳이 있을 때만
+            page = back.pop()
+    else:
+        back.append(page)              # 떠나기 전 페이지를 기억한다
+        page = action
+    print(f'{action:8} -&gt; {page}')
+</code></pre>
+<pre class="output">
+news     -&gt; news
+sports   -&gt; sports
+back     -&gt; news
+weather  -&gt; weather
+back     -&gt; news
+back     -&gt; home
+</pre>
+
+        <p>편집기의 실행 취소도 같은 구조다. 바뀌기 전 상태를 쌓아 두고 취소할 때마다 하나씩 꺼낸다. 세 번째 신호인 중첩은 다음 절에서 리스트 안의 리스트로 다룬다.</p>
+      </section>
+
+      <section id="call-stack">
+        <h2>호출 스택과 재귀를 스택으로 바꾸기</h2>
+        <p>6장에서 함수를 호출하면 프레임(지역 변수와 돌아갈 위치를 담은 기록)이 호출 스택에 쌓이고, 함수가 끝나면 맨 위 프레임이 빠진다고 했다. 그때 "스택처럼 동작한다"고 미뤄 둔 말을 이제 풀 수 있다. 호출은 push, 반환은 pop이다. <strong>가장 늦게 불린 함수가 가장 먼저 끝난다</strong>는 점이 바로 LIFO이고, 그래서 이름이 호출 <em>스택</em>이다. 6장 그림 6-1의 <code>factorial(3)</code>이 <code>f(1)</code>부터 차례로 빠져나오는 모습은 그림 10-1의 pop과 같은 그림이다.</p>
+        <p>재귀는 이 호출 스택에 일을 맡기는 방식이다. 안쪽 문제를 먼저 풀고 돌아와 바깥 문제를 마무리하므로, "중첩을 안에서 밖으로 처리한다"는 세 번째 신호와 정확히 맞는다. 문제는 호출 스택의 높이에 한도가 있다는 것이다(6장). 중첩 리스트를 평평하게 펴는 재귀 함수로 확인해 보자.</p>
+
+<pre data-lang="python" data-title="flatten_recursive.py"><code>
+def flatten(nested: list) -&gt; list:
+    result = []
+    for item in nested:
+        if isinstance(item, list):
+            result.extend(flatten(item))   # 안쪽 리스트는 재귀로 편다
+        else:
+            result.append(item)
+    return result
+
+
+print(flatten([1, [2, [3, 4]], 5]))
+
+deep = [1]
+for k in range(2, 3001):
+    deep = [deep, k]                       # 3000겹으로 싸인 리스트
+try:
+    print(len(flatten(deep)))
+except RecursionError as e:
+    print(f'{type(e).__name__}: {e}')
+</code></pre>
+<pre class="output">
+[1, 2, 3, 4, 5]
+RecursionError: maximum recursion depth exceeded
+</pre>
+
+        <p>리스트가 3000겹이면 프레임도 3000개가 쌓여야 하는데 기본 한도는 1000이다. 한도를 올릴 수도 있지만(6장), 호출 스택이 하던 일을 <strong>우리가 만든 리스트</strong>가 대신하게 하면 한도 자체가 사라진다. 리스트는 메모리가 허락하는 만큼 커질 수 있기 때문이다. 바꾸는 패턴은 재귀 함수의 모양과 상관없이 늘 같다.</p>
+        <ol>
+          <li>처음 할 일을 스택에 넣는다.</li>
+          <li>스택이 빌 때까지 하나 꺼내 처리한다.</li>
+          <li>처리하다 생긴 새 일은 <mark>재귀로 부르는 대신 스택에 넣는다</mark>.</li>
+        </ol>
+
+<pre data-lang="python" data-title="flatten_stack.py"><code>
+def flatten_iter(nested: list) -&gt; list:
+    result = []
+    stack = list(reversed(nested))        # 할 일 더미. 왼쪽 원소가 맨 위에 오도록 거꾸로 넣는다
+    while stack:
+        item = stack.pop()                # 가장 최근에 쌓인 일부터
+        if isinstance(item, list):
+            stack.extend(reversed(item))  # 재귀 호출 대신 안쪽 원소들을 할 일로 쌓는다
+        else:
+            result.append(item)
+    return result
+
+
+print(flatten_iter([1, [2, [3, 4]], 5]))
+
+deep = [1]
+for k in range(2, 3001):
+    deep = [deep, k]
+flat = flatten_iter(deep)
+print(len(flat), flat[:3], flat[-3:])
+</code></pre>
+<pre class="output">
+[1, 2, 3, 4, 5]
+3000 [1, 2, 3] [2998, 2999, 3000]
+</pre>
+
+        <p>재귀 버전에서 프레임이 기억하던 것, 곧 "어느 리스트의 어디까지 처리했는가"를 여기서는 아직 꺼내지 않은 원소들이 스택에 남아 있는 것으로 기억한다. 안쪽 리스트를 만나면 그 원소들을 쌓고 곧바로 그것부터 꺼내니, 안쪽을 먼저 끝내고 바깥으로 돌아오는 순서가 재귀와 같다.</p>
+        <p><code>reversed</code>가 붙은 이유는 앞 절에서 본 "넣었다 빼면 뒤집힌다" 때문이다. 왼쪽 원소를 먼저 처리하려면 왼쪽 원소가 맨 위에 있어야 하므로 오른쪽부터 넣는다. 빼먹으면 순서가 거꾸로 나온다.</p>
+
+<pre data-lang="python" data-title="flatten_order.py"><code>
+nested = [1, [2, 3], 4]
+
+stack = list(nested)          # 거꾸로 넣지 않으면
+result = []
+while stack:
+    item = stack.pop()
+    if isinstance(item, list):
+        stack.extend(item)
+    else:
+        result.append(item)
+print(result)                 # 순서가 뒤집힌다
+</code></pre>
+<pre class="output">
+[4, 3, 2, 1]
+</pre>
+
+        <p>순서가 상관없는 문제라면 <code>reversed</code>를 빼도 된다. 그래프를 깊이 우선으로 탐색하는 DFS도 "이웃을 재귀로 부르는 대신 스택에 넣는" 같은 패턴이며, 13장에서 그대로 쓴다.</p>
+      </section>
+
+      <section id="postfix">
+        <h2>후위 표기식 계산</h2>
+        <p>우리가 쓰는 <code>3 + 4</code>는 연산자를 가운데 두는 <strong>중위 표기</strong>다. 연산자를 피연산자 뒤에 두는 <strong>후위 표기(postfix)</strong>로는 <code>3 4 +</code>라고 쓴다. 후위 표기에는 괄호가 없다. <code>(3 + 4) * 2</code>는 <code>3 4 + 2 *</code>, <code>3 + 4 * 2</code>는 <code>3 4 2 * +</code>로, 연산자가 나오는 자리 자체가 계산 순서를 정하기 때문이다.</p>
+        <p>이런 식은 스택으로 왼쪽에서 오른쪽으로 한 번만 읽으면 계산된다. 규칙은 두 줄이다. <strong>숫자는 쌓는다. 연산자를 만나면 둘을 꺼내 계산하고 결과를 다시 쌓는다.</strong> 연산자의 피연산자는 언제나 "가장 최근에 나온 두 값"이므로, 여기서도 가장 최근 것이 맨 위에 있다는 성질을 쓴다.</p>
+
+        <figure class="fig">
+          <div class="fig-steps">
+            <div class="fig-state">
+              <div class="cells vertical">
+                <div class="cell">3</div>
+                <div class="cell">4</div>
+              </div>
+              <span class="fig-state-label">3 4 읽음</span>
+            </div>
+            <div class="fig-arrow">+</div>
+            <div class="fig-state">
+              <div class="cells vertical">
+                <div class="cell is-hl">7</div>
+              </div>
+              <span class="fig-state-label">3 + 4</span>
+            </div>
+            <div class="fig-arrow">2</div>
+            <div class="fig-state">
+              <div class="cells vertical">
+                <div class="cell">7</div>
+                <div class="cell is-hl">2</div>
+              </div>
+              <span class="fig-state-label">2 쌓음</span>
+            </div>
+            <div class="fig-arrow">*</div>
+            <div class="fig-state">
+              <div class="cells vertical">
+                <div class="cell is-hl">14</div>
+              </div>
+              <span class="fig-state-label">7 × 2</span>
+            </div>
+          </div>
+          <figcaption><b>그림 10-2</b> <code>3 4 + 2 *</code>를 계산하는 동안의 스택. 연산자를 만날 때마다 위의 두 값이 결과 하나로 바뀐다.</figcaption>
+        </figure>
+
+<pre data-lang="python" data-title="postfix_eval.py"><code>
+def eval_postfix(expr: str) -&gt; int:
+    stack = []
+    for token in expr.split():
+        if token.isdigit():
+            stack.append(int(token))      # 숫자는 쌓는다
+            continue
+        b = stack.pop()                   # 나중에 쌓인 것이 오른쪽 피연산자
+        a = stack.pop()
+        if token == '+':
+            stack.append(a + b)
+        elif token == '-':
+            stack.append(a - b)
+        elif token == '*':
+            stack.append(a * b)
+        else:                             # '/'
+            stack.append(a // b)
+    return stack.pop()                    # 마지막에 하나만 남는다
+
+
+print(eval_postfix('3 4 + 2 *'))          # (3 + 4) * 2
+print(eval_postfix('3 4 2 * +'))          # 3 + 4 * 2
+print(eval_postfix('10 3 -'))             # 10 - 3 이지 3 - 10 이 아니다
+print(eval_postfix('7 2 /'))
+</code></pre>
+<pre class="output">
+14
+11
+7
+3
+</pre>
+
+        <p>꺼내는 순서에 주의한다. 먼저 꺼낸 값이 <strong>오른쪽</strong> 피연산자다. <code>10 3 -</code>에서 먼저 나오는 것은 3이므로, 먼저 꺼낸 것을 <code>a</code>라고 부르면 <code>3 - 10</code>을 계산하게 된다. 덧셈과 곱셈은 순서를 바꿔도 결과가 같아서 이 실수가 뺄셈과 나눗셈에서만 드러난다.</p>
+        <p>식을 다 읽으면 스택에 정확히 하나가 남고, 그것이 답이다. 파이썬도 코드를 바이트코드로 바꾼 뒤 이런 스택 위에서 값을 쌓고 꺼내며 계산한다.</p>
+      </section>
+
+      <section id="pitfalls">
+        <h2>자주 하는 실수</h2>
+        <div class="callout callout-warn">
+          <span class="callout-title">빈 스택에서 꺼내거나 들여다보기</span>
+          <p>빈 리스트에 <code>pop()</code>을 하면 <code>IndexError</code>가 난다. <code>stack[-1]</code>도 마찬가지다. 꺼내기 전에 <code>if stack:</code>으로 확인하거나, 비어 있을 때 쓸 값을 조건식으로 정해 둔다. 괄호 검사의 <code>if not stack or ...</code>이 바로 이 확인이다.</p>
+        </div>
+
+<pre data-lang="python" data-title="empty_pop.py"><code>
+stack = []
+for op in ('pop', 'peek'):
+    try:
+        if op == 'pop':
+            stack.pop()
+        else:
+            stack[-1]
+    except IndexError as e:
+        print(f'{type(e).__name__}: {e}')
+
+top = stack[-1] if stack else None   # 안전한 peek
+print(top)
+</code></pre>
+<pre class="output">
+IndexError: pop from empty list
+IndexError: list index out of range
+None
+</pre>
+
+        <div class="callout callout-warn">
+          <span class="callout-title">pop(0)으로 큐처럼 쓰기</span>
+          <p><code>pop(0)</code>은 맨 앞을 꺼내므로 스택이 아니라 큐처럼 동작하고, 매번 뒤의 원소를 모두 당기느라 O(n)이 걸린다. 먼저 넣은 것을 먼저 꺼내야 한다면 <code>collections.deque</code>의 <code>popleft()</code>를 쓴다. 11장에서 다룬다.</p>
+        </div>
+        <div class="callout callout-warn">
+          <span class="callout-title">문자열로 스택 흉내 내기</span>
+          <p>문자열은 바꿀 수 없는 값이라 "맨 뒤 한 글자 빼기"를 <code>s = s[:-1]</code>로 쓰게 되는데, 이 슬라이스는 나머지 글자를 전부 새 문자열로 복사하므로 pop 한 번이 O(n)이다. n번 꺼내면 O(n²)이 된다. <code>s += ch</code>가 빠르게 느껴지는 것은 CPython이 상황에 따라 제자리에서 늘려 주는 최적화 덕분일 뿐 언어가 보장하는 것은 아니다. 스택은 리스트로 만들고, 문자열이 필요하면 마지막에 <code>''.join(stack)</code>으로 합친다.</p>
+        </div>
+        <div class="callout callout-warn">
+          <span class="callout-title">peek 하려다 pop 하기</span>
+          <p>맨 위를 보기만 하려는 자리에 <code>stack.pop()</code>을 쓰면 원소가 사라진다. 흔한 모양이 <code>if stack.pop() == x:</code>처럼 조건식 안에서 꺼내 버리는 것이다. 조건이 거짓이어도 원소는 이미 없다. 보기만 할 때는 <code>stack[-1]</code>, 꺼낼 때는 <code>pop()</code>으로 구분하고, 한 번 꺼낸 값을 다시 써야 하면 변수에 받아 둔다.</p>
+        </div>
+      </section>
+
+      <section id="problem">
+        <h2>대표 문제</h2>
+        <div class="problem">
+          <div class="problem-head">
+            <div class="problem-kicker"><b>Problem</b><span class="chip">보통</span><span class="chip">스택</span><span class="chip">단조 스택</span></div>
+            <h3>다음 큰 수 찾기</h3>
+          </div>
+          <div class="problem-body">
+            <p>정수 리스트 <code>nums</code>가 주어진다. 각 원소에 대해 <strong>그 원소보다 오른쪽에 있으면서 처음으로 나오는 더 큰 수</strong>를 구하라. 그런 수가 없으면 <code>-1</code>이다. 원소마다의 답을 같은 순서로 담은 리스트를 돌려주는 함수 <code>next_greater(nums)</code>를 작성하라.</p>
+            <ul>
+              <li>같은 수는 더 큰 수가 아니다.</li>
+              <li><code>nums</code>의 길이는 1 이상 1,000,000 이하다.</li>
+            </ul>
+            <div class="table-wrap">
+              <table>
+                <thead><tr><th>입력</th><th>출력</th><th>이유</th></tr></thead>
+                <tbody>
+                  <tr><td><code>[2, 1, 3, 5, 4]</code></td><td><code>[3, 3, 5, -1, -1]</code></td><td>2와 1의 오른쪽에서 처음 큰 수는 3, 3의 것은 5. 5와 4의 오른쪽엔 더 큰 수가 없다</td></tr>
+                  <tr><td><code>[5, 4, 3, 2, 1]</code></td><td><code>[-1, -1, -1, -1, -1]</code></td><td>계속 작아지므로 아무도 답이 없다</td></tr>
+                  <tr><td><code>[1, 1, 2]</code></td><td><code>[2, 2, -1]</code></td><td>첫 1의 답은 옆의 1이 아니라 2다</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <details class="reveal">
+            <summary>접근 방법<span class="reveal-hint">먼저 생각해 보고 펼치세요</span></summary>
+            <div class="reveal-body">
+              <p>먼저 떠오르는 방법은 원소마다 오른쪽을 훑어 처음 큰 수를 찾는 것이다.</p>
+<pre data-lang="python" data-title="next_greater_slow.py"><code>
+def next_greater_slow(nums: list[int]) -&gt; list[int]:
+    n = len(nums)
+    answer = [-1] * n
+    for i in range(n):
+        for j in range(i + 1, n):        # 오른쪽을 하나씩 훑는다
+            if nums[j] &gt; nums[i]:
+                answer[i] = nums[j]
+                break
+    return answer
+
+
+print(next_greater_slow([2, 1, 3, 5, 4]))
+</code></pre>
+<pre class="output">
+[3, 3, 5, -1, -1]
+</pre>
+              <p>내림차순 입력처럼 답이 없는 원소가 많으면 매번 끝까지 훑어 O(n²)이다. n이 100만이면 시간 안에 끝나지 않는다.</p>
+              <p>질문을 뒤집어 보자. "내 오른쪽의 큰 수는 누구인가"를 묻는 대신, 새 수 <code>x</code>를 읽는 순간 <strong>"x가 답이 되어 줄 왼쪽 원소는 누구인가"</strong>를 묻는다. 아직 답을 받지 못한 원소들을 스택에 쌓아 두면, <code>x</code>보다 작은 것들이 바로 그 원소들이다. 꺼내서 답을 <code>x</code>로 적어 주고, <code>x</code>도 자기 답을 기다리러 스택에 들어간다.</p>
+              <p>이때 스택 안의 값을 보면 <mark>위로 갈수록 작다</mark>. 큰 수가 들어올 때마다 그보다 작은 위쪽을 모두 꺼냈기 때문에, 남아 있는 것은 아래에서 위로 작아지는 수들뿐이다. 그래서 맨 위가 <code>x</code>보다 크거나 같으면 그 아래는 더 크니 더 볼 필요가 없다. 이렇게 크기 순서를 유지하는 스택을 <strong>단조 스택(monotonic stack)</strong>이라고 한다. 값 대신 인덱스를 쌓는 이유는 답을 <code>answer[i]</code>에 적을 자리가 필요해서다.</p>
+
+<pre data-lang="python" data-title="next_greater_trace.py"><code>
+nums = [2, 1, 3, 5, 4]
+answer = [-1] * len(nums)
+stack = []                                # 아직 답을 못 찾은 인덱스들
+
+for i, x in enumerate(nums):
+    while stack and nums[stack[-1]] &lt; x:  # 맨 위가 x 보다 작으면 그 답은 x
+        answer[stack.pop()] = x
+    stack.append(i)
+    print(f'{x} 처리 후 스택의 값: {[nums[j] for j in stack]}')
+
+print(answer)
+</code></pre>
+<pre class="output">
+2 처리 후 스택의 값: [2]
+1 처리 후 스택의 값: [2, 1]
+3 처리 후 스택의 값: [3]
+5 처리 후 스택의 값: [5]
+4 처리 후 스택의 값: [5, 4]
+[3, 3, 5, -1, -1]
+</pre>
+              <p>3이 들어올 때 2와 1이 한꺼번에 답을 받고 나가는 모습이 보인다. 안쪽에 <code>while</code>이 있어도 전체는 O(n)이다. 각 인덱스는 스택에 <strong>한 번 들어가고 많아야 한 번 나오므로</strong>, <code>while</code>이 도는 총 횟수는 모든 <code>i</code>를 합쳐도 n을 넘지 않는다. 끝까지 스택에 남은 인덱스는 오른쪽에 더 큰 수가 없었다는 뜻이니 <code>-1</code> 그대로 둔다.</p>
+            </div>
+          </details>
+
+          <details class="reveal">
+            <summary>풀이 코드</summary>
+            <div class="reveal-body">
+<pre data-lang="python" data-title="next_greater.py"><code>
+def next_greater(nums: list[int]) -&gt; list[int]:
+    answer = [-1] * len(nums)
+    stack = []                                # 답을 기다리는 인덱스. 값은 위로 갈수록 작다
+
+    for i, x in enumerate(nums):
+        while stack and nums[stack[-1]] &lt; x:  # 맨 위가 x 보다 작으면 x 가 그 답
+            answer[stack.pop()] = x
+        stack.append(i)                       # x 도 자기 답을 기다린다
+
+    return answer                             # 스택에 남은 인덱스는 -1 그대로
+
+
+print(next_greater([2, 1, 3, 5, 4]))
+print(next_greater([5, 4, 3, 2, 1]))
+print(next_greater([1, 1, 2]))
+</code></pre>
+<pre class="output">
+[3, 3, 5, -1, -1]
+[-1, -1, -1, -1, -1]
+[2, 2, -1]
+</pre>
+              <p>조건이 <code>&lt;</code>라서 같은 수는 꺼내지 않는다. <code>[1, 1, 2]</code>에서 두 번째 1이 들어올 때 첫 1은 그대로 남았다가, 2가 들어올 때 둘이 함께 답을 받는다.</p>
+            </div>
+          </details>
+
+          <details class="reveal">
+            <summary>복잡도</summary>
+            <div class="reveal-body">
+              <dl class="cx">
+                <dt>시간</dt><dd><span class="bigo b-linear">O(n)</span> 원소를 한 번씩 읽고, 각 인덱스는 스택에 한 번 들어가고 많아야 한 번 나온다.</dd>
+                <dt>공간</dt><dd><span class="bigo b-linear">O(n)</span> 내림차순 입력이면 아무도 나가지 못해 n개가 모두 스택에 쌓인다.</dd>
+              </dl>
+            </div>
+          </details>
+        </div>
+      </section>
+
+      <section id="recall">
+        <h2>스스로 확인</h2>
+        <div class="recall">
+          <details>
+            <summary>리스트로 스택을 만들 때, 리스트의 앞이 아니라 끝을 맨 위로 삼는 이유는?</summary>
+            <div class="answer"><p>끝에서 넣고 빼면 다른 원소를 옮기지 않아 O(1)이다. 앞을 맨 위로 삼으면 <code>insert(0, x)</code>와 <code>pop(0)</code>이 매번 나머지 원소를 모두 옮겨 O(n)이 된다.</p></div>
+          </details>
+          <details>
+            <summary><code>flatten_iter</code>에서 안쪽 리스트의 원소를 <code>reversed</code>로 거꾸로 쌓는 이유는?</summary>
+            <div class="answer"><p>스택은 나중에 넣은 것을 먼저 꺼내므로, 넣은 순서대로 쌓으면 오른쪽 원소가 먼저 나와 결과가 뒤집힌다. 왼쪽 원소를 먼저 처리하려면 왼쪽 원소가 맨 위에 와야 하니 오른쪽부터 넣는다.</p></div>
+          </details>
+          <details>
+            <summary><code>next_greater</code>에는 <code>for</code> 안에 <code>while</code>이 있는데 왜 O(n²)이 아니라 O(n)인가?</summary>
+            <div class="answer"><p><code>while</code>이 한 번 돌 때마다 인덱스 하나가 스택에서 나간다. 각 인덱스는 한 번만 들어가므로 나가는 횟수도 전체를 합쳐 n을 넘지 못한다. 반복문이 겹쳐 있어도 일의 총량이 n에 비례하면 O(n)이다.</p></div>
+          </details>
+          <details>
+            <summary><code>next_greater</code>의 조건을 <code>nums[stack[-1]] &lt;= x</code>로 바꾸면 <code>[1, 1, 2]</code>의 답은 어떻게 되는가?</summary>
+            <div class="answer"><p><code>[1, 2, -1]</code>이 된다. 두 번째 1이 들어올 때 첫 1을 꺼내 답을 1로 적어 버리므로, 같은 수를 "더 큰 수"로 치는 셈이 된다. 문제가 "크거나 같은 수"를 묻는다면 이렇게 바꾸면 된다.</p></div>
+          </details>
+        </div>
+      </section>
+
+      <section id="summary">
+        <h2>정리</h2>
+        <ol class="summary-list">
+          <li>스택은 마지막에 넣은 것을 먼저 꺼내는 LIFO 구조다. 가장 최근 것이 언제나 맨 위에 있다.</li>
+          <li>파이썬에서는 리스트의 끝을 맨 위로 삼아 <code>append</code>, <code>pop()</code>, <code>[-1]</code>로 쓴다. 셋 다 O(1)이고, <code>pop(0)</code>은 O(n)이니 앞에서 꺼내야 하면 <code>deque</code>를 쓴다.</li>
+          <li>"가장 최근 것과 짝 맞추기", "되돌리기", "중첩을 안에서 밖으로"가 보이면 스택을 떠올린다. 괄호 검사가 대표다.</li>
+          <li>호출 스택은 호출이 push, 반환이 pop인 진짜 스택이다. 재귀가 깊어 한도에 걸리면, 재귀 호출 대신 할 일을 리스트에 쌓는 반복문으로 바꾼다. 순서가 중요하면 거꾸로 넣는다.</li>
+          <li>후위 표기식은 숫자는 쌓고 연산자는 둘 꺼내 계산하면 한 번에 계산된다. 먼저 꺼낸 값이 오른쪽 피연산자다.</li>
+          <li>단조 스택은 크기 순서를 유지하는 스택이다. 각 원소가 한 번 들어가고 한 번 나오므로 "다음 큰 수" 같은 문제를 O(n)에 푼다.</li>
+        </ol>
+      </section>
+
+      <nav class="pager" aria-label="이전 장과 다음 장"></nav>
+    </article>
+  </main>
+
+  <aside class="rail" aria-label="이 페이지 목차">
+    <p class="rail-title">이 페이지</p>
+    <nav id="onthispage"></nav>
+  </aside>
+</div>
+<div class="backdrop" id="backdrop"></div>
+
+<script src="assets/book.js"></script>
+<script src="assets/app.js"></script>
+<script src="assets/code.js"></script>
+</body>
+</html>
