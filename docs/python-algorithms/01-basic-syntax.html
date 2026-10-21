@@ -1,0 +1,674 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>01. 기본 문법과 입출력 — 파이썬 알고리즘 노트</title>
+<script src="assets/theme.js"></script>
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body data-chapter="01">
+<a class="skip-link" href="#content">본문으로 건너뛰기</a>
+<div class="progress" aria-hidden="true"><span></span></div>
+<header class="topbar" id="topbar"></header>
+
+<div class="shell">
+  <aside class="sidebar" id="sidebar" aria-label="책 목차"></aside>
+
+  <main class="main" id="content">
+    <article class="chapter">
+      <header class="chapter-head">
+        <a class="part-pill"></a>
+        <span class="chapter-label"></span>
+        <h1>기본 문법과 입출력</h1>
+        <p class="lede">변수와 연산자, 조건문과 반복문은 모든 풀이의 뼈대입니다. 여기에 코딩 테스트에서 꼭 필요한 빠른 입력과 출력까지 한 장에 정리합니다.</p>
+        <div class="chapter-meta">
+          <span class="chip">변수 · 대입</span><span class="chip">연산자</span><span class="chip">if · for · while</span><span class="chip">input · print</span><span class="chip">sys.stdin</span>
+        </div>
+      </header>
+
+      <div class="goals">
+        <p class="goals-title">이 장에서 배울 것</p>
+        <ul>
+          <li>변수가 값에 붙이는 이름표라는 것을 알고, 여러 값을 한 번에 대입하거나 맞바꿀 수 있다</li>
+          <li><code>//</code>와 <code>%</code>가 음수에서 어떻게 동작하는지 설명할 수 있다</li>
+          <li>조건문과 <code>for</code>·<code>while</code> 반복문으로 실행 흐름을 다룰 수 있다</li>
+          <li><code>sys.stdin.readline</code>으로 입력을 빠르게 받고, 줄 끝의 줄바꿈 문자를 처리할 수 있다</li>
+          <li>많은 결과를 <code>join</code>으로 모아 한 번에 출력할 수 있다</li>
+        </ul>
+      </div>
+
+      <section id="variables">
+        <h2>변수와 대입</h2>
+        <div class="callout callout-key">
+          <span class="callout-title">핵심</span>
+          <p class="callout-big">변수는 값을 담는 상자가 아니라 <mark>값에 붙이는 이름표</mark>다. <code>=</code>는 "같다"가 아니라 "오른쪽 값을 왼쪽 이름에 붙인다"는 뜻이다.</p>
+        </div>
+        <p><code>x = x + 1</code>은 수학식으로 보면 말이 안 되지만 파이썬에서는 자연스럽다. 오른쪽 <code>x + 1</code>을 먼저 계산하고, 그 결과에 <code>x</code>라는 이름표를 옮겨 붙이기 때문이다. 대입은 언제나 <strong>오른쪽을 먼저 계산하고, 그다음 왼쪽 이름에 붙이는</strong> 순서로 일어난다.</p>
+        <p>파이썬은 변수를 만들 때 자료형을 적지 않는다. 자료형은 값이 가지고 있고, 이름은 그 값을 가리키기만 한다. 그래서 같은 이름에 정수를 붙였다가 문자열을 붙여도 된다. 이런 방식을 <strong>동적 타이핑</strong>(dynamic typing)이라고 한다. 자료형이 코드를 쓸 때가 아니라 실행 중에 값에 따라 정해진다는 뜻이다.</p>
+
+<pre data-lang="python" data-title="variables.py"><code>
+score = 90           # 90 이라는 값에 score 라는 이름표를 붙인다
+score = score + 5    # 오른쪽(95)을 먼저 계산한 뒤 이름표를 옮긴다
+print(score)
+
+score = "A"          # 같은 이름에 다른 자료형의 값을 붙여도 된다
+print(score)
+
+a, b = 1, 2          # 여러 이름에 한 번에 대입
+print(a, b)
+
+a, b = b, a          # 임시 변수 없이 두 값을 맞바꾼다
+print(a, b)
+</code></pre>
+<pre class="output">
+95
+A
+1 2
+2 1
+</pre>
+
+        <h3>여러 값을 한 번에 대입하기</h3>
+        <p><code>a, b = 1, 2</code>처럼 쉼표로 이름과 값을 나란히 쓰면 차례로 짝지어 대입된다. 두 값을 맞바꾸는 <code>a, b = b, a</code>가 동작하는 이유도 대입 순서에 있다. 오른쪽 <code>b, a</code>가 먼저 계산되어 값 두 개짜리 묶음(튜플, 3장에서 다룬다)이 만들어지고, 그다음에 왼쪽 이름에 하나씩 붙는다. 그래서 다른 언어처럼 임시 변수 <code>temp</code>를 거칠 필요가 없다.</p>
+
+        <h3>이름 짓기</h3>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>규칙</th><th>예</th></tr></thead>
+            <tbody>
+              <tr><td>소문자로 쓰고 단어는 밑줄로 잇는다(snake_case)</td><td><code>max_score</code>, <code>line_count</code></td></tr>
+              <tr><td>숫자로 시작할 수 없다</td><td><code>2nd</code>는 안 되고 <code>second</code>는 된다</td></tr>
+              <tr><td>대소문자를 구분한다</td><td><code>count</code>와 <code>Count</code>는 다른 이름</td></tr>
+              <tr><td>내장 함수 이름은 피한다</td><td><code>sum</code>, <code>max</code>, <code>list</code>, <code>input</code></td></tr>
+            </tbody>
+          </table>
+        </div>
+        <p>마지막 규칙은 어기기 쉽다. <code>sum = 10</code>이라고 쓰는 순간 그 파일에서 <code>sum</code>은 더 이상 합계 함수가 아니다. 단, 뒤의 "입력 받기"에서 볼 <code>input = sys.stdin.readline</code>은 일부러 <code>input</code>을 더 빠른 함수로 바꿔 끼우는 관용구다.</p>
+      </section>
+
+      <section id="operators">
+        <h2>연산자</h2>
+        <p>산술 연산자는 수학과 거의 같다. 다른 점은 나눗셈이 세 가지(<code>/</code>, <code>//</code>, <code>%</code>)로 나뉜다는 것이다.</p>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>연산자</th><th>뜻</th><th>예</th><th>결과</th></tr></thead>
+            <tbody>
+              <tr><td><code>+</code> <code>-</code> <code>*</code></td><td>더하기, 빼기, 곱하기</td><td><code>7 * 2</code></td><td><code>14</code></td></tr>
+              <tr><td><code>/</code></td><td>나누기. 결과는 언제나 실수</td><td><code>6 / 2</code></td><td><code>3.0</code></td></tr>
+              <tr><td><code>//</code></td><td>몫. 소수점 아래를 내린다</td><td><code>7 // 2</code></td><td><code>3</code></td></tr>
+              <tr><td><code>%</code></td><td>나머지</td><td><code>7 % 2</code></td><td><code>1</code></td></tr>
+              <tr><td><code>**</code></td><td>거듭제곱</td><td><code>2 ** 10</code></td><td><code>1024</code></td></tr>
+            </tbody>
+          </table>
+        </div>
+        <p><code>/</code>는 나누어떨어져도 결과가 실수(<code>3.0</code>)다. 리스트 인덱스처럼 정수만 받는 자리에 이 값을 넣으면 에러가 난다. 그래서 알고리즘 문제에서는 <code>/</code>보다 <code>//</code>를 훨씬 자주 쓴다.</p>
+
+<pre data-lang="python" data-title="operators.py"><code>
+print(7 / 2)          # 나누기: 항상 실수
+print(6 / 2)          # 나누어떨어져도 실수
+print(7 // 2)         # 몫
+print(7 % 2)          # 나머지
+print(2 ** 10)        # 거듭제곱
+print(divmod(17, 5))  # 몫과 나머지를 한 번에
+</code></pre>
+<pre class="output">
+3.5
+3.0
+3
+1
+1024
+(3, 2)
+</pre>
+        <p>연산 순서는 수학과 같아서 곱셈·나눗셈이 덧셈·뺄셈보다 먼저다. 하나 조심할 것은 <code>**</code>가 부호 <code>-</code>보다 먼저 계산된다는 점이다. <code>-2 ** 2</code>는 <code>-(2 ** 2)</code>라서 <code>-4</code>다. 헷갈리면 괄호를 친다. <code>(-2) ** 2</code>는 <code>4</code>다.</p>
+
+        <h3>음수의 몫과 나머지</h3>
+        <p>음수가 끼면 결과가 직관과 다를 수 있다. 파이썬의 <code>//</code>는 결과를 <mark>항상 더 작은 쪽(음의 무한대 쪽)으로 내린다</mark>. -3.5를 내리면 -3이 아니라 -4다.</p>
+
+<pre data-lang="python" data-title="negative_division.py"><code>
+print(-7 // 2)    # -3.5 를 내림 → -4
+print(-7 % 2)     # -7 - (-4 * 2) = 1
+print(7 // -2)    # -3.5 를 내림 → -4
+print(7 % -2)     # 7 - (-4 * -2) = -1
+
+# 몫과 나머지는 언제나 이 관계를 지킨다
+a, b = -7, 2
+print((a // b) * b + a % b == a)
+</code></pre>
+<pre class="output">
+-4
+1
+-4
+-1
+True
+</pre>
+        <p><code>%</code>는 마지막 줄의 관계 <code>(a // b) * b + a % b == a</code>가 늘 성립하도록 정해진다. 몫을 아래로 내렸으니 나머지는 <strong>나누는 수 <code>b</code>와 부호가 같아진다</strong>. C와 Java는 정수 나눗셈의 몫을 0 쪽으로 버려서 <code>-7 / 2</code>가 -3, <code>-7 % 2</code>가 -1이다. 다른 언어로 된 풀이를 옮길 때 답이 달라지는 대표적인 지점이다.</p>
+        <div class="callout callout-tip">
+          <span class="callout-title">원형 인덱스와 %</span>
+          <p>나누는 수가 양수면 <code>%</code>의 결과는 언제나 0 이상이다. 원형으로 도는 인덱스를 계산할 때 편하다. 길이가 <code>n</code>인 원형 배열에서 <code>i</code>번 칸의 왼쪽 칸은 <code>(i - 1) % n</code>이다. <code>i</code>가 0이어도 따로 처리할 필요 없이 <code>n - 1</code>이 나온다.</p>
+        </div>
+
+        <h3>비교와 논리 연산자</h3>
+        <p>비교 연산자 <code>==</code> <code>!=</code> <code>&lt;</code> <code>&lt;=</code> <code>&gt;</code> <code>&gt;=</code>는 <code>True</code>나 <code>False</code>를 돌려준다. 파이썬은 비교를 이어 쓸 수 있어서, 범위 검사를 수학식처럼 <code>0 &lt;= x &lt; n</code>으로 쓴다. 이 식은 <code>0 &lt;= x and x &lt; n</code>과 같다.</p>
+        <p>논리 연산자는 <code>and</code>, <code>or</code>, <code>not</code>이다. 이들은 <strong>단락 평가</strong>(short-circuit evaluation)를 한다. 앞쪽만 보고 결과가 정해지면 뒤쪽은 아예 계산하지 않는다는 뜻이다. <code>and</code>는 앞이 거짓이면, <code>or</code>는 앞이 참이면 뒤를 보지 않는다. 그래서 위험한 계산 앞에 안전 검사를 두는 식으로 쓸 수 있다.</p>
+
+<pre data-lang="python" data-title="compare_logic.py"><code>
+x, n = 7, 10
+print(0 &lt;= x &lt; n)       # 0 &lt;= x and x &lt; n 과 같다
+
+d = 0
+# d != 0 이 거짓이라 뒤쪽 10 / d 는 계산하지 않는다
+print(d != 0 and 10 / d &gt; 1)
+# d == 0 이 참이라 역시 뒤쪽을 보지 않는다
+print(d == 0 or 10 / d &gt; 1)
+</code></pre>
+<pre class="output">
+True
+False
+True
+</pre>
+        <p>순서를 바꿔 <code>10 / d &gt; 1 and d != 0</code>으로 쓰면 앞쪽에서 0으로 나누게 되어 <code>ZeroDivisionError</code>가 난다. 검사는 언제나 위험한 계산보다 앞에 둔다.</p>
+
+        <h3>복합 대입</h3>
+        <p><code>count += 1</code>은 <code>count = count + 1</code>을 줄여 쓴 것이다. <code>-=</code>, <code>*=</code>, <code>//=</code>, <code>%=</code>도 같은 방식이다. 파이썬에는 다른 언어의 <code>++</code>가 없다.</p>
+
+<pre data-lang="python" data-title="compound.py"><code>
+count = 0
+count += 1     # count = count + 1
+count += 1
+count *= 10    # count = count * 10
+print(count)
+</code></pre>
+<pre class="output">
+20
+</pre>
+      </section>
+
+      <section id="conditionals">
+        <h2>조건문</h2>
+        <p><code>if</code> 뒤의 조건이 참이면 바로 아래 블록을 실행한다. <code>elif</code>는 앞의 조건이 모두 거짓일 때 위에서부터 차례로 검사하고, <code>else</code>는 어느 조건도 맞지 않을 때 실행된다. 위에서 먼저 맞은 블록 하나만 실행되므로 조건을 놓는 순서가 중요하다.</p>
+
+<pre data-lang="python" data-title="grade.py"><code>
+score = 85
+
+if score &gt;= 90:
+    grade = "A"
+elif score &gt;= 80:    # 90 미만이면서 80 이상
+    grade = "B"
+else:
+    grade = "C"
+print(grade)
+
+# 조건 표현식: 두 값 중 하나를 고를 때 한 줄로
+parity = "짝수" if score % 2 == 0 else "홀수"
+print(parity)
+</code></pre>
+<pre class="output">
+B
+홀수
+</pre>
+
+        <h3>들여쓰기가 곧 문법이다</h3>
+        <p>파이썬은 중괄호 대신 <strong>들여쓰기</strong>로 블록을 구분한다. 같은 블록에 속한 줄은 같은 깊이로 들여 써야 하고, 관례는 공백 4칸이다. 탭과 공백을 섞어 쓰면 눈으로는 똑같아 보여도 <code>TabError</code>가 난다. 편집기에서 탭 키를 누르면 공백 4칸이 들어가도록 설정해 두면 걱정할 일이 없다. 아직 쓸 내용이 없는 빈 블록에는 아무 일도 하지 않는 <code>pass</code>를 둔다.</p>
+
+        <h3>조건 표현식</h3>
+        <p><code>값1 if 조건 else 값2</code>는 조건이 참이면 값1, 거짓이면 값2가 된다. 두 값 중 하나를 골라 이름에 붙일 때만 쓰는 것이 좋다. 조건이 길어지거나 할 일이 여러 줄이면 일반 <code>if</code>문이 훨씬 읽기 쉽다.</p>
+
+        <h3>참으로 치는 값, 거짓으로 치는 값</h3>
+        <p>조건 자리에는 <code>True</code>나 <code>False</code>가 아닌 값도 올 수 있다. 파이썬은 <mark>비어 있거나 0인 값을 거짓으로 친다</mark>. 나머지는 모두 참이다.</p>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>종류</th><th>거짓으로 치는 값</th><th>참으로 치는 값의 예</th></tr></thead>
+            <tbody>
+              <tr><td>논리값·None</td><td><code>False</code>, <code>None</code></td><td><code>True</code></td></tr>
+              <tr><td>수</td><td><code>0</code>, <code>0.0</code></td><td><code>1</code>, <code>-1</code>, <code>0.5</code></td></tr>
+              <tr><td>문자열</td><td><code>""</code> (빈 문자열)</td><td><code>"0"</code>, <code>" "</code></td></tr>
+              <tr><td>묶음</td><td><code>[]</code>, <code>()</code>, <code>{}</code></td><td><code>[0]</code></td></tr>
+            </tbody>
+          </table>
+        </div>
+
+<pre data-lang="python" data-title="truthy.py"><code>
+values = [0, -1, "", "0", " ", [], [0], None]
+for value in values:
+    # repr 은 문자열을 따옴표째 보여 줘서 빈 문자열도 눈에 보인다
+    print(repr(value), bool(value))
+</code></pre>
+<pre class="output">
+0 False
+-1 True
+'' False
+'0' True
+' ' True
+[] False
+[0] True
+None False
+</pre>
+        <p>그래서 <code>if len(stack) &gt; 0:</code> 대신 <code>if stack:</code>처럼 짧게 쓰는 경우가 많다. 다만 0도 의미 있는 값일 때는 조심한다. 점수가 0점일 수 있는데 <code>if score:</code>라고 쓰면 0점을 "값이 없음"으로 잘못 처리한다. 그럴 때는 <code>if score is not None:</code>처럼 무엇을 검사하는지 분명히 적는다. <code>None</code>과 <code>is</code>는 2장에서 다룬다.</p>
+      </section>
+
+      <section id="loops">
+        <h2>반복문</h2>
+        <p><code>for</code>는 묶음에서 값을 하나씩 꺼내며 반복하고, <code>while</code>은 조건이 참인 동안 반복한다. 반복할 대상이나 횟수가 정해져 있으면 <code>for</code>를, 언제 끝날지 조건으로만 알 수 있으면 <code>while</code>을 쓴다.</p>
+
+<pre data-lang="python" data-title="for_basic.py"><code>
+for ch in "abc":            # 문자열은 글자 하나씩
+    print(ch)
+
+for score in [90, 75]:      # 리스트는 원소 하나씩
+    print(score)
+</code></pre>
+<pre class="output">
+a
+b
+c
+90
+75
+</pre>
+
+        <h3>range로 정수 만들기</h3>
+        <p>정해진 횟수만큼 반복할 때는 <code>range</code>를 쓴다. 인자를 몇 개 주느냐에 따라 뜻이 달라진다.</p>
+        <ul>
+          <li><code>range(stop)</code> — 0부터 <code>stop - 1</code>까지</li>
+          <li><code>range(start, stop)</code> — <code>start</code>부터 <code>stop - 1</code>까지</li>
+          <li><code>range(start, stop, step)</code> — <code>start</code>부터 <code>step</code>씩 건너뛰며, <code>stop</code> 직전까지</li>
+        </ul>
+
+        <figure class="fig">
+          <div class="fig-steps">
+            <div class="cells">
+              <div class="cell is-hl" data-i="start">1</div>
+              <div class="cell">2</div>
+              <div class="cell">3</div>
+              <div class="cell is-hl">4</div>
+              <div class="cell">5</div>
+              <div class="cell">6</div>
+              <div class="cell is-hl">7</div>
+              <div class="cell">8</div>
+              <div class="cell">9</div>
+              <div class="cell is-ghost" data-i="stop">10</div>
+            </div>
+          </div>
+          <figcaption><b>그림 1-1</b> <code>range(1, 10, 3)</code>은 1에서 시작해 3씩 건너뛴 1, 4, 7을 만든다. stop인 10은 들어가지 않는다.</figcaption>
+        </figure>
+
+        <p><mark>stop은 포함하지 않는다</mark>. 처음엔 어색하지만 이유가 있다. <code>range(n)</code>은 정확히 <code>n</code>개의 수 0, 1, …, <code>n - 1</code>을 만드는데, 이것이 길이 <code>n</code>인 리스트의 인덱스와 딱 맞는다. <code>range(a, b)</code>에 든 수의 개수가 <code>b - a</code>로 바로 계산되는 것도 장점이다.</p>
+
+<pre data-lang="python" data-title="range_demo.py"><code>
+print(list(range(5)))          # 0부터 4까지
+print(list(range(2, 6)))       # 2부터 5까지
+print(list(range(1, 10, 3)))   # 1부터 3씩 건너뛰며
+print(list(range(5, 0, -1)))   # step 이 음수면 거꾸로
+</code></pre>
+<pre class="output">
+[0, 1, 2, 3, 4]
+[2, 3, 4, 5]
+[1, 4, 7]
+[5, 4, 3, 2, 1]
+</pre>
+        <p><code>range</code>는 수를 미리 다 만들어 두지 않고, 반복할 때마다 하나씩 내준다. 그래서 <code>range(10 ** 9)</code>처럼 커도 메모리를 거의 쓰지 않는다. 위 코드는 내용을 눈으로 보려고 <code>list()</code>로 펼쳤을 뿐이다.</p>
+
+        <h3>while</h3>
+        <p><code>while</code>은 조건을 먼저 검사하고, 참이면 블록을 실행한 뒤 다시 조건으로 돌아간다. 블록 안에서 조건이 언젠가 거짓이 되도록 무언가를 바꿔야 반복이 끝난다. 아래는 앞에서 본 <code>%</code>와 <code>//</code>로 각 자리 숫자를 떼어 내 더하는 코드다.</p>
+
+<pre data-lang="python" data-title="digit_sum.py"><code>
+n = 2025
+digit_sum = 0
+while n &gt; 0:
+    digit_sum += n % 10    # 맨 끝 자리 숫자
+    n //= 10               # 맨 끝 자리를 떼어 낸다
+print(digit_sum)           # 2 + 0 + 2 + 5
+</code></pre>
+<pre class="output">
+9
+</pre>
+
+        <h3>break와 continue</h3>
+        <p><code>break</code>는 반복문을 즉시 끝내고, <code>continue</code>는 이번 차례의 남은 부분을 건너뛰고 다음 차례로 넘어간다. <code>while True:</code>로 끝없이 돌다가 원하는 조건이 되면 <code>break</code>로 빠져나오는 형태도 자주 쓴다.</p>
+
+<pre data-lang="python" data-title="break_continue.py"><code>
+for n in range(1, 20):
+    if n % 2 == 0:
+        continue      # 짝수는 건너뛰고 다음 n 으로
+    if n &gt; 7:
+        break         # 7 을 넘으면 반복을 끝낸다
+    print(n)
+</code></pre>
+<pre class="output">
+1
+3
+5
+7
+</pre>
+        <p>인덱스와 값을 함께 꺼내는 <code>enumerate</code>, 여러 묶음을 나란히 도는 <code>zip</code>은 3장에서 리스트와 함께 다룬다.</p>
+      </section>
+
+      <section id="input">
+        <h2>입력 받기</h2>
+        <p>코딩 테스트는 대부분 데이터를 <strong>표준 입력</strong>으로 준다. 표준 입력은 프로그램이 키보드나 파일에서 글자를 읽어 들이는 기본 통로다. <code>input()</code>은 여기서 한 줄을 읽어 <mark>문자열</mark>로 돌려준다. 숫자로 쓰려면 직접 바꿔야 한다.</p>
+
+<pre data-lang="python" data-title="input_basic.py"><code>
+n = int(input())                        # 한 줄에 정수 하나
+a, b = map(int, input().split())        # 한 줄에 정수 두 개
+nums = list(map(int, input().split()))  # 개수를 모르는 정수들
+print(n, a + b, nums)
+</code></pre>
+<pre class="stdin">
+3
+10 20
+4 8 15
+</pre>
+<pre class="output">
+3 30 [4, 8, 15]
+</pre>
+        <p><code>split()</code>은 문자열을 공백 기준으로 잘라 문자열 여러 개로 만들고, <code>map(int, …)</code>은 그 하나하나에 <code>int</code>를 적용한다. <code>a, b = …</code>처럼 이름을 나열해 받으면 값의 개수가 정확히 맞아야 한다. 개수를 모를 때는 <code>list(…)</code>로 한꺼번에 받는다.</p>
+
+        <figure class="fig">
+          <div class="fig-steps">
+            <div class="fig-state">
+              <div class="cells">
+                <div class="cell">3</div>
+                <div class="cell">␣</div>
+                <div class="cell">5</div>
+                <div class="cell is-hl">\n</div>
+              </div>
+              <span class="fig-state-label">읽은 한 줄</span>
+            </div>
+            <div class="fig-arrow">split()</div>
+            <div class="fig-state">
+              <div class="cells">
+                <div class="cell">'3'</div>
+                <div class="cell">'5'</div>
+              </div>
+              <span class="fig-state-label">문자열 2개</span>
+            </div>
+            <div class="fig-arrow">map(int)</div>
+            <div class="fig-state">
+              <div class="cells">
+                <div class="cell is-hl">3</div>
+                <div class="cell is-hl">5</div>
+              </div>
+              <span class="fig-state-label">정수 2개</span>
+            </div>
+          </div>
+          <figcaption><b>그림 1-2</b> 한 줄을 정수로 바꾸는 과정. ␣는 공백이다. 뒤에서 볼 <code>readline()</code>은 줄 끝에 <code>\n</code>을 남기는데, <code>split()</code>은 공백과 <code>\n</code>을 모두 구분자로 보고 떼어 낸다.</figcaption>
+        </figure>
+
+        <h3>N줄 입력받기</h3>
+        <p>첫 줄에 개수 N이 오고, 이어서 N줄이 오는 형식이 가장 흔하다. 개수만큼 <code>for</code>를 돌며 한 줄씩 읽는다.</p>
+
+<pre data-lang="python" data-title="read_n_lines.py"><code>
+n = int(input())
+total = 0
+for _ in range(n):     # _ 는 "이 값은 쓰지 않는다"는 관례적인 이름
+    total += int(input())
+print(total)
+</code></pre>
+<pre class="stdin">
+4
+7
+2
+9
+1
+</pre>
+<pre class="output">
+19
+</pre>
+
+        <h3>빠른 입력: sys.stdin.readline</h3>
+        <p>입력이 수십만 줄이면 <code>input()</code>만으로 시간 제한을 넘길 수 있다. <code>input()</code>은 사람이 키보드로 입력하는 상황에 맞춰 만들어져서, 부를 때마다 출력 버퍼를 비우는 등 대화형 입력을 위한 부가 작업을 한다. 반면 <code>sys.stdin.readline()</code>은 미리 크게 읽어 둔 버퍼에서 한 줄을 떼어 줄 뿐이라 훨씬 가볍다. 그래서 코딩 테스트에서는 아래 두 줄로 시작하는 것이 관례다.</p>
+
+<pre data-lang="python" data-title="fast_input.py"><code>
+import sys
+input = sys.stdin.readline   # 이제부터 input() 은 빠른 readline
+
+n = int(input())
+words = []
+for _ in range(n):
+    words.append(input().rstrip())   # 줄 끝의 '\n' 을 떼어 낸다
+print(words)
+</code></pre>
+<pre class="stdin">
+2
+apple
+banana
+</pre>
+<pre class="output">
+['apple', 'banana']
+</pre>
+        <p>대신 한 가지가 다르다. <code>input()</code>은 줄 끝의 줄바꿈 문자 <code>\n</code>을 떼어 주지만, <code>readline()</code>은 <mark>그대로 남긴다</mark>. 숫자로 바꿀 때는 <code>int()</code>가 앞뒤 공백과 줄바꿈을 무시하므로 문제가 없다. 문자열로 쓸 때는 반드시 <code>.rstrip()</code>으로 떼어 낸다.</p>
+
+<pre data-lang="python" data-title="newline_demo.py"><code>
+import sys
+
+line = sys.stdin.readline()
+print(repr(line))              # 줄바꿈이 붙어 있다
+print(line == "abc")
+print(line.rstrip() == "abc")
+
+print(int(sys.stdin.readline()) + 1)  # int() 는 '\n' 을 무시한다
+</code></pre>
+<pre class="stdin">
+abc
+41
+</pre>
+<pre class="output">
+'abc\n'
+False
+True
+42
+</pre>
+        <div class="callout callout-tip">
+          <span class="callout-title">한꺼번에 읽기</span>
+          <p>줄 구분이 중요하지 않다면 <code>sys.stdin.read().split()</code>으로 입력 전체를 한 번에 읽는 방법도 있다. 줄바꿈과 공백을 가리지 않고 모든 값을 문자열 목록 하나로 받는다.</p>
+        </div>
+      </section>
+
+      <section id="output">
+        <h2>출력하기</h2>
+        <p><code>print</code>는 받은 값들을 공백으로 구분해 출력하고, 끝에 줄바꿈을 붙인다. 구분자는 <code>sep</code>로, 끝에 붙는 글자는 <code>end</code>로 바꿀 수 있다.</p>
+
+<pre data-lang="python" data-title="print_basic.py"><code>
+print(1, 2, 3)               # 공백으로 구분, 끝에 줄바꿈
+print(1, 2, 3, sep=", ")     # 구분자를 바꾼다
+print("a", end="")           # 줄바꿈 대신 아무것도 붙이지 않는다
+print("b")
+
+name, score = "kim", 95
+print(f"{name}의 점수는 {score}점")
+print(f"보너스 포함 {score + 5}점")  # 중괄호 안에 식도 된다
+</code></pre>
+<pre class="output">
+1 2 3
+1, 2, 3
+ab
+kim의 점수는 95점
+보너스 포함 100점
+</pre>
+        <p>문자열 앞에 <code>f</code>를 붙인 <strong>f-string</strong>은 중괄호 안의 이름이나 식을 계산해 그 자리에 넣는다. 소수점 자릿수나 칸 맞춤 같은 서식 지정은 5장에서 다룬다.</p>
+
+        <h3>많은 줄은 모아서 한 번에</h3>
+        <p>결과가 수십만 줄이면 <code>print</code>를 그만큼 부르는 비용이 쌓인다. 결과를 리스트에 모았다가 <mark>문자열 하나로 이어 붙여 한 번에 출력</mark>하면 그 비용이 한 번으로 줄어든다. <code>"\n".join(…)</code>은 원소 사이에 줄바꿈을 끼워 하나의 문자열로 만든다.</p>
+
+<pre data-lang="python" data-title="print_many.py"><code>
+results = []
+for i in range(1, 6):
+    results.append(i * i)
+
+print("\n".join(map(str, results)))   # 한 줄에 하나씩
+print(" ".join(map(str, results)))    # 한 줄에 공백으로 구분
+print(*results)                       # 풀어 넣어도 같은 결과
+</code></pre>
+<pre class="output">
+1
+4
+9
+16
+25
+1 4 9 16 25
+1 4 9 16 25
+</pre>
+        <p><code>join</code>은 문자열만 이어 붙인다. 정수 리스트를 그대로 넣으면 <code>TypeError: sequence item 0: expected str instance, int found</code>가 나므로 <code>map(str, …)</code>으로 먼저 바꾼다. 마지막 줄의 <code>*results</code>는 리스트의 원소를 낱낱이 풀어 <code>print</code>에 넘긴다는 뜻이다. 풀어 넣기는 3장에서 다시 본다.</p>
+
+        <h3>sys.stdout.write</h3>
+        <p><code>sys.stdout.write</code>는 <code>print</code>보다 단순하다. 문자열 하나만 받고, 줄바꿈을 붙여 주지 않는다. 숫자는 직접 <code>str</code>로 바꾸고 <code>\n</code>도 직접 넣어야 한다.</p>
+
+<pre data-lang="python" data-title="stdout_write.py"><code>
+import sys
+
+sys.stdout.write("hello\n")        # 줄바꿈을 직접 넣는다
+sys.stdout.write(str(42) + "\n")   # 문자열만 받는다
+</code></pre>
+<pre class="output">
+hello
+42
+</pre>
+      </section>
+
+      <section id="pitfalls">
+        <h2>자주 하는 실수</h2>
+        <div class="callout callout-warn">
+          <span class="callout-title">음수를 // 와 % 로 나누기</span>
+          <p><code>-7 // 2</code>는 -3이 아니라 -4이고, <code>-7 % 2</code>는 -1이 아니라 1이다. 파이썬은 몫을 음의 무한대 쪽으로 내리기 때문이다. C나 Java로 된 풀이를 옮기거나, 0 쪽으로 버린 몫을 기대하고 짠 코드에서 답이 어긋난다.</p>
+        </div>
+        <div class="callout callout-warn">
+          <span class="callout-title">readline 이 남긴 줄바꿈</span>
+          <p><code>sys.stdin.readline()</code>으로 읽은 <code>"abc"</code>는 실제로 <code>"abc\n"</code>이라 <code>== "abc"</code>가 <code>False</code>다. 길이도 하나 더 길게 나온다. 문자열로 쓸 입력은 <code>.rstrip()</code>을 붙여 읽는다.</p>
+        </div>
+        <div class="callout callout-warn">
+          <span class="callout-title">입력은 문자열이다</span>
+          <p><code>input()</code>과 <code>split()</code>이 돌려주는 값은 모두 문자열이다. 바꾸지 않고 더하면 <code>"10" + "20"</code>처럼 이어 붙어 <code>"1020"</code>이 된다. 크기 비교도 사전 순서로 일어나 <code>"9" &gt; "10"</code>이 참이 된다. 숫자로 쓸 값은 읽자마자 <code>int</code>로 바꾼다.</p>
+        </div>
+        <div class="callout callout-warn">
+          <span class="callout-title">++ 는 없다</span>
+          <p><code>count++</code>는 문법 오류다. 더 위험한 쪽은 <code>++count</code>다. 이것은 부호 <code>+</code>를 두 번 붙인 식으로 해석되어 에러 없이 실행되지만, 값은 전혀 바뀌지 않는다. 1을 더할 때는 <code>count += 1</code>을 쓴다.</p>
+        </div>
+        <div class="callout callout-warn">
+          <span class="callout-title">내장 함수 이름을 변수로 쓰기</span>
+          <p><code>sum = 0</code>이나 <code>max = nums[0]</code>처럼 쓰면 그 뒤로는 <code>sum()</code>, <code>max()</code>를 부를 수 없다. 부르는 순간 <code>TypeError: 'int' object is not callable</code>이 난다. <code>total</code>, <code>max_value</code>처럼 다른 이름을 쓴다.</p>
+        </div>
+      </section>
+
+      <section id="problem">
+        <h2>대표 문제</h2>
+        <div class="problem">
+          <div class="problem-head">
+            <div class="problem-kicker"><b>Problem</b><span class="chip">쉬움</span><span class="chip">반복문</span><span class="chip">입출력</span></div>
+            <h3>369 게임</h3>
+          </div>
+          <div class="problem-body">
+            <p>정수 N이 주어진다(1 ≤ N ≤ 1,000). 1부터 N까지의 수를 한 줄에 공백으로 구분해 출력하되, 숫자 3, 6, 9가 들어 있는 수는 그 수 대신 "짝"을 출력한다. "짝"은 3, 6, 9가 들어 있는 자리의 개수만큼 이어서 쓴다. 예를 들어 13은 "짝", 33은 "짝짝", 369는 "짝짝짝"이 된다.</p>
+            <div class="table-wrap">
+              <table>
+                <thead><tr><th>입력</th><th>출력</th></tr></thead>
+                <tbody>
+                  <tr><td><code>7</code></td><td><code>1 2 짝 4 5 짝 7</code></td></tr>
+                  <tr><td><code>15</code></td><td><code>1 2 짝 4 5 짝 7 8 짝 10 11 12 짝 14 15</code></td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <details class="reveal">
+            <summary>접근 방법<span class="reveal-hint">먼저 생각해 보고 펼치세요</span></summary>
+            <div class="reveal-body">
+              <p>수의 각 자리를 보려면 <mark>수를 문자열로 바꾸는 것</mark>이 가장 간단하다. <code>str(33)</code>은 <code>"33"</code>이고, <code>for</code>로 돌면 글자가 하나씩 나온다.</p>
+              <ol>
+                <li>1부터 N까지 <code>for</code>로 돈다. <code>range(1, n + 1)</code>이어야 N까지 포함된다.</li>
+                <li>각 수를 문자열로 바꿔 글자마다 <code>"369"</code> 안에 있는지(<code>digit in "369"</code>) 보고 개수를 센다.</li>
+                <li>개수가 0이면 수 자체를, 아니면 <code>"짝" * 개수</code>를 결과에 넣는다. 문자열에 정수를 곱하면 그만큼 반복된다.</li>
+                <li>결과를 모아 <code>" ".join</code>으로 한 번에 출력한다.</li>
+              </ol>
+            </div>
+          </details>
+
+          <details class="reveal">
+            <summary>풀이 코드</summary>
+            <div class="reveal-body">
+<pre data-lang="python" data-title="game_369.py"><code>
+import sys
+input = sys.stdin.readline
+
+n = int(input())
+words = []
+for num in range(1, n + 1):
+    claps = 0
+    for digit in str(num):       # 자리마다 3, 6, 9 인지 본다
+        if digit in "369":
+            claps += 1
+    words.append("짝" * claps if claps else str(num))
+
+print(" ".join(words))
+</code></pre>
+<pre class="stdin">
+36
+</pre>
+<pre class="output">
+1 2 짝 4 5 짝 7 8 짝 10 11 12 짝 14 15 짝 17 18 짝 20 21 22 짝 24 25 짝 27 28 짝 짝 짝 짝 짝짝 짝 짝 짝짝
+</pre>
+              <p>30부터는 십의 자리에 3이 있어서 모두 "짝"이고, 33과 36은 두 자리 모두 해당되어 "짝짝"이 된다.</p>
+            </div>
+          </details>
+
+          <details class="reveal">
+            <summary>복잡도</summary>
+            <div class="reveal-body">
+              <p>빅오 표기는 2장에서 자세히 다룬다. 여기서는 "N에 비례해 늘어난다"는 뜻으로 읽으면 된다.</p>
+              <dl class="cx">
+                <dt>시간</dt><dd><span class="bigo b-linear">O(N)</span> 수 N개를 보고, 수마다 자릿수만큼 글자를 본다. 자릿수는 엄밀히 log N에 비례하지만 N ≤ 1,000에서는 많아야 4자리라 사실상 N에 비례한다.</dd>
+                <dt>공간</dt><dd><span class="bigo b-linear">O(N)</span> 출력할 문자열 N개를 리스트에 모아 둔다.</dd>
+              </dl>
+            </div>
+          </details>
+        </div>
+      </section>
+
+      <section id="recall">
+        <h2>스스로 확인</h2>
+        <div class="recall">
+          <details>
+            <summary><code>-7 // 2</code>와 <code>-7 % 2</code>의 값은 무엇이고, 왜 그렇게 나오는가?</summary>
+            <div class="answer"><p>-4와 1이다. <code>//</code>는 -3.5를 음의 무한대 쪽으로 내려 -4를 만들고, <code>%</code>는 <code>(a // b) * b + a % b == a</code>가 성립하도록 정해지므로 <code>-7 - (-4 * 2) = 1</code>이 된다.</p></div>
+          </details>
+          <details>
+            <summary><code>range(10, 0, -3)</code>이 만드는 수를 차례로 적어 보라.</summary>
+            <div class="answer"><p>10, 7, 4, 1이다. 10에서 시작해 3씩 줄어들고, stop인 0은 포함하지 않는다. 1 다음 값인 -2는 0을 지나쳤으므로 나오지 않는다.</p></div>
+          </details>
+          <details>
+            <summary><code>d</code>가 0일 때 <code>d != 0 and 10 / d &gt; 1</code>이 에러 없이 <code>False</code>가 되는 이유는?</summary>
+            <div class="answer"><p>단락 평가 때문이다. <code>and</code>의 앞쪽 <code>d != 0</code>이 거짓이면 전체 결과가 이미 거짓으로 정해지므로, 뒤쪽 <code>10 / d</code>는 계산하지 않는다. 순서를 바꾸면 0으로 나누는 에러가 난다.</p></div>
+          </details>
+          <details>
+            <summary><code>input = sys.stdin.readline</code>으로 읽은 줄을 문자열로 비교했더니 늘 다르다고 나온다. 무엇을 빠뜨렸는가?</summary>
+            <div class="answer"><p><code>readline()</code>은 줄 끝의 <code>\n</code>을 남긴다. <code>input().rstrip()</code>으로 떼어 내야 한다. 정수로 바꿀 때는 <code>int()</code>가 줄바꿈을 무시하므로 상관없다.</p></div>
+          </details>
+        </div>
+      </section>
+
+      <section id="summary">
+        <h2>정리</h2>
+        <ol class="summary-list">
+          <li>변수는 값에 붙이는 이름표다. 대입은 오른쪽을 먼저 계산한 뒤 왼쪽에 붙이므로 <code>a, b = b, a</code>로 값을 맞바꿀 수 있다.</li>
+          <li><code>/</code>는 항상 실수를 돌려준다. 정수 몫은 <code>//</code>, 나머지는 <code>%</code>다. 음수에서 <code>//</code>는 음의 무한대 쪽으로 내리고, <code>%</code>는 나누는 수와 부호가 같다.</li>
+          <li><code>and</code>와 <code>or</code>는 단락 평가를 하므로, 안전 검사를 위험한 계산 앞에 둔다. 비어 있거나 0인 값은 조건에서 거짓으로 친다.</li>
+          <li><code>range(start, stop, step)</code>은 stop을 포함하지 않는다. 횟수가 정해지면 <code>for</code>, 조건으로만 끝을 알면 <code>while</code>을 쓴다.</li>
+          <li>입력이 많으면 <code>input = sys.stdin.readline</code>을 쓴다. 줄 끝의 <code>\n</code>이 남으므로 문자열은 <code>.rstrip()</code>으로 다듬는다.</li>
+          <li>출력이 많으면 결과를 모아 <code>"\n".join(map(str, results))</code>로 한 번에 출력한다.</li>
+        </ol>
+      </section>
+
+      <nav class="pager" aria-label="이전 장과 다음 장"></nav>
+    </article>
+  </main>
+
+  <aside class="rail" aria-label="이 페이지 목차">
+    <p class="rail-title">이 페이지</p>
+    <nav id="onthispage"></nav>
+  </aside>
+</div>
+<div class="backdrop" id="backdrop"></div>
+
+<script src="assets/book.js"></script>
+<script src="assets/app.js"></script>
+<script src="assets/code.js"></script>
+</body>
+</html>

@@ -1,0 +1,639 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>02. 자료형과 빅오 — 파이썬 알고리즘 노트</title>
+<script src="assets/theme.js"></script>
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body data-chapter="02">
+<a class="skip-link" href="#content">본문으로 건너뛰기</a>
+<div class="progress" aria-hidden="true"><span></span></div>
+<header class="topbar" id="topbar"></header>
+
+<div class="shell">
+  <aside class="sidebar" id="sidebar" aria-label="책 목차"></aside>
+
+  <main class="main" id="content">
+    <article class="chapter">
+      <header class="chapter-head">
+        <a class="part-pill"></a>
+        <span class="chapter-label"></span>
+        <h1>자료형과 빅오</h1>
+        <p class="lede">숫자 하나, 리스트 하나에도 알고 써야 할 성질이 있습니다. 파이썬 자료형의 특징을 익히고, 코드가 얼마나 빨리 도는지 빅오 표기법으로 어림하는 법을 배웁니다.</p>
+        <div class="chapter-meta">
+          <span class="chip">int · float</span><span class="chip">가변 · 불변</span><span class="chip">빅오</span><span class="chip">시간 제한</span>
+        </div>
+      </header>
+
+      <div class="goals">
+        <p class="goals-title">이 장에서 배울 것</p>
+        <ul>
+          <li>파이썬 기본 자료형을 구분하고, 가변과 불변의 차이를 설명할 수 있다</li>
+          <li>int와 float의 차이, 실수 오차와 반올림 함정을 안다</li>
+          <li>빅오 표기법이 무엇을 재는지 설명하고, 코드에서 복잡도를 읽을 수 있다</li>
+          <li>문제의 입력 크기를 보고 시간 안에 도는 복잡도를 어림할 수 있다</li>
+        </ul>
+      </div>
+
+      <section id="types-overview">
+        <h2>자료형 한눈에</h2>
+        <div class="callout callout-key">
+          <span class="callout-title">핵심</span>
+          <p class="callout-big">자료형마다 <mark>할 수 있는 일과 걸리는 시간이 다르다</mark>. 알맞은 자료형을 고르는 것이 빠르고 정확한 코드의 출발점이다.</p>
+        </div>
+        <p>파이썬에서는 변수가 아니라 <strong>값(객체)</strong>이 자료형을 가진다. 같은 변수에 숫자를 넣었다가 문자열을 넣어도 되는 이유다. <strong>자료형(type)</strong>은 그 값이 어떤 종류인지, 그래서 어떤 연산을 할 수 있는지를 정한다.</p>
+        <p>알고리즘 문제에서 자주 쓰는 자료형은 아래 아홉 가지가 거의 전부다. "가변"은 만든 뒤에 내용을 고칠 수 있다는 뜻이고, "불변"은 고칠 수 없다는 뜻이다. 이 차이는 이 장 뒷부분에서 자세히 본다.</p>
+
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>자료형</th><th>예</th><th>가변 / 불변</th><th>자세히 다루는 곳</th></tr></thead>
+            <tbody>
+              <tr><td><code>int</code></td><td><code>42</code>, <code>-7</code>, <code>10 ** 18</code></td><td>불변</td><td>이 장</td></tr>
+              <tr><td><code>float</code></td><td><code>3.14</code>, <code>1e-9</code></td><td>불변</td><td>이 장</td></tr>
+              <tr><td><code>bool</code></td><td><code>True</code>, <code>False</code></td><td>불변</td><td>이 장, 1장</td></tr>
+              <tr><td><code>NoneType</code></td><td><code>None</code></td><td>불변</td><td>이 장</td></tr>
+              <tr><td><code>str</code></td><td><code>'abc'</code></td><td>불변</td><td>5장</td></tr>
+              <tr><td><code>list</code></td><td><code>[1, 2, 3]</code></td><td>가변</td><td>3장</td></tr>
+              <tr><td><code>tuple</code></td><td><code>(1, 2)</code></td><td>불변</td><td>3장</td></tr>
+              <tr><td><code>dict</code></td><td><code>{'a': 1}</code></td><td>가변</td><td>4장</td></tr>
+              <tr><td><code>set</code></td><td><code>{1, 2}</code></td><td>가변</td><td>4장</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <p>값의 자료형은 <code>type()</code>으로 확인한다. "이 값이 이 자료형인가?"를 물을 때는 <code>isinstance()</code>를 쓴다. <code>isinstance()</code>에는 자료형 여러 개를 튜플로 넘길 수도 있다.</p>
+
+<pre data-lang="python" data-title="check_type.py"><code>
+print(type(42))
+print(type(3.14))
+print(type('abc'))
+print(type([1, 2]))
+
+print(isinstance(42, int))
+print(isinstance(42, (int, float)))   # 둘 중 하나면 True
+print(isinstance('42', int))          # 숫자처럼 보여도 문자열이다
+</code></pre>
+<pre class="output">
+&lt;class 'int'&gt;
+&lt;class 'float'&gt;
+&lt;class 'str'&gt;
+&lt;class 'list'&gt;
+True
+True
+False
+</pre>
+      </section>
+
+      <section id="numbers">
+        <h2>숫자: int와 float</h2>
+        <p>정수는 <code>int</code>, 소수점이 있는 수는 <code>float</code>이다. 둘 다 숫자지만 성질이 꽤 다르다. <code>int</code>는 정확하고 끝이 없으며, <code>float</code>은 빠르지만 근삿값이다.</p>
+
+        <h3>int에는 크기 제한이 없다</h3>
+        <p>C++의 <code>long long</code>이나 Java의 <code>long</code>은 64비트라는 정해진 칸에 담기기 때문에, 약 9.2 × 10<sup>18</sup>을 넘으면 값이 엉뚱하게 바뀐다. 이를 <strong>오버플로(overflow)</strong>라고 한다. 파이썬의 <code>int</code>는 수가 커지면 저장 공간을 알아서 늘리므로 오버플로가 없다.</p>
+
+<pre data-lang="python" data-title="big_int.py"><code>
+print(2 ** 100)
+print(10 ** 18 * 10 ** 18)
+
+factorial = 1
+for i in range(1, 31):     # 30! = 1 × 2 × ... × 30
+    factorial *= i
+print(factorial)
+</code></pre>
+<pre class="output">
+1267650600228229401496703205376
+1000000000000000000000000000000000000
+265252859812191058636308480000000
+</pre>
+        <p>다만 공짜는 아니다. 자릿수가 아주 커지면 덧셈·곱셈 한 번에 걸리는 시간도 그만큼 늘어난다. 코딩 테스트에 나오는 10<sup>18</sup> 정도의 수는 걱정하지 않아도 된다.</p>
+
+        <h3>float은 2진수 근삿값이다</h3>
+        <p><code>float</code>은 수를 2진수 소수로 저장한다. 10진수의 1/3이 0.333…으로 끝나지 않듯, 10진수 0.1은 2진수로 쓰면 끝없이 이어진다. 컴퓨터는 이를 정해진 자리에서 잘라 저장하므로, <mark>0.1은 정확히 0.1이 아니라 0.1에 아주 가까운 값</mark>이다.</p>
+
+<pre data-lang="python" data-title="float_error.py"><code>
+import math
+
+print(0.1 + 0.2)
+print(0.1 + 0.2 == 0.3)
+print(f'{0.1:.20f}')                  # 소수 20자리까지 찍어 보면 보인다
+print(math.isclose(0.1 + 0.2, 0.3))   # 충분히 가까우면 True
+</code></pre>
+<pre class="output">
+0.30000000000000004
+False
+0.10000000000000000555
+True
+</pre>
+        <p>그래서 실수끼리는 <code>==</code>로 비교하지 않는다. <code>math.isclose()</code>로 "충분히 가까운지"를 보거나, 처음부터 정수로 계산하는 편이 낫다. 예를 들어 돈을 다룰 때 3.5원 대신 35전처럼 단위를 바꾸면 오차가 생기지 않는다.</p>
+
+        <h3>float은 큰 정수를 정확히 담지 못한다</h3>
+        <p><code>float</code>은 유효 숫자를 약 15~16자리까지만 기억한다. 정확히는 2<sup>53</sup>(약 9 × 10<sup>15</sup>)을 넘는 정수부터는 끝자리가 뭉개질 수 있다.</p>
+
+<pre data-lang="python" data-title="float_big_int.py"><code>
+n = 2 ** 53 + 1
+print(n)
+print(float(n))            # 끝자리 1이 사라진다
+print(int(float(n)) == n)
+</code></pre>
+<pre class="output">
+9007199254740993
+9007199254740992.0
+False
+</pre>
+        <p>이 성질 때문에 큰 정수 계산에서 <code>/</code>를 쓰면 틀린 답이 나온다. <code>/</code>는 결과를 언제나 <code>float</code>으로 만들기 때문이다. 이 장의 대표 문제에서 실제로 확인한다.</p>
+
+        <h3>버림, 내림, 반올림</h3>
+        <p>소수를 정수로 바꾸는 방법은 여러 가지이고, 음수에서 결과가 갈린다. <code>//</code>의 기본 동작은 1장에서 봤다.</p>
+
+<pre data-lang="python" data-title="to_int.py"><code>
+print(int(3.7), int(-3.7))      # 0 쪽으로 버린다
+print(7 // 2, -7 // 2)          # 더 작은 쪽(아래)으로 내린다
+print(round(2.5), round(3.5))   # 딱 절반이면 짝수 쪽으로 간다
+print(round(-2.5))
+print(int(2.5 + 0.5))           # 0 이상에서 "사사오입"이 필요할 때
+</code></pre>
+<pre class="output">
+3 -3
+3 -4
+2 4
+-2
+3
+</pre>
+        <p><code>int()</code>는 소수 부분을 그냥 떼어 내므로 <code>-3.7</code>이 <code>-3</code>이 된다. <code>//</code>는 수직선에서 왼쪽으로 내리므로 <code>-3.5</code>가 <code>-4</code>가 된다. <code>round()</code>는 딱 절반일 때 가까운 짝수를 고르는 <strong>짝수 반올림</strong>이다. 은행가 반올림이라고도 하는데, 많은 수를 반올림해 더할 때 오차가 한쪽으로 쌓이지 않게 하려는 규칙이다. 학교에서 배운 사사오입이 필요하면 0 이상의 수에 한해 <code>int(x + 0.5)</code>처럼 직접 계산한다.</p>
+
+        <h3>무한대</h3>
+        <p><code>float('inf')</code>는 어떤 수보다도 큰 값이다. 최솟값을 찾을 때 "아직 아무것도 못 봤다"는 시작값으로 자주 쓴다. <code>math.inf</code>도 같은 값이다.</p>
+
+<pre data-lang="python" data-title="infinity.py"><code>
+INF = float('inf')
+
+best = INF                 # 어떤 비용이 와도 이것보다는 작다
+for cost in [7, 3, 9]:
+    if cost &lt; best:
+        best = cost
+print(best)
+
+print(INF &gt; 10 ** 100, -INF &lt; -10 ** 100)
+</code></pre>
+<pre class="output">
+3
+True True
+</pre>
+      </section>
+
+      <section id="bool-and-none">
+        <h2>bool과 None</h2>
+
+        <h3>bool은 int의 한 종류다</h3>
+        <p><code>True</code>와 <code>False</code>는 사실 정수 <code>1</code>과 <code>0</code>처럼 동작한다. 파이썬에서 <code>bool</code>은 <code>int</code>를 물려받은 자료형이기 때문이다. 이 성질 덕분에 조건을 만족하는 개수를 <code>sum()</code> 한 번으로 셀 수 있다.</p>
+
+<pre data-lang="python" data-title="bool_is_int.py"><code>
+print(True + True)
+print(True * 10)
+print(isinstance(True, int))
+
+nums = [3, -1, 4, -1, 5]
+# x &gt; 0 은 True/False 이고, 그걸 더하면 True의 개수가 된다
+print(sum(x &gt; 0 for x in nums))
+</code></pre>
+<pre class="output">
+2
+10
+True
+3
+</pre>
+        <p>마지막 줄처럼 괄호 안에 <code>for</code>를 쓰는 문법은 3장의 리스트 컴프리헨션과 같은 원리다. 지금은 "<code>nums</code>의 원소마다 <code>x &gt; 0</code>을 계산해 더한다"로 읽으면 된다.</p>
+
+        <h3>None은 "값이 없음"을 뜻한다</h3>
+        <p><code>None</code>은 아직 값이 없거나 찾지 못했다는 표시로 쓰는 특별한 값이다. <code>return</code> 없이 끝난 함수도 <code>None</code>을 돌려준다(6장). 프로그램 전체에 <code>None</code>은 딱 하나만 존재하므로, 비교할 때는 같은 객체인지를 묻는 <code>is</code>를 쓴다.</p>
+        <p><code>if not x:</code>로 대신하면 안 되는 이유가 있다. <code>0</code>, 빈 문자열, 빈 리스트도 조건식에서 거짓이 되기 때문이다(1장). 찾은 값이 하필 <code>0</code>이면 "못 찾았다"로 착각한다.</p>
+
+<pre data-lang="python" data-title="none_check.py"><code>
+def first_multiple(nums, k):
+    for x in nums:
+        if x % k == 0:
+            return x
+    return None            # 못 찾으면 None
+
+
+found = first_multiple([0, 4, 7], 7)
+print(found)
+print('is None:', found is None)   # 정확하다: 0을 찾았다
+print('not    :', not found)       # 0도 거짓이라 못 찾은 것처럼 보인다
+</code></pre>
+<pre class="output">
+0
+is None: False
+not    : True
+</pre>
+      </section>
+
+      <section id="mutability">
+        <h2>가변과 불변</h2>
+        <p>파이썬의 변수는 값을 담는 상자가 아니라 값에 붙인 <strong>이름표</strong>에 가깝다. <code>b = a</code>는 값을 복사하지 않는다. 같은 값에 이름표를 하나 더 붙일 뿐이다.</p>
+        <p>값을 고칠 수 없는 불변 객체라면 이 차이가 드러나지 않는다. 그런데 리스트처럼 고칠 수 있는 가변 객체라면, <mark>한 이름으로 고친 내용이 다른 이름으로도 보인다</mark>.</p>
+
+        <figure class="fig">
+          <div class="fig-steps">
+            <div class="fig-state">
+              <div class="cells">
+                <div class="cell">1</div>
+                <div class="cell">2</div>
+                <div class="cell">3</div>
+              </div>
+              <span class="fig-state-label">b = a 직후: a, b</span>
+            </div>
+            <div class="fig-arrow">b.append(4)</div>
+            <div class="fig-state">
+              <div class="cells">
+                <div class="cell">1</div>
+                <div class="cell">2</div>
+                <div class="cell">3</div>
+                <div class="cell is-hl">4</div>
+              </div>
+              <span class="fig-state-label">a로 봐도 4가 있다</span>
+            </div>
+          </div>
+          <figcaption><b>그림 2-1</b> <code>b = a</code>는 리스트를 복사하지 않는다. 두 이름이 리스트 하나를 함께 가리킨다.</figcaption>
+        </figure>
+
+<pre data-lang="python" data-title="alias.py"><code>
+a = [1, 2, 3]
+b = a              # 같은 리스트에 이름을 하나 더 붙인다
+b.append(4)
+print(a)
+print(a is b)      # is: 같은 객체인가?
+
+c = a.copy()       # 내용이 같은 "새" 리스트
+print(a == c, a is c)
+c.append(5)
+print(a)
+print(c)
+</code></pre>
+<pre class="output">
+[1, 2, 3, 4]
+True
+True False
+[1, 2, 3, 4]
+[1, 2, 3, 4, 5]
+</pre>
+        <p><code>==</code>는 "내용이 같은가"를, <code>is</code>는 "같은 객체인가"를 묻는다. <code>c</code>는 내용은 <code>a</code>와 같지만 다른 객체라서, <code>c</code>를 고쳐도 <code>a</code>는 그대로다.</p>
+
+        <h3>불변 객체는 "고치는" 대신 새로 만든다</h3>
+        <p><code>int</code>나 <code>str</code>은 불변이라 내용을 고칠 방법 자체가 없다. <code>x += 1</code>은 10을 11로 고치는 것이 아니라, 11이라는 새 객체를 만들어 <code>x</code>라는 이름표를 옮겨 붙인다. 그래서 다른 이름은 영향을 받지 않는다.</p>
+
+<pre data-lang="python" data-title="immutable.py"><code>
+x = 10
+y = x
+x += 1             # 새 객체 11에 x를 붙인다. y는 여전히 10
+print(x, y)
+
+s = 'abc'
+t = s
+s += 'd'           # 문자열도 새로 만들어진다
+print(s, t)
+</code></pre>
+<pre class="output">
+11 10
+abcd abc
+</pre>
+
+        <h3>리스트를 복사하는 법</h3>
+        <p>리스트를 따로 고치고 싶다면 복사본을 만든다. 아래 셋은 모두 같은 결과를 낸다.</p>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>코드</th><th>뜻</th></tr></thead>
+            <tbody>
+              <tr><td><code>b = a.copy()</code></td><td>복사 메서드. 의도가 가장 잘 드러난다</td></tr>
+              <tr><td><code>b = a[:]</code></td><td>처음부터 끝까지 잘라 낸 새 리스트(슬라이싱, 3장)</td></tr>
+              <tr><td><code>b = list(a)</code></td><td><code>a</code>의 원소로 새 리스트를 만든다</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <p>셋 다 바깥 리스트만 새로 만드는 <strong>얕은 복사</strong>다. 리스트 안에 리스트가 든 2차원 리스트에서는 안쪽 리스트가 여전히 공유된다. 이 문제와 해결법은 3장에서 다룬다. 함수에 리스트를 넘길 때도 복사가 아니라 같은 리스트가 넘어간다는 점은 6장에서 다시 본다.</p>
+      </section>
+
+      <section id="big-o">
+        <h2>빅오 표기법</h2>
+        <p>같은 문제를 푸는 코드라도 입력이 커질 때 느려지는 정도가 다르다. <strong>빅오(Big-O) 표기법</strong>은 입력 크기 <code>n</code>이 커질 때 <mark>기본 연산의 횟수가 어떤 모양으로 늘어나는지</mark>를 나타낸다. 기본 연산은 대입, 비교, 사칙연산처럼 한 번에 끝나는 작은 일을 말한다.</p>
+        <p>빅오는 정확한 횟수가 아니라 늘어나는 모양만 본다. 그래서 두 가지를 버린다.</p>
+        <ul>
+          <li><strong>낮은 차수의 항</strong>: <code>3n² + 5n + 2</code>에서 <code>5n</code>과 <code>2</code>를 버린다.</li>
+          <li><strong>상수 배</strong>: 남은 <code>3n²</code>에서 3을 버려 <code>O(n²)</code>이 된다.</li>
+        </ul>
+        <p>낮은 차수를 버리는 이유는 <code>n</code>이 커지면 가장 높은 차수가 전체를 거의 다 차지하기 때문이다. 직접 계산해 보면 분명하다.</p>
+
+<pre data-lang="python" data-title="dominant_term.py"><code>
+for n in (10, 1000, 1000000):
+    total = 3 * n * n + 5 * n + 2
+    share = 3 * n * n / total      # 전체 중 n² 항이 차지하는 비율
+    print(n, total, f'{share:.6f}')
+</code></pre>
+<pre class="output">
+10 352 0.852273
+1000 3005002 0.998335
+1000000 3000005000002 0.999998
+</pre>
+        <p>상수 배를 버리는 이유는 그 값이 컴퓨터, 언어, 구현 방식에 따라 달라지기 때문이다. 반면 "<code>n</code>이 두 배가 되면 연산은 네 배가 된다"는 <code>n²</code>의 성질은 어디서나 같다. 빅오는 이 변하지 않는 성질만 남긴 것이다.</p>
+        <p>빅오는 엄밀히 말해 "이보다 빨리 늘지는 않는다"는 <strong>상한</strong>이다. 코딩 테스트에서는 보통 가장 나쁜 입력이 들어왔을 때를 기준으로 따진다.</p>
+
+        <h3>대표적인 복잡도</h3>
+        <p>아래 표는 <code>n</code>에 따라 연산 횟수가 대략 얼마가 되는지 보여 준다. 로그는 밑이 2인 로그다.</p>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>복잡도</th><th>이름</th><th>n = 10</th><th>n = 1,000</th><th>n = 1,000,000</th></tr></thead>
+            <tbody>
+              <tr><td><span class="bigo b-const">O(1)</span></td><td>상수</td><td>1</td><td>1</td><td>1</td></tr>
+              <tr><td><span class="bigo b-log">O(log n)</span></td><td>로그</td><td>약 3</td><td>약 10</td><td>약 20</td></tr>
+              <tr><td><span class="bigo b-linear">O(n)</span></td><td>선형</td><td>10</td><td>1,000</td><td>100만</td></tr>
+              <tr><td><span class="bigo b-nlogn">O(n log n)</span></td><td>선형 로그</td><td>약 33</td><td>약 1만</td><td>약 2천만</td></tr>
+              <tr><td><span class="bigo b-quad">O(n²)</span></td><td>이차</td><td>100</td><td>100만</td><td>1조</td></tr>
+              <tr><td><span class="bigo b-quad">O(2ⁿ)</span></td><td>지수</td><td>1,024</td><td>302자리 수</td><td>30만 자리가 넘는 수</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <p><code>O(log n)</code>은 <code>n</code>이 100만이 되어도 20번 남짓이다. 반대로 <code>O(2ⁿ)</code>은 <code>n</code>이 1,000이기만 해도 우주의 나이만큼 돌려도 끝나지 않는다. 같은 <code>n</code>에서도 복잡도에 따라 차이가 이만큼 벌어진다.</p>
+      </section>
+
+      <section id="reading-complexity">
+        <h2>코드에서 복잡도 읽기</h2>
+        <p>복잡도를 구할 때는 "<code>n</code>이 커지면 이 코드는 몇 번 도는가"만 따지면 된다. 대부분은 반복문의 모양을 보면 바로 나온다. 아래 세 함수는 각자 반복을 몇 번 했는지 세어 돌려준다.</p>
+
+<pre data-lang="python" data-title="count_steps.py"><code>
+def single_loop(n):
+    steps = 0
+    for _ in range(n):     # 쓰지 않는 변수는 관례상 _로 쓴다
+        steps += 1
+    return steps
+
+
+def nested_loop(n):
+    steps = 0
+    for _ in range(n):
+        for _ in range(n):
+            steps += 1
+    return steps
+
+
+def halving_loop(n):
+    steps = 0
+    while n &gt; 1:
+        n //= 2            # 매번 남은 크기가 절반이 된다
+        steps += 1
+    return steps
+
+
+for n in (10, 100, 1000):
+    print(n, single_loop(n), nested_loop(n), halving_loop(n))
+</code></pre>
+<pre class="output">
+10 10 100 3
+100 100 10000 6
+1000 1000 1000000 9
+</pre>
+        <p><code>n</code>이 100배(10 → 1,000)가 될 때 반복문 하나는 100배, 이중 반복문은 1만 배로 늘었다. 반면 절반씩 줄이는 반복문은 3번에서 9번으로 6번 늘었을 뿐이다.</p>
+
+        <h3>반복문 하나는 O(n), 겹치면 곱한다</h3>
+        <p><code>n</code>번 도는 반복문 하나는 <span class="bigo b-linear">O(n)</span>이다. 그 안에 <code>n</code>번 도는 반복문이 또 있으면 <code>n × n</code>이라 <span class="bigo b-quad">O(n²)</span>이다. 반복문이 겹치지 않고 나란히 있으면 곱하지 않고 더한다. <code>O(n) + O(n)</code>은 <code>O(2n)</code>이고, 상수를 버리면 그대로 <code>O(n)</code>이다.</p>
+
+        <h3>절반씩 줄이면 O(log n)</h3>
+        <p>남은 크기를 매번 절반으로 줄이면 1이 될 때까지 log₂n번 걸린다. log₂n은 "2를 몇 번 곱해야 n이 되는가"이기 때문이다. 20장의 이진 탐색이 이렇게 동작한다.</p>
+
+        <figure class="fig">
+          <div class="fig-steps">
+            <div class="fig-state"><div class="cells"><div class="cell">16</div></div><span class="fig-state-label">시작</span></div>
+            <div class="fig-arrow">// 2</div>
+            <div class="fig-state"><div class="cells"><div class="cell">8</div></div><span class="fig-state-label">1번</span></div>
+            <div class="fig-arrow">// 2</div>
+            <div class="fig-state"><div class="cells"><div class="cell">4</div></div><span class="fig-state-label">2번</span></div>
+            <div class="fig-arrow">// 2</div>
+            <div class="fig-state"><div class="cells"><div class="cell">2</div></div><span class="fig-state-label">3번</span></div>
+            <div class="fig-arrow">// 2</div>
+            <div class="fig-state"><div class="cells"><div class="cell is-hl">1</div></div><span class="fig-state-label">4번</span></div>
+          </div>
+          <figcaption><b>그림 2-2</b> 16을 절반씩 줄이면 4번 만에 1이 된다. 16 = 2⁴이므로 log₂16 = 4다.</figcaption>
+        </figure>
+
+        <h3>정렬은 O(n log n)</h3>
+        <p>파이썬의 <code>sorted()</code>와 <code>list.sort()</code>는 <span class="bigo b-nlogn">O(n log n)</span>이다. 정렬을 한 번 하고 반복문을 한 번 돌면 <code>O(n log n) + O(n)</code>이므로 전체는 더 큰 쪽인 <code>O(n log n)</code>이다. 정렬 알고리즘은 19장에서 다룬다.</p>
+
+        <h3>한 줄짜리 코드에 숨은 비용</h3>
+        <p>반복문이 안 보인다고 O(1)인 것은 아니다. 내장 함수와 연산자 중에는 안에서 원소를 하나하나 훑는 것이 많다. 아래 코드는 반복문이 하나뿐인 것처럼 보이지만, <code>x in b</code>가 <code>b</code>를 처음부터 끝까지 훑으므로 실제로는 이중 반복문이다.</p>
+
+<pre data-lang="python" data-title="hidden_cost.py"><code>
+def count_common(a, b):
+    count = 0
+    for x in a:            # len(a)번
+        if x in b:         # 리스트의 in은 b를 앞에서부터 훑는다
+            count += 1
+    return count
+
+
+print(count_common([1, 3, 5, 7], [3, 4, 5, 6]))
+</code></pre>
+<pre class="output">
+2
+</pre>
+        <p>두 리스트의 길이가 모두 <code>n</code>이면 <span class="bigo b-quad">O(n²)</span>이다. <code>b</code>를 집합(set)으로 바꾸면 <code>in</code>이 평균 O(1)이 되어 전체가 O(n)으로 줄어든다. 집합은 4장에서 다룬다. 자주 만나는 숨은 비용을 정리하면 다음과 같다.</p>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>코드</th><th>시간</th><th>이유</th></tr></thead>
+            <tbody>
+              <tr><td><code>len(a)</code></td><td><span class="bigo b-const">O(1)</span></td><td>길이를 따로 저장해 둔다</td></tr>
+              <tr><td><code>x in a</code> (리스트)</td><td><span class="bigo b-linear">O(n)</span></td><td>앞에서부터 하나씩 비교한다</td></tr>
+              <tr><td><code>min(a)</code>, <code>max(a)</code>, <code>sum(a)</code></td><td><span class="bigo b-linear">O(n)</span></td><td>모든 원소를 한 번씩 본다</td></tr>
+              <tr><td><code>a[i:j]</code></td><td><span class="bigo b-linear">O(j−i)</span></td><td>잘라 낸 만큼 새 리스트에 복사한다</td></tr>
+              <tr><td><code>a.insert(0, x)</code>, <code>a.pop(0)</code></td><td><span class="bigo b-linear">O(n)</span></td><td>뒤의 원소를 모두 한 칸씩 옮긴다</td></tr>
+              <tr><td><code>sorted(a)</code></td><td><span class="bigo b-nlogn">O(n log n)</span></td><td>정렬은 비교만으로 이보다 빠를 수 없다</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section id="time-limit">
+        <h2>시간 제한 어림하기</h2>
+        <p>코딩 테스트 문제에는 "시간 제한 1초"와 "1 ≤ N ≤ 100,000" 같은 입력 범위가 함께 적혀 있다. 이 둘만 있으면 코드를 짜기 전에 어떤 복잡도로 풀어야 하는지 알 수 있다.</p>
+        <div class="callout callout-key">
+          <span class="callout-title">어림값</span>
+          <p>파이썬(CPython)은 단순한 연산을 <strong>1초에 대략 1천만 번 안팎</strong> 처리한다고 잡는다. 채점 서버의 성능, 연산의 종류, 코드 모양에 따라 몇 배씩 달라지는 거친 기준이다. "이 정도면 확실히 된다 / 확실히 안 된다"를 가르는 용도로만 쓴다.</p>
+        </div>
+        <p>이 기준으로 입력 크기별로 1초 안에 노려볼 만한 복잡도를 정리하면 다음과 같다.</p>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>n의 최댓값</th><th>노릴 복잡도</th><th>연산 수 어림</th></tr></thead>
+            <tbody>
+              <tr><td>약 10</td><td><span class="bigo b-quad">O(n!)</span></td><td>10! ≈ 363만</td></tr>
+              <tr><td>약 20</td><td><span class="bigo b-quad">O(2ⁿ)</span></td><td>2²⁰ ≈ 105만</td></tr>
+              <tr><td>약 200</td><td><span class="bigo b-quad">O(n³)</span></td><td>200³ = 800만</td></tr>
+              <tr><td>약 3,000</td><td><span class="bigo b-quad">O(n²)</span></td><td>3,000² = 900만</td></tr>
+              <tr><td>10만 ~ 50만</td><td><span class="bigo b-nlogn">O(n log n)</span></td><td>10만 × 17 ≈ 170만</td></tr>
+              <tr><td>수백만</td><td><span class="bigo b-linear">O(n)</span></td><td>n번</td></tr>
+              <tr><td>10⁹ 이상</td><td><span class="bigo b-log">O(log n)</span>, <span class="bigo b-const">O(1)</span></td><td>수십 번 이하</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="callout callout-tip">
+          <span class="callout-title">팁</span>
+          <p>문제를 읽으면 입력 범위부터 본다. N ≤ 100,000이면 O(n²)은 100억 번이라 어림값으로 1,000초쯤 걸린다. 처음부터 O(n log n) 이하의 방법을 찾아야 한다는 뜻이다. 이렇게 복잡도를 거꾸로 정하면 풀이 방향이 빨리 좁혀진다.</p>
+        </div>
+        <p>백준처럼 PyPy3를 함께 제공하는 채점 사이트도 있다. PyPy3는 실행 중에 코드를 기계어로 바꿔 돌리는 파이썬 구현이라, 반복문이 많은 코드가 CPython보다 훨씬 빨라지는 경우가 많다. 다만 메모리를 더 쓰는 편이고, 복잡도 자체가 맞지 않는 풀이를 구해 주지는 못한다.</p>
+      </section>
+
+      <section id="pitfalls">
+        <h2>자주 하는 실수</h2>
+        <div class="callout callout-warn">
+          <span class="callout-title">실수를 ==로 비교하기</span>
+          <p><code>0.1 + 0.2 == 0.3</code>은 <code>False</code>다. 실수 비교는 <code>math.isclose()</code>를 쓰거나, 단위를 바꿔 정수로 계산한다.</p>
+        </div>
+        <div class="callout callout-warn">
+          <span class="callout-title">큰 정수에 / 쓰기</span>
+          <p><code>/</code>의 결과는 항상 <code>float</code>이라 약 9 × 10<sup>15</sup>을 넘는 정수는 끝자리가 틀어질 수 있다. <code>(10 ** 17 + 1) / 1</code>은 <code>1e+17</code>이 되어 끝의 1이 사라진다. 나누어떨어지는 정수 나눗셈은 <code>//</code>로 한다.</p>
+        </div>
+        <div class="callout callout-warn">
+          <span class="callout-title">round()를 사사오입으로 믿기</span>
+          <p><code>round(2.5)</code>는 <code>3</code>이 아니라 <code>2</code>다. 딱 절반이면 짝수 쪽으로 간다. 게다가 <code>round(2.675, 2)</code>는 <code>2.67</code>이 나오는데, 2.675가 실제로는 그보다 아주 조금 작은 값으로 저장되기 때문이다. 반올림 규칙이 중요한 문제는 정수로 바꿔 직접 계산한다.</p>
+        </div>
+        <div class="callout callout-warn">
+          <span class="callout-title">b = a를 복사로 착각하기</span>
+          <p>리스트에 <code>b = a</code>를 하고 <code>b</code>를 고치면 <code>a</code>도 바뀐다. 따로 쓰려면 <code>a.copy()</code>로 복사본을 만든다.</p>
+        </div>
+        <div class="callout callout-warn">
+          <span class="callout-title">is로 값 비교하기</span>
+          <p><code>is</code>는 내용이 아니라 같은 객체인지를 묻는다. 숫자나 문자열에 쓰면 실행 환경에 따라 결과가 달라질 수 있다. 값 비교는 언제나 <code>==</code>로 하고, <code>is</code>는 <code>None</code>을 확인할 때만 쓴다.</p>
+        </div>
+      </section>
+
+      <section id="problem">
+        <h2>대표 문제</h2>
+        <div class="problem">
+          <div class="problem-head">
+            <div class="problem-kicker"><b>Problem</b><span class="chip">쉬움</span><span class="chip">수학</span><span class="chip">빅오</span></div>
+            <h3>1부터 N까지의 합</h3>
+          </div>
+          <div class="problem-body">
+            <p>정수 <code>N</code>이 한 줄로 주어진다(1 ≤ N ≤ 10<sup>18</sup>). 1부터 <code>N</code>까지 모든 정수의 합을 정확하게 출력하라. 시간 제한은 1초다.</p>
+            <div class="table-wrap">
+              <table>
+                <thead><tr><th>입력</th><th>출력</th></tr></thead>
+                <tbody>
+                  <tr><td><code>10</code></td><td><code>55</code></td></tr>
+                  <tr><td><code>100000</code></td><td><code>5000050000</code></td></tr>
+                  <tr><td><code>1000000000000000000</code></td><td><code>500000000000000000500000000000000000</code></td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <details class="reveal">
+            <summary>접근 방법<span class="reveal-hint">먼저 생각해 보고 펼치세요</span></summary>
+            <div class="reveal-body">
+              <p>반복문으로 1부터 더하면 O(N)이다. N이 10<sup>18</sup>이면 덧셈만 10<sup>18</sup>번인데, 1초에 1천만 번이라는 어림값으로 나누면 10<sup>11</sup>초, 약 3천 년이 걸린다. 입력 범위가 10<sup>18</sup>이라는 것 자체가 <mark>O(1)이나 O(log N)으로 풀라는 신호</mark>다.</p>
+              <p>1부터 N까지의 합은 공식 N(N+1)/2로 한 번에 구할 수 있다. 1 + N, 2 + (N−1), …처럼 앞뒤를 짝지으면 합이 모두 N+1인 쌍이 N/2개 생기기 때문이다.</p>
+              <p>남은 함정은 나눗셈이다. <code>/</code>를 쓰면 결과가 <code>float</code>이 되어 큰 수에서 끝자리가 틀어진다.</p>
+
+<pre data-lang="python" data-title="slash_vs_floor.py"><code>
+n = 10 ** 18
+print(n * (n + 1) // 2)        # 정수 나눗셈: 정확하다
+print(n * (n + 1) / 2)         # float이 된다
+print(int(n * (n + 1) / 2))    # 정수로 되돌려도 이미 틀렸다
+</code></pre>
+<pre class="output">
+500000000000000000500000000000000000
+5e+35
+500000000000000021210318687008980992
+</pre>
+              <p><code>N(N+1)</code>은 연속한 두 정수의 곱이라 항상 짝수다. 그래서 <code>// 2</code>로 나눠도 버려지는 나머지가 없고, 결과가 정확하다.</p>
+            </div>
+          </details>
+
+          <details class="reveal">
+            <summary>풀이 코드</summary>
+            <div class="reveal-body">
+<pre data-lang="python" data-title="sum_to_n.py"><code>
+import sys
+
+input = sys.stdin.readline
+
+
+def sum_to(n: int) -&gt; int:
+    # n(n+1)은 항상 짝수라 // 2 가 정확히 나누어떨어진다
+    return n * (n + 1) // 2
+
+
+n = int(input())
+print(sum_to(n))
+</code></pre>
+<pre class="stdin">
+1000000000000000000
+</pre>
+<pre class="output">
+500000000000000000500000000000000000
+</pre>
+            </div>
+          </details>
+
+          <details class="reveal">
+            <summary>복잡도</summary>
+            <div class="reveal-body">
+              <dl class="cx">
+                <dt>시간</dt><dd><span class="bigo b-const">O(1)</span> N이 얼마든 곱셈 한 번, 덧셈 한 번, 나눗셈 한 번이다. 결과가 36자리라 엄밀히는 자릿수에 비례하지만, 이 정도 크기에서는 무시해도 된다.</dd>
+                <dt>공간</dt><dd><span class="bigo b-const">O(1)</span> 정수 몇 개만 쓴다.</dd>
+              </dl>
+            </div>
+          </details>
+        </div>
+      </section>
+
+      <section id="recall">
+        <h2>스스로 확인</h2>
+        <div class="recall">
+          <details>
+            <summary><code>0.1 + 0.2 == 0.3</code>이 <code>False</code>인 이유는?</summary>
+            <div class="answer"><p><code>float</code>은 수를 2진수로 저장하는데, 0.1·0.2·0.3은 2진수로 끝나지 않는 소수라 모두 가장 가까운 근삿값으로 저장된다. 근삿값끼리 더한 결과가 0.3의 근삿값과 마지막 자리에서 달라서 <code>False</code>가 된다.</p></div>
+          </details>
+          <details>
+            <summary><code>int(-2.5)</code>와 <code>-5 // 2</code>의 결과는 각각 무엇인가?</summary>
+            <div class="answer"><p><code>int(-2.5)</code>는 0 쪽으로 버려서 <code>-2</code>, <code>-5 // 2</code>는 아래로 내려서 <code>-3</code>이다. 양수에서는 둘이 같지만 음수에서는 1만큼 차이 난다.</p></div>
+          </details>
+          <details>
+            <summary><code>a = [1]</code>, <code>b = a</code> 다음에 <code>b += [2]</code>를 하면 <code>a</code>는 어떻게 되는가?</summary>
+            <div class="answer"><p><code>a</code>도 <code>[1, 2]</code>가 된다. <code>a</code>와 <code>b</code>는 같은 리스트이고, 리스트의 <code>+=</code>는 새 리스트를 만들지 않고 그 리스트 끝에 원소를 붙이기 때문이다. 불변인 <code>int</code>의 <code>+=</code>가 새 객체를 만드는 것과 대조된다. 반면 <code>b = b + [2]</code>는 새 리스트를 만들어 <code>b</code>에 붙이므로 <code>a</code>는 그대로다.</p></div>
+          </details>
+          <details>
+            <summary>N ≤ 100,000인 문제에서 이중 반복문(O(N²)) 풀이가 위험한 이유는?</summary>
+            <div class="answer"><p>N² = 100억 번이다. 1초에 1천만 번이라는 어림값으로 약 1,000초가 걸려 시간 제한을 크게 넘는다. 이 범위에서는 O(N log N) 이하의 방법을 찾아야 한다.</p></div>
+          </details>
+        </div>
+      </section>
+
+      <section id="summary">
+        <h2>정리</h2>
+        <ol class="summary-list">
+          <li>값마다 자료형이 있다. 리스트·딕셔너리·집합은 가변이고, 숫자·문자열·튜플은 불변이다.</li>
+          <li><code>int</code>는 크기 제한이 없고 정확하다. <code>float</code>은 2진 근삿값이라 오차가 있으니 <code>==</code> 대신 <code>math.isclose()</code>를 쓰거나 정수로 계산한다.</li>
+          <li><code>int()</code>는 0 쪽으로 버리고, <code>//</code>는 아래로 내리고, <code>round()</code>는 짝수 쪽으로 반올림한다. 큰 정수 나눗셈은 <code>//</code>로 한다.</li>
+          <li><code>bool</code>은 <code>int</code>의 일종이라 <code>sum()</code>으로 개수를 셀 수 있다. <code>None</code>은 <code>is None</code>으로 확인한다.</li>
+          <li><code>b = a</code>는 복사가 아니라 같은 객체에 이름을 하나 더 붙이는 것이다. 가변 객체를 따로 쓰려면 <code>copy()</code>로 복사한다.</li>
+          <li>빅오는 <code>n</code>이 커질 때 연산 수가 늘어나는 모양이다. 낮은 차수와 상수 배는 버리고, 숨은 비용까지 포함해 센다.</li>
+          <li>입력 범위와 "1초에 대략 1천만 번"이라는 어림값으로, 코드를 짜기 전에 필요한 복잡도를 먼저 정한다.</li>
+        </ol>
+      </section>
+
+      <nav class="pager" aria-label="이전 장과 다음 장"></nav>
+    </article>
+  </main>
+
+  <aside class="rail" aria-label="이 페이지 목차">
+    <p class="rail-title">이 페이지</p>
+    <nav id="onthispage"></nav>
+  </aside>
+</div>
+<div class="backdrop" id="backdrop"></div>
+
+<script src="assets/book.js"></script>
+<script src="assets/app.js"></script>
+<script src="assets/code.js"></script>
+</body>
+</html>

@@ -1,0 +1,661 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>04. 딕셔너리와 집합 — 파이썬 알고리즘 노트</title>
+<script src="assets/theme.js"></script>
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body data-chapter="04">
+<a class="skip-link" href="#content">본문으로 건너뛰기</a>
+<div class="progress" aria-hidden="true"><span></span></div>
+<header class="topbar" id="topbar"></header>
+
+<div class="shell">
+  <aside class="sidebar" id="sidebar" aria-label="책 목차"></aside>
+
+  <main class="main" id="content">
+    <article class="chapter">
+      <header class="chapter-head">
+        <a class="part-pill"></a>
+        <span class="chapter-label"></span>
+        <h1>딕셔너리와 집합</h1>
+        <p class="lede">이름표(키)로 값을 바로 꺼내는 딕셔너리와, 중복 없이 "있는지 없는지"만 기억하는 집합을 다룹니다. 둘 다 해시 덕분에 데이터가 아무리 많아도 거의 한 번에 찾습니다.</p>
+        <div class="chapter-meta">
+          <span class="chip">dict · set</span><span class="chip">해시</span><span class="chip">Counter</span><span class="chip">defaultdict</span><span class="chip">두 수의 합</span>
+        </div>
+      </header>
+
+      <div class="goals">
+        <p class="goals-title">이 장에서 배울 것</p>
+        <ul>
+          <li>리스트의 <code>in</code>보다 딕셔너리·집합의 <code>in</code>이 빠른 이유를 해시로 설명할 수 있다</li>
+          <li>딕셔너리에 값을 넣고, 찾고, 지우고, 순회할 수 있다</li>
+          <li><code>get</code>, <code>defaultdict</code>, <code>Counter</code>로 개수를 세고 같은 것끼리 묶을 수 있다</li>
+          <li>집합으로 중복을 없애고 합집합·교집합·차집합을 구할 수 있다</li>
+          <li>어떤 값이 키가 될 수 있는지와 그 이유를 안다</li>
+        </ul>
+      </div>
+
+      <section id="why-hash">
+        <h2>해시로 바로 찾기</h2>
+        <div class="callout callout-key">
+          <span class="callout-title">핵심</span>
+          <p class="callout-big">딕셔너리와 집합은 <mark>키를 해시 값으로 바꿔, 저장된 칸으로 바로 찾아간다</mark>. 그래서 데이터가 많아져도 찾는 시간이 거의 늘지 않는다.</p>
+        </div>
+        <p>리스트에서 <code>x in a</code>를 하면 파이썬은 맨 앞 원소부터 하나씩 비교한다. 원소가 백만 개이고 찾는 값이 없으면 백만 번을 비교하므로 O(n)이다.</p>
+        <p>번호가 붙은 사물함을 떠올려 보자. 열쇠에 "17번"이라고 적혀 있으면 1번부터 열어 볼 필요 없이 17번 앞으로 바로 가면 된다. 딕셔너리와 집합에서 키에 번호를 매기는 것이 해시 함수다.</p>
+        <p><strong>해시 함수(hash function)</strong>는 값을 받아 정해진 규칙으로 정수 하나를 만드는 함수다. 이 정수를 <strong>해시 값</strong>이라고 한다. 같은 값을 넣으면 언제나 같은 해시 값이 나온다. 파이썬에서는 <code>hash()</code>로 직접 볼 수 있다.</p>
+
+<pre data-lang="python" data-title="hash_basic.py"><code>
+print(hash(42))                        # 작은 양의 정수는 자기 자신
+print(hash('apple') == hash('apple'))  # 같은 값이면 언제나 같은 해시
+print(hash((1, 2)) == hash((1, 2)))
+</code></pre>
+<pre class="output">
+42
+True
+True
+</pre>
+
+        <p>문자열의 해시 값은 보안을 위해 <strong>프로그램을 실행할 때마다 달라진다</strong>. 한 번 실행되는 동안에는 변하지 않으니 찾기에는 문제가 없지만, 문자열을 담은 집합은 출력 순서가 실행마다 바뀔 수 있다. 이 장의 예제가 집합을 출력할 때 늘 <code>sorted()</code>로 감싸는 이유다.</p>
+        <p>딕셔너리는 안쪽에 칸이 여러 개인 표를 두고, 키의 해시 값으로 넣을 칸을 정한다. 실제 규칙은 더 복잡하지만 "해시 값을 칸 수로 나눈 나머지"라고 생각해도 원리는 같다.</p>
+
+        <figure class="fig">
+          <div class="fig-steps">
+            <div class="fig-state">
+              <div class="cells">
+                <div class="cell">17</div>
+                <div class="cell">12</div>
+              </div>
+            </div>
+            <div class="fig-arrow">hash % 8</div>
+            <div class="fig-state">
+              <div class="cells">
+                <div class="cell" data-i="0"></div>
+                <div class="cell is-hl" data-i="1">17</div>
+                <div class="cell" data-i="2"></div>
+                <div class="cell" data-i="3"></div>
+                <div class="cell is-hl" data-i="4">12</div>
+                <div class="cell" data-i="5"></div>
+                <div class="cell" data-i="6"></div>
+                <div class="cell" data-i="7"></div>
+              </div>
+            </div>
+          </div>
+          <figcaption><b>그림 4-1</b> 키 17과 12를 8칸짜리 표에 넣는 모습. 17 % 8 = 1, 12 % 8 = 4이므로 1번과 4번 칸에 들어간다. 찾을 때도 같은 계산으로 그 칸에 바로 간다.</figcaption>
+        </figure>
+
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>자료형</th><th><code>x in 자료</code>가 하는 일</th><th>시간</th></tr></thead>
+            <tbody>
+              <tr><td>list</td><td>앞에서부터 하나씩 비교한다</td><td><span class="bigo b-linear">O(n)</span></td></tr>
+              <tr><td>dict, set</td><td>해시 값으로 칸을 계산해 그 칸만 확인한다</td><td><span class="bigo b-const">O(1)</span> 평균</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <p>"평균"이 붙는 이유는 <strong>충돌(collision)</strong> 때문이다. 서로 다른 키가 같은 칸을 가리키면 몇 번 더 비교해야 하고, 충돌이 극단적으로 몰리면 최악에는 O(n)이 된다. 파이썬은 표가 어느 정도 차면 칸을 늘려 충돌을 줄이므로 실제로는 거의 항상 O(1)이다. 충돌은 12장에서 다룬다.</p>
+      </section>
+
+      <section id="dict-basics">
+        <h2>딕셔너리 기본</h2>
+        <p><strong>딕셔너리(dict)</strong>는 키(key)와 값(value)을 짝지어 저장하는 자료형이다. 사전에서 단어로 뜻을 찾듯 키로 값을 찾는다.</p>
+
+<pre data-lang="python" data-title="dict_basic.py"><code>
+scores = {'kim': 90, 'lee': 75}
+
+print(scores['kim'])          # 키로 값 읽기
+scores['park'] = 82           # 없는 키에 대입하면 새로 추가
+scores['lee'] = 80            # 있는 키에 대입하면 덮어쓰기
+print(scores)
+
+print('lee' in scores)        # in 은 키가 있는지 본다
+print(80 in scores)           # 값은 보지 않는다
+print(len(scores))
+
+del scores['kim']             # 지우기
+removed = scores.pop('park')  # 지우면서 값을 돌려받기
+print(removed, scores)
+</code></pre>
+<pre class="output">
+90
+{'kim': 90, 'lee': 80, 'park': 82}
+True
+False
+3
+82 {'lee': 80}
+</pre>
+
+        <p><code>80 in scores</code>가 <code>False</code>인 데 주의한다. 딕셔너리의 <code>in</code>은 <mark>키만 확인한다</mark>. 값을 찾으려면 <code>80 in scores.values()</code>라고 써야 하고, 이때는 하나씩 비교하므로 O(n)이다.</p>
+
+        <h3>없는 키를 읽을 때</h3>
+        <p><code>d[k]</code>로 없는 키를 읽으면 <code>KeyError</code>가 난다. 키가 없을 수도 있다면 에러 대신 기본값을 돌려주는 <code>get</code>을 쓴다.</p>
+
+<pre data-lang="python" data-title="dict_get.py"><code>
+stock = {'apple': 3}
+
+print(stock.get('apple'))      # 키가 있으면 값
+print(stock.get('pear'))       # 없으면 None
+print(stock.get('pear', 0))    # 없을 때 돌려줄 값을 정할 수 있다
+
+try:
+    print(stock['pear'])
+except KeyError as e:
+    print(f'{type(e).__name__}: {e}')
+</code></pre>
+<pre class="output">
+3
+None
+0
+KeyError: 'pear'
+</pre>
+
+        <p>지울 때도 같다. <code>del d[k]</code>와 <code>d.pop(k)</code>는 키가 없으면 <code>KeyError</code>를 내지만, <code>d.pop(k, None)</code>처럼 기본값을 주면 조용히 기본값을 돌려준다.</p>
+
+        <h3>순회하기</h3>
+        <p>딕셔너리를 그냥 돌면 키가 나오고, <code>items()</code>로 돌면 키와 값이 짝으로 나온다. 순서는 <strong>넣은 순서</strong>이고, 파이썬 3.7부터 언어 규칙으로 보장된다.</p>
+
+<pre data-lang="python" data-title="dict_loop.py"><code>
+ages = {'kim': 25, 'lee': 31, 'park': 28}
+
+for name in ages:                 # 그냥 돌면 키가 나온다
+    print(name)
+
+for name, age in ages.items():    # 키와 값을 함께 꺼낸다
+    print(name, age)
+
+print(list(ages.values()))        # 값만 모으기
+</code></pre>
+<pre class="output">
+kim
+lee
+park
+kim 25
+lee 31
+park 28
+[25, 31, 28]
+</pre>
+
+        <h3>딕셔너리 컴프리헨션</h3>
+        <p>리스트 컴프리헨션(3장)처럼 중괄호 안에 <code>키: 값</code>을 적어 한 줄로 만들 수 있다.</p>
+
+<pre data-lang="python" data-title="dict_comprehension.py"><code>
+words = ['apple', 'kiwi', 'banana']
+
+lengths = {w: len(w) for w in words}
+print(lengths)
+</code></pre>
+<pre class="output">
+{'apple': 5, 'kiwi': 4, 'banana': 6}
+</pre>
+      </section>
+
+      <section id="counting">
+        <h2>세기와 묶기</h2>
+        <p>코딩 테스트에서 딕셔너리를 가장 많이 쓰는 곳은 <strong>몇 번 나왔는지 세기</strong>와 <strong>같은 것끼리 묶기</strong>다. 방법은 세 가지이고, 결과는 같으며 쓰기 편한 정도만 다르다.</p>
+
+        <h3>get으로 세기</h3>
+        <p>처음 보는 키는 0에서, 본 적 있는 키는 원래 값에서 1을 더한다. <code>get(name, 0)</code>이 두 경우를 한 줄로 처리한다.</p>
+
+<pre data-lang="python" data-title="count_get.py"><code>
+votes = ['kim', 'lee', 'kim', 'park', 'kim', 'lee']
+
+count = {}
+for name in votes:
+    count[name] = count.get(name, 0) + 1   # 처음이면 0에서 시작
+print(count)
+</code></pre>
+<pre class="output">
+{'kim': 3, 'lee': 2, 'park': 1}
+</pre>
+
+        <h3>defaultdict: 없는 키를 알아서 만든다</h3>
+        <p><code>collections.defaultdict</code>는 없는 키를 읽는 순간 기본값을 만들어 넣는 딕셔너리다. 괄호 안에 기본값을 만들 함수를 넘긴다. <code>int()</code>는 0을, <code>list()</code>는 빈 리스트를 돌려주므로 각각 세기와 묶기에 알맞다.</p>
+
+<pre data-lang="python" data-title="count_defaultdict.py"><code>
+from collections import defaultdict
+
+votes = ['kim', 'lee', 'kim', 'park', 'kim', 'lee']
+count = defaultdict(int)          # 없는 키는 int() == 0 으로 시작
+for name in votes:
+    count[name] += 1
+print(dict(count))
+
+# 첫 글자가 같은 단어끼리 묶기
+words = ['apple', 'banana', 'avocado', 'blueberry', 'cherry']
+groups = defaultdict(list)        # 없는 키는 빈 리스트로 시작
+for w in words:
+    groups[w[0]].append(w)
+print(dict(groups))
+</code></pre>
+<pre class="output">
+{'kim': 3, 'lee': 2, 'park': 1}
+{'a': ['apple', 'avocado'], 'b': ['banana', 'blueberry'], 'c': ['cherry']}
+</pre>
+
+        <p>일반 딕셔너리였다면 "키가 없으면 빈 리스트부터 넣는다"는 확인을 매번 해야 한다. 출력할 때 감싼 <code>dict()</code>는 모양을 보기 좋게 바꿀 뿐이다.</p>
+
+        <div class="callout callout-warn">
+          <span class="callout-title">읽기만 해도 키가 생긴다</span>
+          <p><code>defaultdict</code>는 <code>count['choi']</code>처럼 <strong>읽기만 해도</strong> <code>'choi': 0</code>을 새로 넣는다. 그래서 <code>if count['choi'] &gt; 0:</code>처럼 확인만 하려던 코드가 딕셔너리를 몰래 키운다. 키가 있는지 볼 때는 <code>'choi' in count</code>를 쓴다.</p>
+        </div>
+
+        <h3>Counter: 세기 전용 도구</h3>
+        <p><code>collections.Counter</code>는 세는 일만을 위한 딕셔너리다. 리스트나 문자열을 통째로 넘기면 한 번에 센다. 없는 키를 읽으면 0을 돌려주지만 키를 만들지는 않는다.</p>
+
+<pre data-lang="python" data-title="count_counter.py"><code>
+from collections import Counter
+
+votes = ['kim', 'lee', 'kim', 'park', 'kim', 'lee']
+count = Counter(votes)
+print(count)
+print(count['kim'], count['choi'])   # 없는 키는 0
+print(count.most_common(2))          # 많이 나온 순서로 2개
+
+print(Counter('banana'))             # 문자열은 글자 단위로 센다
+</code></pre>
+<pre class="output">
+Counter({'kim': 3, 'lee': 2, 'park': 1})
+3 0
+[('kim', 3), ('lee', 2)]
+Counter({'a': 3, 'n': 2, 'b': 1})
+</pre>
+
+        <p><code>most_common(k)</code>은 많은 순서로 <code>(키, 개수)</code> 짝을 k개 돌려주고, k를 빼면 전부 돌려준다. 개수가 같으면 <strong>먼저 나온 키가 앞에</strong> 온다. 문제가 "같으면 사전순"처럼 다른 기준을 요구하면 <code>count.items()</code>를 3장의 방법으로 직접 정렬해야 한다.</p>
+
+<pre data-lang="python" data-title="counter_tie.py"><code>
+from collections import Counter
+
+count = Counter(['b', 'a', 'c', 'a', 'b'])
+print(count.most_common())     # 같으면 먼저 나온 'b' 가 앞
+</code></pre>
+<pre class="output">
+[('b', 2), ('a', 2), ('c', 1)]
+</pre>
+
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>방법</th><th>없는 키를 읽으면</th><th>어울리는 때</th></tr></thead>
+            <tbody>
+              <tr><td><code>dict</code> + <code>get</code></td><td>기본값을 돌려준다. 키는 안 생긴다</td><td>import 없이 간단히 셀 때</td></tr>
+              <tr><td><code>defaultdict</code></td><td>기본값으로 키를 만들어 넣는다</td><td>리스트에 모으기, <code>+=</code>로 쌓기</td></tr>
+              <tr><td><code>Counter</code></td><td>0을 돌려준다. 키는 안 생긴다</td><td>개수 세기, 많은 순으로 뽑기</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section id="set-basics">
+        <h2>집합</h2>
+        <p><strong>집합(set)</strong>은 값 없이 키만 모아 둔 딕셔너리라고 생각하면 된다. 같은 값은 하나만 들어가고, 해시로 찾으니 <code>in</code>이 평균 O(1)이다. 대신 순서가 없어서 <code>s[0]</code> 같은 인덱스 접근은 할 수 없다. <mark>빈 집합은 <code>{}</code>가 아니라 <code>set()</code>으로 만든다.</mark> <code>{}</code>는 빈 딕셔너리다.</p>
+
+<pre data-lang="python" data-title="set_basic.py"><code>
+nums = {3, 1, 3, 2, 1}
+print(sorted(nums))        # 중복은 저절로 사라진다
+
+nums.add(5)
+nums.discard(9)            # 없는 값이어도 조용히 넘어간다
+try:
+    nums.remove(9)         # 없는 값이면 KeyError
+except KeyError as e:
+    print(f'{type(e).__name__}: {e}')
+
+print(2 in nums, len(nums))
+print(sorted({x % 3 for x in range(10)}))   # 집합 컴프리헨션
+</code></pre>
+<pre class="output">
+[1, 2, 3]
+KeyError: 9
+True 4
+[0, 1, 2]
+</pre>
+
+        <p>꼭 있어야 하는 값이면 <code>remove</code>로 실수를 일찍 잡고, 없어도 되면 <code>discard</code>를 쓴다.</p>
+
+        <h3>중복 없애기: 순서를 지킬까 말까</h3>
+        <p>중복을 없애는 가장 짧은 방법은 집합으로 바꾸는 것이지만, <code>list(set(data))</code>의 순서는 보장되지 않는다. 처음 나온 순서를 지키려면 원소를 딕셔너리의 키로 넣는 <code>dict.fromkeys</code>를 쓴다. 키는 중복 없이 넣은 순서대로 남는다.</p>
+
+<pre data-lang="python" data-title="dedupe.py"><code>
+data = [5, 3, 5, 1, 3, 9]
+
+print(sorted(set(data)))           # 정렬된 결과가 필요할 때
+print(list(dict.fromkeys(data)))   # 처음 나온 순서를 지킬 때
+</code></pre>
+<pre class="output">
+[1, 3, 5, 9]
+[5, 3, 1, 9]
+</pre>
+      </section>
+
+      <section id="set-operations">
+        <h2>집합 연산</h2>
+        <p>집합은 합집합, 교집합, 차집합을 연산자 하나로 계산한다. "두 목록에 모두 있는 것"이나 "한쪽에만 있는 것"을 반복문 없이 바로 구할 수 있다.</p>
+
+        <figure class="fig">
+          <div class="fig-steps">
+            <div class="fig-state">
+              <div class="cells">
+                <div class="cell">1</div>
+                <div class="cell">2</div>
+                <div class="cell is-hl">3</div>
+                <div class="cell is-hl">4</div>
+              </div>
+              <span class="fig-state-label">a</span>
+            </div>
+            <div class="fig-state">
+              <div class="cells">
+                <div class="cell is-hl">3</div>
+                <div class="cell is-hl">4</div>
+                <div class="cell">5</div>
+                <div class="cell">6</div>
+              </div>
+              <span class="fig-state-label">b</span>
+            </div>
+            <div class="fig-arrow">a &amp; b</div>
+            <div class="fig-state">
+              <div class="cells">
+                <div class="cell is-hl">3</div>
+                <div class="cell is-hl">4</div>
+              </div>
+              <span class="fig-state-label">교집합</span>
+            </div>
+          </div>
+          <figcaption><b>그림 4-2</b> a와 b에 모두 있는 3과 4가 교집합이 된다.</figcaption>
+        </figure>
+
+<pre data-lang="python" data-title="set_operations.py"><code>
+a = {1, 2, 3, 4}
+b = {3, 4, 5, 6}
+
+print(sorted(a | b))   # 합집합: 어느 한쪽에라도 있는 것
+print(sorted(a &amp; b))   # 교집합: 양쪽 모두에 있는 것
+print(sorted(a - b))   # 차집합: a 에만 있는 것
+print(sorted(b - a))   # 차집합은 순서를 바꾸면 결과가 다르다
+print(sorted(a ^ b))   # 대칭차집합: 한쪽에만 있는 것
+</code></pre>
+<pre class="output">
+[1, 2, 3, 4, 5, 6]
+[3, 4]
+[1, 2]
+[5, 6]
+[1, 2, 5, 6]
+</pre>
+
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>연산</th><th>연산자</th><th>메서드</th><th>결과</th></tr></thead>
+            <tbody>
+              <tr><td>합집합</td><td><code>a | b</code></td><td><code>a.union(b)</code></td><td>어느 한쪽에라도 있는 원소</td></tr>
+              <tr><td>교집합</td><td><code>a &amp; b</code></td><td><code>a.intersection(b)</code></td><td>양쪽 모두에 있는 원소</td></tr>
+              <tr><td>차집합</td><td><code>a - b</code></td><td><code>a.difference(b)</code></td><td><code>a</code>에만 있는 원소</td></tr>
+              <tr><td>대칭차집합</td><td><code>a ^ b</code></td><td><code>a.symmetric_difference(b)</code></td><td>한쪽에만 있는 원소</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <p>연산자는 양쪽이 모두 집합이어야 하고, 메서드는 리스트도 받는다. <code>a | [7, 8]</code>은 <code>TypeError</code>지만 <code>a.union([7, 8])</code>은 동작한다.</p>
+
+        <h3>써먹기: 빠진 번호 찾기</h3>
+        <p>출석 번호가 1번부터 10번까지인 반에서 과제를 내지 않은 번호는 "전체 번호 − 낸 번호", 곧 차집합이다. 두 번 낸 번호는 집합으로 바꿀 때 하나로 합쳐진다.</p>
+
+<pre data-lang="python" data-title="set_practice.py"><code>
+submitted = [3, 7, 1, 10, 4, 7, 2]      # 두 번 낸 사람도 있다
+everyone = set(range(1, 11))
+
+missing = everyone - set(submitted)
+print(sorted(missing))
+</code></pre>
+<pre class="output">
+[5, 6, 8, 9]
+</pre>
+      </section>
+
+      <section id="hashable">
+        <h2>키가 될 수 있는 것</h2>
+        <p>딕셔너리의 키와 집합의 원소는 해시 값을 계산할 수 있어야 한다. 이런 값을 <strong>해시 가능(hashable)</strong>하다고 한다. <mark>내용이 바뀌지 않는(불변) 값이면 대부분 키가 될 수 있다.</mark></p>
+        <p>그림 4-1을 떠올리면 이유를 알 수 있다. 키를 넣은 뒤 내용이 바뀌면 해시 값도 바뀌어, 찾을 때 계산한 칸과 실제로 들어 있는 칸이 어긋난다. 그래서 파이썬은 내용을 바꿀 수 있는 리스트를 키로 받지 않는다.</p>
+
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>자료형</th><th>키가 되는가</th><th>이유</th></tr></thead>
+            <tbody>
+              <tr><td><code>int</code>, <code>float</code>, <code>str</code>, <code>bool</code></td><td>된다</td><td>불변이다</td></tr>
+              <tr><td><code>tuple</code></td><td>원소가 모두 해시 가능할 때만</td><td><code>(1, 2)</code>는 되고 <code>(1, [2])</code>는 안 된다</td></tr>
+              <tr><td><code>frozenset</code></td><td>된다</td><td>바꿀 수 없는 집합이다</td></tr>
+              <tr><td><code>list</code>, <code>dict</code>, <code>set</code></td><td>안 된다</td><td>내용을 바꿀 수 있다</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+<pre data-lang="python" data-title="hashable_keys.py"><code>
+pos = {}
+pos[(0, 1)] = 'start'           # 튜플은 키가 된다
+print(pos[(0, 1)])
+
+for key in ([0, 1], (0, [1])):  # 리스트, 리스트를 품은 튜플
+    try:
+        pos[key] = 'x'
+    except TypeError as e:
+        print(f'{type(e).__name__}: {e}')
+</code></pre>
+<pre class="output">
+start
+TypeError: unhashable type: 'list'
+TypeError: unhashable type: 'list'
+</pre>
+
+        <p>튜플의 해시 값은 원소들의 해시 값으로 계산하므로, 안에 리스트가 있으면 튜플도 키가 될 수 없다. 좌표처럼 여러 값을 묶은 키는 정수만 담은 튜플로 만든다. 격자 지도에서 지나간 칸을 <code>visited.add((r, c))</code>로 집합에 넣어 두면 <code>(r, c) in visited</code>로 평균 O(1)에 확인할 수 있다. 13장의 그래프 탐색에서 이 방식을 다시 쓴다.</p>
+      </section>
+
+      <section id="complexity">
+        <h2>연산별 시간복잡도</h2>
+        <p>기본 연산은 해시로 칸을 계산하므로 평균 O(1)이고, 집합끼리의 연산은 원소를 하나씩 확인하므로 크기에 비례한다. 표에서 n은 <code>a</code>(또는 <code>d</code>)의 크기, m은 <code>b</code>의 크기다.</p>
+
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>연산</th><th>코드</th><th>평균 시간</th><th>이유</th></tr></thead>
+            <tbody>
+              <tr><td>읽기·쓰기</td><td><code>d[k]</code>, <code>d[k] = v</code></td><td><span class="bigo b-const">O(1)</span></td><td>해시로 칸을 바로 찾는다</td></tr>
+              <tr><td>지우기</td><td><code>del d[k]</code>, <code>s.discard(x)</code></td><td><span class="bigo b-const">O(1)</span></td><td>지울 칸을 바로 찾는다</td></tr>
+              <tr><td>키·원소 확인</td><td><code>k in d</code>, <code>x in s</code></td><td><span class="bigo b-const">O(1)</span></td><td>계산한 칸만 본다</td></tr>
+              <tr><td>값 확인</td><td><code>v in d.values()</code></td><td><span class="bigo b-linear">O(n)</span></td><td>값은 해시로 찾지 않아 하나씩 비교한다</td></tr>
+              <tr><td>합집합</td><td><code>a | b</code></td><td><span class="bigo b-linear">O(n + m)</span></td><td>양쪽 원소를 모두 새 집합에 넣는다</td></tr>
+              <tr><td>교집합</td><td><code>a &amp; b</code></td><td><span class="bigo b-linear">O(min(n, m))</span></td><td>작은 쪽을 돌며 큰 쪽에 있는지 본다</td></tr>
+              <tr><td>차집합</td><td><code>a - b</code></td><td><span class="bigo b-linear">O(n)</span></td><td><code>a</code>의 원소마다 <code>b</code>에 있는지 본다</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <p>차이가 가장 크게 드러나는 곳은 <strong>반복문 안에서 "있는지" 확인할 때</strong>다. 질문 n개를 크기 n인 리스트에 <code>in</code>으로 물으면 최악에 n × n번, n이 10만이면 100억 번을 비교한다. <mark>반복문 밖에서 <code>set(lst)</code>로 한 번 바꿔 두면</mark> 바꾸는 데 n번, 질문마다 평균 한 번이라 20만 번 정도로 끝난다.</p>
+      </section>
+
+      <section id="pitfalls">
+        <h2>자주 하는 실수</h2>
+        <div class="callout callout-warn">
+          <span class="callout-title">없을 수도 있는 키를 []로 읽기</span>
+          <p><code>d[k]</code>는 키가 없으면 <code>KeyError</code>로 멈춘다. <code>get</code>을 쓰거나 <code>if k in d:</code>로 먼저 확인한다.</p>
+        </div>
+        <div class="callout callout-warn">
+          <span class="callout-title">순회하면서 키를 넣거나 지우기</span>
+          <p>딕셔너리를 <code>for</code>로 도는 도중에 키를 추가하거나 지우면 <code>RuntimeError</code>가 난다. 있는 키의 값만 바꾸는 것은 괜찮다. 지워야 한다면 <code>list(d)</code>로 키 목록을 복사해 그것을 돌거나, <code>{k: v for k, v in d.items() if 조건}</code>으로 남길 것만 새로 만든다.</p>
+        </div>
+
+<pre data-lang="python" data-title="dict_modify_loop.py"><code>
+stock = {'apple': 0, 'pear': 2, 'kiwi': 0}
+try:
+    for name in stock:
+        if stock[name] == 0:
+            del stock[name]        # 도는 중에 크기가 바뀐다
+except RuntimeError as e:
+    print(f'{type(e).__name__}: {e}')
+
+stock = {'apple': 0, 'pear': 2, 'kiwi': 0}
+for name in list(stock):           # 키 목록을 복사해 두고 돈다
+    if stock[name] == 0:
+        del stock[name]
+print(stock)
+</code></pre>
+<pre class="output">
+RuntimeError: dictionary changed size during iteration
+{'pear': 2}
+</pre>
+
+        <div class="callout callout-warn">
+          <span class="callout-title">집합의 순서에 기대기</span>
+          <p>문자열을 담은 집합은 실행할 때마다 출력 순서가 달라질 수 있다. 내 컴퓨터에서 원하는 순서로 나왔어도 채점 서버에서는 다를 수 있다. 순서가 필요하면 <code>sorted()</code>나 <code>dict.fromkeys</code>를 쓴다.</p>
+        </div>
+        <div class="callout callout-warn">
+          <span class="callout-title">리스트를 키로 쓰기</span>
+          <p><code>TypeError: unhashable type: 'list'</code>가 난다. 여러 값을 묶은 키는 <code>tuple(lst)</code>로 바꿔 넣는다.</p>
+        </div>
+      </section>
+
+      <section id="problem">
+        <h2>대표 문제</h2>
+        <div class="problem">
+          <div class="problem-head">
+            <div class="problem-kicker"><b>Problem</b><span class="chip">쉬움</span><span class="chip">딕셔너리</span></div>
+            <h3>두 수의 합</h3>
+          </div>
+          <div class="problem-body">
+            <p>정수 리스트 <code>nums</code>와 정수 <code>target</code>이 주어진다. <code>nums</code>에서 더해서 <code>target</code>이 되는 두 원소를 찾아, 두 원소의 <strong>인덱스</strong>를 작은 것부터 담은 리스트로 돌려주는 함수 <code>two_sum(nums, target)</code>을 작성하라.</p>
+            <ul>
+              <li>답은 언제나 정확히 하나 있다.</li>
+              <li>같은 원소를 두 번 쓸 수는 없다. 값이 같은 서로 다른 원소는 쓸 수 있다.</li>
+              <li><code>nums</code>의 길이는 2 이상 100,000 이하이고, 음수가 들어 있을 수 있다.</li>
+            </ul>
+            <div class="table-wrap">
+              <table>
+                <thead><tr><th><code>nums</code></th><th><code>target</code></th><th>출력</th><th>이유</th></tr></thead>
+                <tbody>
+                  <tr><td><code>[4, 9, 2, 7]</code></td><td><code>9</code></td><td><code>[2, 3]</code></td><td>2 + 7 = 9</td></tr>
+                  <tr><td><code>[6, -2, 11, 3]</code></td><td><code>1</code></td><td><code>[1, 3]</code></td><td>-2 + 3 = 1</td></tr>
+                  <tr><td><code>[3, 3, 8]</code></td><td><code>6</code></td><td><code>[0, 1]</code></td><td>값은 같아도 서로 다른 원소다</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <details class="reveal">
+            <summary>접근 방법<span class="reveal-hint">먼저 생각해 보고 펼치세요</span></summary>
+            <div class="reveal-body">
+              <p>먼저 떠오르는 방법은 모든 쌍을 더해 보는 것이다.</p>
+<pre data-lang="python" data-title="two_sum_slow.py"><code>
+def two_sum_slow(nums: list[int], target: int) -&gt; list[int]:
+    n = len(nums)
+    for i in range(n):
+        for j in range(i + 1, n):     # 모든 쌍을 한 번씩 본다
+            if nums[i] + nums[j] == target:
+                return [i, j]
+    return []
+
+
+print(two_sum_slow([4, 9, 2, 7], 9))
+</code></pre>
+<pre class="output">
+[2, 3]
+</pre>
+              <p>쌍이 n(n-1)/2개라 O(n²)이다. n이 10만이면 약 50억 쌍이라 시간 안에 끝나지 않는다.</p>
+              <p>관점을 바꿔 보자. 지금 보는 수가 <code>x</code>라면 짝은 <code>target - x</code>로 정해져 있다. 그러니 <mark>"그 짝이 앞에 나온 적이 있는가?"만 빠르게 알면 된다</mark>. 지금까지 본 값을 딕셔너리에 <code>{값: 인덱스}</code>로 적어 두면 평균 O(1)로 답할 수 있다.</p>
+              <ol>
+                <li>빈 딕셔너리 <code>seen</code>을 만든다.</li>
+                <li>원소를 앞에서부터 보며, 짝 <code>need = target - x</code>가 <code>seen</code>에 있으면 <code>[seen[need], i]</code>를 돌려준다.</li>
+                <li>없으면 <code>seen[x] = i</code>로 지금 값을 적어 두고 다음 원소로 넘어간다. 짝을 확인한 <strong>뒤에</strong> 적어야 자기 자신과 짝을 짓지 않는다.</li>
+              </ol>
+            </div>
+          </details>
+
+          <details class="reveal">
+            <summary>풀이 코드</summary>
+            <div class="reveal-body">
+<pre data-lang="python" data-title="two_sum.py"><code>
+def two_sum(nums: list[int], target: int) -&gt; list[int]:
+    seen = {}                        # 값 -&gt; 그 값이 나온 인덱스
+
+    for i, x in enumerate(nums):
+        need = target - x            # x 와 짝이 될 값
+        if need in seen:             # 짝이 앞에 나왔는가: 평균 O(1)
+            return [seen[need], i]
+        seen[x] = i                  # 확인한 뒤에 적는다
+
+    return []                        # 답이 항상 있으니 여기엔 오지 않는다
+
+
+print(two_sum([4, 9, 2, 7], 9))
+print(two_sum([6, -2, 11, 3], 1))
+print(two_sum([3, 3, 8], 6))
+</code></pre>
+<pre class="output">
+[2, 3]
+[1, 3]
+[0, 1]
+</pre>
+              <p><code>seen</code>의 인덱스는 늘 <code>i</code>보다 작아서 결과가 저절로 작은 것부터 담긴다.</p>
+            </div>
+          </details>
+
+          <details class="reveal">
+            <summary>복잡도</summary>
+            <div class="reveal-body">
+              <dl class="cx">
+                <dt>시간</dt><dd><span class="bigo b-linear">O(n)</span> 원소를 한 번씩 보고, 원소마다 딕셔너리 확인과 기록이 평균 O(1)이다.</dd>
+                <dt>공간</dt><dd><span class="bigo b-linear">O(n)</span> 답이 맨 끝에 있으면 거의 모든 값을 <code>seen</code>에 적는다.</dd>
+              </dl>
+            </div>
+          </details>
+        </div>
+      </section>
+
+      <section id="recall">
+        <h2>스스로 확인</h2>
+        <div class="recall">
+          <details>
+            <summary>리스트의 <code>x in lst</code>는 O(n)인데 집합의 <code>x in s</code>는 평균 O(1)인 이유는?</summary>
+            <div class="answer"><p>리스트는 앞에서부터 하나씩 비교한다. 집합은 <code>x</code>의 해시 값으로 칸을 계산해 그 칸만 확인하므로, 원소가 많아져도 확인 횟수가 거의 늘지 않는다.</p></div>
+          </details>
+          <details>
+            <summary><code>two_sum</code>에서 <code>seen[x] = i</code>를 짝 확인보다 먼저 하면 어떤 입력에서 틀리는가?</summary>
+            <div class="answer"><p><code>target</code>이 어떤 원소의 두 배일 때 틀린다. <code>nums = [3, 1, 5]</code>, <code>target = 6</code>이면 답은 <code>[1, 2]</code>인데, 3을 먼저 적고 짝 3을 찾으면 방금 적은 자기 자신이 나와 <code>[0, 0]</code>을 돌려준다.</p></div>
+          </details>
+          <details>
+            <summary><code>count = defaultdict(int)</code>에서 <code>if count['x'] &gt; 0:</code>으로 확인만 하면 무슨 일이 생기는가?</summary>
+            <div class="answer"><p><code>'x'</code>가 없었다면 읽는 순간 <code>'x': 0</code>이 새로 추가된다. 확인만 하려면 <code>'x' in count</code>를 쓰거나, 키를 만들지 않는 <code>Counter</code>를 쓴다.</p></div>
+          </details>
+          <details>
+            <summary><code>[[1, 2], [1, 2], [3]]</code>의 중복을 <code>set()</code>으로 없애려 하면 왜 실패하고, 어떻게 고치는가?</summary>
+            <div class="answer"><p>리스트는 해시 가능하지 않아 <code>TypeError</code>가 난다. <code>{tuple(x) for x in data}</code>처럼 튜플로 바꿔 넣으면 <code>(1, 2)</code>와 <code>(3,)</code> 두 개가 남는다.</p></div>
+          </details>
+        </div>
+      </section>
+
+      <section id="summary">
+        <h2>정리</h2>
+        <ol class="summary-list">
+          <li>딕셔너리와 집합은 키를 해시 값으로 바꿔 칸을 바로 찾는다. 그래서 찾기, 넣기, 지우기가 평균 O(1)이다.</li>
+          <li>딕셔너리는 넣은 순서를 기억한다. <code>in</code>은 키만 확인하고, 없을 수도 있는 키는 <code>get</code>으로 읽는다.</li>
+          <li>세기는 <code>get(k, 0) + 1</code>, <code>defaultdict(int)</code>, <code>Counter</code> 중 하나로 하고, 묶기는 <code>defaultdict(list)</code>가 편하다. <code>defaultdict</code>는 읽기만 해도 키가 생긴다.</li>
+          <li>집합은 중복을 없애고 <code>|</code> <code>&amp;</code> <code>-</code> <code>^</code>로 합·교·차집합을 구한다. 순서가 없으니 출력할 때는 <code>sorted()</code>를 쓴다.</li>
+          <li>키와 원소는 해시 가능한 불변 값이어야 한다. 리스트 대신 튜플을 쓴다.</li>
+          <li>반복문 안에서 "있는지"를 자주 묻는다면 리스트를 집합이나 딕셔너리로 바꿔 O(n²)을 O(n)으로 줄인다.</li>
+        </ol>
+      </section>
+
+      <nav class="pager" aria-label="이전 장과 다음 장"></nav>
+    </article>
+  </main>
+
+  <aside class="rail" aria-label="이 페이지 목차">
+    <p class="rail-title">이 페이지</p>
+    <nav id="onthispage"></nav>
+  </aside>
+</div>
+<div class="backdrop" id="backdrop"></div>
+
+<script src="assets/book.js"></script>
+<script src="assets/app.js"></script>
+<script src="assets/code.js"></script>
+</body>
+</html>

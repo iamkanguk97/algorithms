@@ -1,0 +1,652 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>03. 리스트와 튜플 — 파이썬 알고리즘 노트</title>
+<script src="assets/theme.js"></script>
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body data-chapter="03">
+<a class="skip-link" href="#content">본문으로 건너뛰기</a>
+<div class="progress" aria-hidden="true"><span></span></div>
+<header class="topbar" id="topbar"></header>
+
+<div class="shell">
+  <aside class="sidebar" id="sidebar" aria-label="책 목차"></aside>
+
+  <main class="main" id="content">
+    <article class="chapter">
+      <header class="chapter-head">
+        <a class="part-pill"></a>
+        <span class="chapter-label"></span>
+        <h1>리스트와 튜플</h1>
+        <p class="lede">여러 값을 순서대로 담는 리스트는 코딩 테스트에서 가장 많이 쓰는 자료형입니다. 리스트를 자르고, 고치고, 정렬하는 법과 함께 바꿀 수 없는 짝꿍인 튜플을 익힙니다.</p>
+        <div class="chapter-meta">
+          <span class="chip">인덱싱 · 슬라이싱</span><span class="chip">컴프리헨션</span><span class="chip">sort · sorted</span><span class="chip">튜플 · 언패킹</span>
+        </div>
+      </header>
+
+      <div class="goals">
+        <p class="goals-title">이 장에서 배울 것</p>
+        <ul>
+          <li>인덱스와 슬라이싱으로 리스트에서 원하는 부분을 꺼낼 수 있다</li>
+          <li>리스트 메서드마다 걸리는 시간이 다른 이유를 설명할 수 있다</li>
+          <li>리스트 컴프리헨션과 2차원 리스트를 함정 없이 만들 수 있다</li>
+          <li>튜플 언패킹, <code>enumerate</code>, <code>zip</code>으로 반복문을 짧게 쓸 수 있다</li>
+          <li><code>key</code>를 써서 여러 기준으로 정렬할 수 있다</li>
+        </ul>
+      </div>
+
+      <section id="list-basics">
+        <h2>리스트 만들기와 인덱싱</h2>
+        <div class="callout callout-key">
+          <span class="callout-title">핵심</span>
+          <p class="callout-big">리스트는 <mark>값을 순서대로 늘어놓고 번호로 바로 찾아가는</mark> 자료형이다. 번호는 0부터 센다.</p>
+        </div>
+        <p>리스트는 대괄호 안에 값을 쉼표로 늘어놓아 만든다. 각 칸의 번호를 <strong>인덱스(index)</strong>라고 한다. 인덱스는 "맨 앞에서 몇 칸 떨어져 있는가"를 뜻해서 첫 칸이 0번이다.</p>
+        <p>음수 인덱스는 뒤에서부터 센다. <code>-1</code>은 마지막 칸, <code>-2</code>는 그 앞 칸이다. 내부에서는 음수 <code>i</code>를 <code>len(a) + i</code>로 바꿔 찾아간다.</p>
+
+        <figure class="fig">
+          <div class="fig-steps">
+            <div class="cells">
+              <div class="cell" data-i="0" data-ptr="-5">10</div>
+              <div class="cell" data-i="1" data-ptr="-4">20</div>
+              <div class="cell" data-i="2" data-ptr="-3">30</div>
+              <div class="cell" data-i="3" data-ptr="-2">40</div>
+              <div class="cell" data-i="4" data-ptr="-1">50</div>
+            </div>
+          </div>
+          <figcaption><b>그림 3-1</b> 칸 바로 아래 회색 숫자는 앞에서 센 인덱스, 그 아래 색 숫자는 뒤에서 센 인덱스다. <code>nums[1]</code>과 <code>nums[-4]</code>는 같은 칸이다.</figcaption>
+        </figure>
+
+<pre data-lang="python" data-title="list_basics.py"><code>
+nums = [10, 20, 30, 40, 50]
+
+print(list(range(5)))      # range를 리스트로 펼친다
+print([0] * 4)             # 0으로 채운 4칸짜리 리스트
+print(nums[0], nums[-1])   # 첫 칸, 마지막 칸
+nums[1] = 99               # 칸의 값을 바꿀 수 있다
+print(nums, len(nums))
+</code></pre>
+<pre class="output">
+[0, 1, 2, 3, 4]
+[0, 0, 0, 0]
+10 50
+[10, 99, 30, 40, 50] 5
+</pre>
+
+        <p>인덱스로 읽고 쓰는 일은 리스트가 얼마나 길든 <span class="bigo b-const">O(1)</span>이다. 칸들이 메모리에 나란히 놓여 있어서 "시작 위치 + 칸 크기 × 인덱스"로 위치를 바로 계산하기 때문이다(8장). 없는 칸을 읽으면 <code>IndexError: list index out of range</code>가 난다.</p>
+        <p><code>[0] * n</code>은 방문 표시나 개수 세기용 배열에 자주 쓴다. 단, 2차원에서는 함정이 있다(2차원 리스트 절).</p>
+      </section>
+
+      <section id="slicing">
+        <h2>슬라이싱</h2>
+        <p><strong>슬라이싱(slicing)</strong>은 리스트의 한 구간을 잘라 새 리스트로 만드는 문법이다. <code>a[start:stop:step]</code>처럼 쓰고, <mark>start 칸은 들어가고 stop 칸은 들어가지 않는다.</mark></p>
+
+        <figure class="fig">
+          <div class="fig-steps">
+            <div class="cells">
+              <div class="cell" data-i="0">10</div>
+              <div class="cell is-hl" data-i="1">20</div>
+              <div class="cell is-hl" data-i="2">30</div>
+              <div class="cell is-hl" data-i="3">40</div>
+              <div class="cell" data-i="4">50</div>
+            </div>
+            <div class="fig-arrow">a[1:4]</div>
+            <div class="cells">
+              <div class="cell is-hl" data-i="0">20</div>
+              <div class="cell is-hl" data-i="1">30</div>
+              <div class="cell is-hl" data-i="2">40</div>
+            </div>
+          </div>
+          <figcaption><b>그림 3-2</b> <code>a[1:4]</code>는 1번 칸부터 4번 칸 바로 앞까지 잘라 새 리스트를 만든다.</figcaption>
+        </figure>
+
+        <p>start를 빼면 처음부터, stop을 빼면 끝까지, step을 빼면 한 칸씩이다. step이 음수면 뒤에서 앞으로 걷는다. 이때 start와 stop을 빼면 끝에서 처음까지라는 뜻이 되어 <code>a[::-1]</code>이 뒤집힌 리스트가 된다.</p>
+
+<pre data-lang="python" data-title="slicing.py"><code>
+a = [10, 20, 30, 40, 50]
+
+print(a[1:4])     # 1, 2, 3번 칸 (4번은 빠진다)
+print(a[3:])      # 3번 칸부터 끝까지
+print(a[::2])     # 두 칸씩 건너뛰며
+print(a[-2:])     # 뒤에서 두 개
+print(a[::-1])    # 거꾸로
+print(a[1:100])   # 범위를 넘어도 에러가 나지 않는다
+</code></pre>
+<pre class="output">
+[20, 30, 40]
+[40, 50]
+[10, 30, 50]
+[40, 50]
+[50, 40, 30, 20, 10]
+[20, 30, 40, 50]
+</pre>
+
+        <p>인덱싱과 달리 슬라이싱은 범위를 벗어나도 있는 칸까지만 잘라 준다. 그리고 결과는 원본의 일부를 가리키는 것이 아니라 <strong>새 리스트</strong>다. 그래서 <code>a[:]</code>는 전체 복사가 되고, 잘라 낸 길이 k만큼 <span class="bigo b-linear">O(k)</span>가 걸린다. 반면 <code>b = a</code>는 복사가 아니라 같은 리스트에 이름을 하나 더 붙이는 것이다(2장).</p>
+
+        <div class="callout callout-tip">
+          <span class="callout-title">stop 칸을 빼는 이유</span>
+          <p>그래야 <code>a[:k] + a[k:]</code>가 겹치거나 빠지는 칸 없이 정확히 원래 리스트가 된다. 잘라 낸 길이도 <code>stop - start</code>로 바로 나온다.</p>
+        </div>
+      </section>
+
+      <section id="list-methods">
+        <h2>리스트 메서드와 시간복잡도</h2>
+        <p>메서드는 이름과 함께 <mark>리스트의 어디에서 일어나는 연산인지</mark>를 기억해야 한다. 같은 "넣기"라도 끝에서 하느냐 앞에서 하느냐에 따라 속도가 크게 다르다.</p>
+
+<pre data-lang="python" data-title="list_methods.py"><code>
+a = [3, 1, 4]
+
+a.append(1)          # 끝에 하나 붙인다
+a.extend([5, 9])     # 끝에 여러 개 이어 붙인다
+print(a)
+
+a.insert(0, 2)       # 0번 자리에 끼워 넣는다
+print(a)
+
+print(a.pop())       # 끝 원소를 꺼내 돌려준다
+print(a.pop(0))      # 0번 원소를 꺼내 돌려준다
+print(a)
+
+a.remove(1)          # 값이 1인 첫 원소를 지운다
+print(a)
+print(a.index(4), a.count(1), 5 in a)
+</code></pre>
+<pre class="output">
+[3, 1, 4, 1, 5, 9]
+[2, 3, 1, 4, 1, 5, 9]
+9
+2
+[3, 1, 4, 1, 5]
+[3, 4, 1, 5]
+1 1 True
+</pre>
+
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>연산</th><th>코드</th><th>시간</th><th>이유</th></tr></thead>
+            <tbody>
+              <tr><td>인덱스로 읽기·쓰기</td><td><code>a[i]</code></td><td><span class="bigo b-const">O(1)</span></td><td>위치를 바로 계산한다</td></tr>
+              <tr><td>끝에 넣기</td><td><code>append(x)</code></td><td><span class="bigo b-const">O(1)*</span></td><td>끝에 붙이기만 한다</td></tr>
+              <tr><td>끝에서 꺼내기</td><td><code>pop()</code></td><td><span class="bigo b-const">O(1)</span></td><td>끝에서 떼기만 한다</td></tr>
+              <tr><td>중간·앞에 넣기</td><td><code>insert(i, x)</code></td><td><span class="bigo b-linear">O(n)</span></td><td>i 뒤 원소를 한 칸씩 민다</td></tr>
+              <tr><td>중간·앞에서 빼기</td><td><code>pop(i)</code>, <code>del a[i]</code></td><td><span class="bigo b-linear">O(n)</span></td><td>i 뒤 원소를 한 칸씩 당긴다</td></tr>
+              <tr><td>값으로 지우기</td><td><code>remove(x)</code></td><td><span class="bigo b-linear">O(n)</span></td><td>찾고, 당긴다</td></tr>
+              <tr><td>값 찾기·세기</td><td><code>in</code>, <code>index</code>, <code>count</code></td><td><span class="bigo b-linear">O(n)</span></td><td>처음부터 하나씩 비교한다</td></tr>
+              <tr><td>정렬</td><td><code>sort()</code></td><td><span class="bigo b-nlogn">O(n log n)</span></td><td>19장에서 다룬다</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <p>* <code>append</code>는 가끔 공간이 모자라 원소를 더 큰 곳으로 통째로 옮기지만, 평균을 내면 한 번에 O(1)이다(8장).</p>
+
+        <p>O(n)인 연산은 두 부류다. <code>in</code>처럼 값을 처음부터 훑는 연산과, <code>insert</code>와 <code>pop(i)</code>처럼 칸을 밀거나 당기는 연산이다. 리스트는 칸이 빈틈없이 붙어 있어야 해서, 중간에 하나를 넣으면 그 뒤 원소가 모두 한 칸씩 옮겨 간다.</p>
+
+        <figure class="fig">
+          <div class="fig-steps">
+            <div class="cells">
+              <div class="cell" data-i="0">3</div>
+              <div class="cell" data-i="1">1</div>
+              <div class="cell" data-i="2">4</div>
+              <div class="cell" data-i="3">1</div>
+            </div>
+            <div class="fig-arrow">insert(1, 9)</div>
+            <div class="cells">
+              <div class="cell" data-i="0">3</div>
+              <div class="cell is-hl" data-i="1">9</div>
+              <div class="cell" data-i="2">1</div>
+              <div class="cell" data-i="3">4</div>
+              <div class="cell" data-i="4">1</div>
+            </div>
+          </div>
+          <figcaption><b>그림 3-3</b> 9가 들어갈 1번 자리를 비우려고, 그 뒤의 1, 4, 1이 모두 한 칸씩 밀린다.</figcaption>
+        </figure>
+
+        <p>그래서 맨 앞에서 넣고 빼는 <code>insert(0, x)</code>와 <code>pop(0)</code>이 가장 느리다. 앞쪽 작업이 잦으면 <code>collections.deque</code>를 쓴다(7장, 11장).</p>
+      </section>
+
+      <section id="comprehension">
+        <h2>리스트 컴프리헨션</h2>
+        <p><strong>리스트 컴프리헨션(list comprehension)</strong>은 반복하면서 리스트를 채우는 코드를 식 하나로 쓰는 문법이다. <code>[식 for 변수 in 대상 if 조건]</code>을 "무엇을 담을지, 어디서 꺼낼지, 무엇만 남길지" 순서로 읽는다.</p>
+
+<pre data-lang="python" data-title="comprehension.py"><code>
+squares = []
+for x in range(1, 6):
+    squares.append(x * x)
+print(squares)
+
+print([x * x for x in range(1, 6)])          # 같은 결과를 한 줄로
+print([x for x in range(10) if x % 3 == 0])  # 조건에 맞는 것만
+print(['짝' if x % 2 == 0 else '홀' for x in range(4)])
+print([(r, c) for r in range(2) for c in range(3)])
+</code></pre>
+<pre class="output">
+[1, 4, 9, 16, 25]
+[1, 4, 9, 16, 25]
+[0, 3, 6, 9]
+['짝', '홀', '짝', '홀']
+[(0, 0), (0, 1), (0, 2), (1, 0), (1, 1), (1, 2)]
+</pre>
+
+        <p><code>if</code>가 들어가는 자리가 두 군데라 헷갈리기 쉽다. <code>for</code> <strong>뒤</strong>의 <code>if</code>는 거르는 조건이라 맞지 않는 값이 빠진다. <code>for</code> <strong>앞</strong>의 <code>A if 조건 else B</code>는 값을 고르는 식이라 개수는 그대로이고, <code>else</code>가 꼭 있어야 한다. 이중 반복은 쓴 순서대로 바깥, 안쪽 반복이 된다.</p>
+
+        <div class="callout callout-tip">
+          <span class="callout-title">반복문이 더 나을 때</span>
+          <p>조건이 여럿 겹치거나, 반복이 셋 이상 중첩되거나, 중간에 <code>print</code> 같은 다른 일을 해야 하면 평범한 <code>for</code> 문이 더 읽기 쉽다.</p>
+        </div>
+      </section>
+
+      <section id="tuple">
+        <h2>튜플과 언패킹</h2>
+        <h3>튜플은 바꿀 수 없는 리스트</h3>
+        <p><strong>튜플(tuple)</strong>은 한 번 만들면 바꿀 수 없는 순서 있는 묶음이다. 인덱싱, 슬라이싱, <code>len</code>, <code>in</code>은 리스트와 똑같이 쓰지만, 칸 대입이나 <code>append</code>처럼 내용을 바꾸는 연산은 없다.</p>
+
+<pre data-lang="python" data-title="tuple_basics.py"><code>
+point = (3, 5)
+single = (7,)        # 원소 하나짜리 튜플은 쉼표가 필요하다
+not_tuple = (7)      # 괄호만 있으면 그냥 정수 7
+print(type(single).__name__, type(not_tuple).__name__)
+
+try:
+    point[0] = 10
+except TypeError as e:
+    print(f'{type(e).__name__}: {e}')
+</code></pre>
+<pre class="output">
+tuple int
+TypeError: 'tuple' object does not support item assignment
+</pre>
+
+        <p>튜플을 만드는 것은 괄호가 아니라 <strong>쉼표</strong>다. 괄호는 식을 묶는 데도 쓰여서 <code>(7)</code>은 그냥 7이다.</p>
+        <p>좌표 <code>(r, c)</code>나 <code>(이름, 점수)</code>처럼 바뀌면 안 되는 작은 묶음에 튜플을 쓴다. 리스트와 달리 딕셔너리의 키나 집합의 원소가 될 수 있다(4장).</p>
+
+        <h3>패킹과 언패킹</h3>
+        <p>여러 값을 쉼표로 묶어 튜플 하나로 만드는 것을 <strong>패킹(packing)</strong>, 묶음을 풀어 여러 이름에 나눠 담는 것을 <strong>언패킹(unpacking)</strong>이라고 한다. 언패킹은 리스트나 문자열에도 된다.</p>
+
+<pre data-lang="python" data-title="unpacking.py"><code>
+pair = 3, 5          # 쉼표만 써도 튜플이다(패킹)
+x, y = pair          # 하나씩 나눠 담는다(언패킹)
+print(x, y)
+
+x, y = y, x          # 두 값 바꾸기
+print(x, y)
+
+first, *rest = [1, 2, 3, 4]   # 나머지는 리스트로
+print(first, rest)
+</code></pre>
+<pre class="output">
+3 5
+5 3
+1 [2, 3, 4]
+</pre>
+
+        <p><code>x, y = y, x</code>가 임시 변수 없이 되는 이유는 오른쪽이 먼저 계산되기 때문이다. 튜플 <code>(5, 3)</code>이 먼저 만들어진 뒤 왼쪽 이름들에 나눠 담긴다.</p>
+        <p><code>*rest</code> 같은 별표 이름이 없으면 이름 수와 값의 수가 같아야 하고, 다르면 <code>ValueError</code>가 난다. 함수의 <code>return a, b</code>도 튜플 하나를 돌려주고 받는 쪽에서 언패킹하는 것이다.</p>
+
+        <h3>enumerate와 zip</h3>
+        <p>인덱스와 값이 함께 필요하면 <code>range(len(a))</code>로 돌며 <code>a[i]</code>를 꺼내는 대신 <code>enumerate(a)</code>를 쓴다. <code>(인덱스, 값)</code> 튜플을 차례로 내놓고, <code>for</code>가 그 자리에서 언패킹한다. 두 리스트를 나란히 걸을 때는 같은 자리끼리 묶어 주는 <code>zip</code>을 쓴다. <mark>길이가 다르면 짧은 쪽이 끝날 때 함께 멈춘다.</mark></p>
+
+<pre data-lang="python" data-title="enumerate_zip.py"><code>
+fruits = ['사과', '배', '감']
+prices = [1200, 3000, 800, 500]
+
+for i, fruit in enumerate(fruits):        # (인덱스, 값)
+    print(i, fruit)
+
+for fruit, price in zip(fruits, prices):  # 짧은 쪽에서 멈춘다
+    print(fruit, price)
+</code></pre>
+<pre class="output">
+0 사과
+1 배
+2 감
+사과 1200
+배 3000
+감 800
+</pre>
+
+        <p><code>prices</code>의 500은 짝이 없어 조용히 버려졌다. 길이가 반드시 같아야 한다면 <code>zip(a, b, strict=True)</code>로 써서 다를 때 <code>ValueError</code>가 나게 한다.</p>
+      </section>
+
+      <section id="grid">
+        <h2>2차원 리스트</h2>
+        <p>2차원 리스트는 리스트를 원소로 갖는 리스트로, 지도나 게임판처럼 행과 열이 있는 데이터를 담는다. <code>grid[r][c]</code>는 r번 행 리스트를 꺼낸 뒤 그 안의 c번 칸을 읽는다. 반복 변수 <code>_</code>는 "이 값은 쓰지 않는다"는 관례적 표시다.</p>
+
+<pre data-lang="python" data-title="grid.py"><code>
+n, m = 3, 4
+grid = [[0] * m for _ in range(n)]   # 행마다 새 리스트를 만든다
+grid[1][2] = 7                       # 1행 2열
+
+for row in grid:
+    print(row)
+</code></pre>
+<pre class="output">
+[0, 0, 0, 0]
+[0, 0, 7, 0]
+[0, 0, 0, 0]
+</pre>
+
+        <h3>곱하기로 만들면 생기는 일</h3>
+        <p><code>[[0] * m] * n</code>으로 만들면 한 칸만 바꿨는데 모든 행이 함께 바뀐다.</p>
+
+<pre data-lang="python" data-title="grid_trap.py"><code>
+bad = [[0] * 4] * 3      # 같은 행 하나를 세 번 가리킨다
+bad[1][2] = 7
+
+for row in bad:
+    print(row)
+print(bad[0] is bad[1])  # 0행과 1행이 같은 리스트인가?
+</code></pre>
+<pre class="output">
+[0, 0, 7, 0]
+[0, 0, 7, 0]
+[0, 0, 7, 0]
+True
+</pre>
+
+        <p>리스트의 칸에는 값 자체가 아니라 값을 가리키는 <strong>참조</strong>가 들어 있고(2장), <code>*</code>는 이 참조를 복사할 뿐이다. 그래서 <code>[[0] * 4] * 3</code>은 <mark>행 리스트 하나를 가리키는 참조 세 개</mark>다.</p>
+        <p><code>[0] * 4</code>도 네 칸이 같은 0을 가리키지만 문제가 없다. 정수는 바꿀 수 없는 값이라, 칸에 7을 대입하면 그 칸만 7을 가리키게 되고 다른 칸은 그대로 0을 가리킨다. 컴프리헨션은 반복할 때마다 <code>[0] * m</code>을 새로 계산하므로 행마다 다른 리스트가 생긴다.</p>
+
+        <h3>얕은 복사와 깊은 복사</h3>
+        <p><code>grid.copy()</code>나 <code>grid[:]</code>는 바깥 리스트만 새로 만들고 행은 원본과 함께 쓴다. 이것을 <strong>얕은 복사(shallow copy)</strong>라고 한다. 안쪽 리스트까지 모두 새로 만드는 <strong>깊은 복사(deep copy)</strong>는 <code>copy.deepcopy</code>가 한다.</p>
+
+<pre data-lang="python" data-title="grid_copy.py"><code>
+import copy
+
+grid = [[1, 2], [3, 4]]
+shallow = grid.copy()          # 바깥 리스트만 새로 만든다
+deep = copy.deepcopy(grid)     # 안쪽 리스트까지 새로 만든다
+
+grid[0][0] = 99
+print(shallow)
+print(deep)
+</code></pre>
+<pre class="output">
+[[99, 2], [3, 4]]
+[[1, 2], [3, 4]]
+</pre>
+
+        <p>격자에 숫자처럼 바꿀 수 없는 값만 있다면 행마다 슬라이스하는 <code>[row[:] for row in grid]</code>로 충분하고, 끝까지 따라가며 복사하는 <code>deepcopy</code>보다 가볍다.</p>
+
+        <h3>행과 열 뒤집기: zip(*grid)</h3>
+        <p>함수를 부를 때 리스트 앞에 <code>*</code>를 붙이면 원소를 낱개 인자로 풀어 넘긴다. 그래서 <code>zip(*grid)</code>는 <code>zip(grid[0], grid[1], ...)</code>과 같아서 열끼리 묶인다. 행과 열을 맞바꾸는 <strong>전치(transpose)</strong>가 한 줄이다.</p>
+
+<pre data-lang="python" data-title="grid_zip.py"><code>
+grid = [[1, 2, 3],
+        [4, 5, 6]]
+
+transposed = [list(col) for col in zip(*grid)]
+print(transposed)
+
+# 시계 방향 90도 회전: 행 순서를 뒤집은 뒤 전치한다
+rotated = [list(row) for row in zip(*grid[::-1])]
+print(rotated)
+</code></pre>
+<pre class="output">
+[[1, 4], [2, 5], [3, 6]]
+[[4, 1], [5, 2], [6, 3]]
+</pre>
+      </section>
+
+      <section id="sorting">
+        <h2>정렬</h2>
+        <h3>sort와 sorted</h3>
+        <p><code>a.sort()</code>는 리스트 <code>a</code> 자체를 정렬한다. 이렇게 원본을 직접 바꾸는 방식을 <strong>제자리(in-place)</strong> 연산이라고 한다. <code>sorted(a)</code>는 원본을 그대로 두고 정렬된 새 리스트를 돌려준다.</p>
+
+<pre data-lang="python" data-title="sort_vs_sorted.py"><code>
+a = [3, 1, 2]
+b = sorted(a)        # 새 리스트를 돌려준다. a는 그대로다
+print(a, b)
+
+result = a.sort()    # a 자체를 정렬하고 None을 돌려준다
+print(a, result)
+
+print(sorted(a, reverse=True))   # 내림차순
+</code></pre>
+<pre class="output">
+[3, 1, 2] [1, 2, 3]
+[1, 2, 3] None
+[3, 2, 1]
+</pre>
+
+        <p><code>sort()</code>가 <code>None</code>을 돌려주는 것은 원본이 바뀌었음을 분명히 하려는 설계다. <code>sorted()</code>는 문자열이나 튜플도 받아 리스트를 돌려준다. 둘 다 <span class="bigo b-nlogn">O(n log n)</span>이고 내부 동작은 19장에서 다룬다.</p>
+
+        <h3>key: 무엇으로 비교할지 정하기</h3>
+        <p>다른 기준으로 정렬하려면 <code>key</code>에 함수를 넘긴다. 정렬은 원소마다 이 함수를 한 번씩 불러 비교용 값을 만들고 그 값으로 순서를 정한다. 원소 자체는 바뀌지 않는다.</p>
+
+<pre data-lang="python" data-title="sort_key.py"><code>
+words = ['banana', 'Kiwi', 'apple', 'fig']
+
+print(sorted(words))                  # 대문자가 소문자보다 앞
+print(sorted(words, key=str.lower))   # 대소문자를 무시하고
+print(sorted(words, key=len))         # 길이순
+</code></pre>
+<pre class="output">
+['Kiwi', 'apple', 'banana', 'fig']
+['apple', 'banana', 'fig', 'Kiwi']
+['fig', 'Kiwi', 'apple', 'banana']
+</pre>
+
+        <p><code>'Kiwi'</code>가 맨 앞인 것은 대문자의 문자 코드값이 소문자보다 작기 때문이다(5장). 함수는 <code>str.lower</code>처럼 괄호 없이 이름만 넘긴다.</p>
+
+        <h3>여러 기준으로 정렬하기</h3>
+        <p>"나이 많은 순, 같으면 이름순"처럼 기준이 여럿이면 key가 <strong>튜플</strong>을 돌려주게 한다. 튜플은 첫 원소끼리 비교하고, 같으면 다음 원소를 비교한다. 그래서 튜플에 넣는 순서가 곧 기준의 우선순위다.</p>
+
+<pre data-lang="python" data-title="sort_multi.py"><code>
+people = [('민수', 25), ('지아', 31), ('하늘', 25), ('도윤', 31)]
+
+# 나이 내림차순, 나이가 같으면 이름 오름차순
+by_age = sorted(people, key=lambda p: (-p[1], p[0]))
+print(by_age)
+</code></pre>
+<pre class="output">
+[('도윤', 31), ('지아', 31), ('민수', 25), ('하늘', 25)]
+</pre>
+
+        <p><code>lambda p: (-p[1], p[0])</code>은 "<code>p</code>를 받아 <code>(-p[1], p[0])</code>을 돌려주는 이름 없는 함수"다(6장). 숫자 기준을 내림차순으로 바꾸려면 부호를 뒤집는다. -31이 -25보다 작으니 31살이 앞에 온다. 한글 이름은 코드값 순서가 곧 가나다순이다.</p>
+
+        <h3>안정 정렬</h3>
+        <p>파이썬의 정렬은 <strong>안정 정렬(stable sort)</strong>이다. 기준 값이 같은 원소끼리는 정렬 전 순서를 지킨다는 뜻이다. 덕분에 부호를 뒤집을 수 없는 "이름 내림차순" 같은 기준도 다룰 수 있다. <mark>덜 중요한 기준부터 차례로 여러 번 정렬하면</mark> 먼저 정렬한 순서가 동점자 사이에 남는다.</p>
+
+<pre data-lang="python" data-title="sort_stable.py"><code>
+people = [('민수', 25), ('지아', 31), ('하늘', 25), ('도윤', 31)]
+
+# 나이 오름차순, 같으면 이름 내림차순: 덜 중요한 기준부터
+step1 = sorted(people, key=lambda p: p[0], reverse=True)
+print(step1)
+print(sorted(step1, key=lambda p: p[1]))
+</code></pre>
+<pre class="output">
+[('하늘', 25), ('지아', 31), ('민수', 25), ('도윤', 31)]
+[('하늘', 25), ('민수', 25), ('지아', 31), ('도윤', 31)]
+</pre>
+
+        <p>나이가 같은 하늘과 민수는 첫 정렬의 순서를 지킨다.</p>
+      </section>
+
+      <section id="pitfalls">
+        <h2>자주 하는 실수</h2>
+        <div class="callout callout-warn">
+          <span class="callout-title">a = a.sort()</span>
+          <p><code>sort()</code>는 <code>None</code>을 돌려주므로 <code>a</code>에 <code>None</code>이 담겨 리스트를 잃는다. 제자리 정렬은 <code>a.sort()</code>만 쓰고, 새 리스트가 필요하면 <code>a = sorted(a)</code>로 쓴다.</p>
+        </div>
+        <div class="callout callout-warn">
+          <span class="callout-title">[[0] * m] * n으로 격자 만들기</span>
+          <p>모든 행이 같은 리스트라서 한 칸을 고치면 같은 열 전체가 바뀐다. <code>[[0] * m for _ in range(n)]</code>으로 만든다.</p>
+        </div>
+        <div class="callout callout-warn">
+          <span class="callout-title">append로 리스트 붙이기</span>
+          <p><code>a.append([5, 9])</code>는 리스트 <code>[5, 9]</code>를 원소 하나로 붙인다. 5와 9를 각각 붙이려면 <code>a.extend([5, 9])</code>를 쓴다.</p>
+        </div>
+        <div class="callout callout-warn">
+          <span class="callout-title">돌고 있는 리스트에서 원소 지우기</span>
+          <p>반복문은 인덱스를 하나씩 늘려 가며 원소를 꺼낸다. 도중에 지우면 뒤 원소가 한 칸씩 당겨져 바로 다음 원소를 건너뛴다. 아래에서 2가 하나 남는 이유다. 남길 것만 골라 새 리스트를 만든다.</p>
+        </div>
+
+<pre data-lang="python" data-title="remove_while_loop.py"><code>
+nums = [1, 2, 2, 3]
+for x in nums:
+    if x == 2:
+        nums.remove(x)   # 지우는 순간 뒤 원소가 당겨진다
+print(nums)
+
+nums = [1, 2, 2, 3]
+nums = [x for x in nums if x != 2]   # 남길 것만 고른다
+print(nums)
+</code></pre>
+<pre class="output">
+[1, 2, 3]
+[1, 3]
+</pre>
+      </section>
+
+      <section id="problem">
+        <h2>대표 문제</h2>
+        <div class="problem">
+          <div class="problem-head">
+            <div class="problem-kicker"><b>Problem</b><span class="chip">쉬움</span><span class="chip">정렬</span><span class="chip">튜플 key</span></div>
+            <h3>여러 기준으로 순위 매기기</h3>
+          </div>
+          <div class="problem-body">
+            <p>퍼즐 대회 참가자 N명의 닉네임, 점수, 걸린 시간(초), 레벨이 주어진다. 아래 기준으로 순위를 매겨 1등부터 닉네임을 한 줄에 하나씩 출력하라.</p>
+            <ol>
+              <li>점수가 높은 사람이 앞선다.</li>
+              <li>점수가 같으면 시간이 짧은 사람이 앞선다.</li>
+              <li>시간도 같으면 레벨이 높은 사람이 앞선다.</li>
+              <li>모두 같으면 닉네임이 사전순으로 앞서는 사람이 앞선다.</li>
+            </ol>
+            <p>첫 줄에 N(1 ≤ N ≤ 100,000), 다음 N줄에 <code>닉네임 점수 시간 레벨</code>이 공백으로 나뉘어 주어진다. 닉네임은 서로 다른 영어 소문자 1~10자이고 나머지는 정수다. 아래는 6명의 예시와 그 순위다.</p>
+            <div class="table-wrap">
+              <table>
+                <thead><tr><th>순위</th><th>닉네임</th><th>점수</th><th>시간</th><th>레벨</th><th>이유</th></tr></thead>
+                <tbody>
+                  <tr><td>1</td><td><code>ari</code></td><td>90</td><td>95</td><td>2</td><td>90점 중 가장 빠르다</td></tr>
+                  <tr><td>2</td><td><code>bora</code></td><td>90</td><td>120</td><td>7</td><td>레벨이 mint보다 높다</td></tr>
+                  <tr><td>3</td><td><code>mint</code></td><td>90</td><td>120</td><td>3</td><td></td></tr>
+                  <tr><td>4</td><td><code>dan</code></td><td>85</td><td>100</td><td>5</td><td>juno와 모두 같아 닉네임순</td></tr>
+                  <tr><td>5</td><td><code>juno</code></td><td>85</td><td>100</td><td>5</td><td></td></tr>
+                  <tr><td>6</td><td><code>cole</code></td><td>70</td><td>60</td><td>9</td><td>점수가 가장 낮다</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <details class="reveal">
+            <summary>접근 방법<span class="reveal-hint">먼저 생각해 보고 펼치세요</span></summary>
+            <div class="reveal-body">
+              <p>기준이 넷이어도 정렬은 한 번이면 된다. key가 <mark>우선순위 순서대로 값을 담은 튜플</mark>을 돌려주면 튜플 비교가 첫 기준부터 차례로 따져 준다.</p>
+              <ol>
+                <li>한 사람을 <code>(닉네임, 점수, 시간, 레벨)</code> 튜플로 읽는다. 숫자는 꼭 <code>int</code>로 바꾼다. 문자열로 비교하면 <code>'9'</code>가 <code>'85'</code>보다 크다.</li>
+                <li>오름차순 기준(시간, 닉네임)은 그대로, 내림차순 기준(점수, 레벨)은 부호를 뒤집는다: <code>(-점수, 시간, -레벨, 닉네임)</code>.</li>
+                <li>정렬한 뒤 닉네임만 모아 한 번에 출력한다.</li>
+              </ol>
+            </div>
+          </details>
+
+          <details class="reveal">
+            <summary>풀이 코드</summary>
+            <div class="reveal-body">
+<pre data-lang="python" data-title="rank_players.py"><code>
+import sys
+input = sys.stdin.readline
+
+
+def rank(players: list[tuple[str, int, int, int]]) -&gt; list[str]:
+    # 점수 높은 순, 시간 짧은 순, 레벨 높은 순, 닉네임 사전순
+    ordered = sorted(players,
+                     key=lambda p: (-p[1], p[2], -p[3], p[0]))
+    return [p[0] for p in ordered]
+
+
+n = int(input())
+players = []
+for _ in range(n):
+    name, score, seconds, level = input().split()
+    players.append((name, int(score), int(seconds), int(level)))
+
+print('\n'.join(rank(players)))
+</code></pre>
+<pre class="stdin">
+6
+mint 90 120 3
+juno 85 100 5
+ari 90 95 2
+bora 90 120 7
+dan 85 100 5
+cole 70 60 9
+</pre>
+<pre class="output">
+ari
+bora
+mint
+dan
+juno
+cole
+</pre>
+            </div>
+          </details>
+
+          <details class="reveal">
+            <summary>복잡도</summary>
+            <div class="reveal-body">
+              <dl class="cx">
+                <dt>시간</dt><dd><span class="bigo b-nlogn">O(n log n)</span> 정렬이 대부분이다. key 튜플 비교 한 번은 일정한 시간이다.</dd>
+                <dt>공간</dt><dd><span class="bigo b-linear">O(n)</span> 참가자 목록, 정렬된 새 리스트, key 값을 담는다.</dd>
+              </dl>
+            </div>
+          </details>
+        </div>
+      </section>
+
+      <section id="recall">
+        <h2>스스로 확인</h2>
+        <div class="recall">
+          <details>
+            <summary><code>a = [10, 20, 30, 40, 50]</code>일 때 <code>a[-2:]</code>와 <code>a[1:-1]</code>의 결과는?</summary>
+            <div class="answer"><p><code>a[-2:]</code>는 뒤에서 두 번째 칸부터 끝까지라 <code>[40, 50]</code>이다. <code>a[1:-1]</code>은 1번 칸부터 마지막 칸 바로 앞까지라 <code>[20, 30, 40]</code>이다.</p></div>
+          </details>
+          <details>
+            <summary>리스트 맨 앞에서 <code>pop(0)</code>을 반복하면 왜 느려지는가?</summary>
+            <div class="answer"><p>꺼낼 때마다 나머지 원소를 모두 한 칸씩 당겨서 한 번에 O(n), n번이면 O(n²)이다. 이럴 때는 <code>deque</code>의 <code>popleft()</code>를 쓴다.</p></div>
+          </details>
+          <details>
+            <summary><code>[[0] * 3] * 2</code>에서 <code>grid[0][0] = 1</code>을 하면 왜 두 행이 함께 바뀌고, <code>[0] * 3</code>은 왜 괜찮은가?</summary>
+            <div class="answer"><p><code>* 2</code>는 행 리스트의 참조를 복사할 뿐이라 두 행이 같은 리스트다. <code>[0] * 3</code>의 칸들도 같은 0을 가리키지만, 정수는 바꿀 수 없어서 대입하면 그 칸만 다른 값을 가리킨다.</p></div>
+          </details>
+          <details>
+            <summary><code>key=lambda p: (-p[1], p[0])</code>에서 <code>-p[1]</code>은 무슨 일을 하는가? 이름을 내림차순으로 하려면?</summary>
+            <div class="answer"><p>부호를 뒤집어 그 숫자 기준만 내림차순으로 만든다. 문자열은 그럴 수 없으니 먼저 이름으로 <code>reverse=True</code> 정렬한 뒤, 안정 정렬을 믿고 더 중요한 기준으로 다시 정렬한다.</p></div>
+          </details>
+        </div>
+      </section>
+
+      <section id="summary">
+        <h2>정리</h2>
+        <ol class="summary-list">
+          <li>리스트는 0부터 세는 인덱스로 O(1)에 접근한다. 음수 인덱스는 뒤에서부터 센다.</li>
+          <li>슬라이싱 <code>a[start:stop:step]</code>은 stop을 포함하지 않으며, 잘라 낸 값으로 새 리스트를 만든다.</li>
+          <li>끝에서 넣고 빼면 O(1), 앞이나 중간에서 넣고 빼거나 값을 찾으면 O(n)이다.</li>
+          <li>컴프리헨션에서 <code>for</code> 뒤의 <code>if</code>는 거르고, 앞의 <code>A if 조건 else B</code>는 값을 고른다.</li>
+          <li>2차원 리스트는 <code>[[0] * m for _ in range(n)]</code>으로 만들고, 복사할 때는 행까지 복사한다.</li>
+          <li>튜플은 바꿀 수 없는 묶음이고, 언패킹, <code>enumerate</code>, <code>zip</code>과 짝을 이룬다.</li>
+          <li>여러 기준 정렬은 key가 튜플을 돌려주게 하고, 숫자 내림차순은 부호를 뒤집는다. 파이썬 정렬은 안정 정렬이다.</li>
+        </ol>
+      </section>
+
+      <nav class="pager" aria-label="이전 장과 다음 장"></nav>
+    </article>
+  </main>
+
+  <aside class="rail" aria-label="이 페이지 목차">
+    <p class="rail-title">이 페이지</p>
+    <nav id="onthispage"></nav>
+  </aside>
+</div>
+<div class="backdrop" id="backdrop"></div>
+
+<script src="assets/book.js"></script>
+<script src="assets/app.js"></script>
+<script src="assets/code.js"></script>
+</body>
+</html>

@@ -1,0 +1,288 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>견본 · 10. 스택 — 파이썬 알고리즘 노트</title>
+<script src="assets/theme.js"></script>
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<!--
+  장 페이지 견본. 새 장은 이 파일을 복사해 <body data-chapter>, <title>, 본문만 바꾼다.
+  · 사이드바, 부 이름, "Chapter NN", 읽는 시간, 절 번호, 이 페이지 목차, 이전/다음 장은 스크립트가 채운다.
+  · 쓸 수 있는 요소: .goals  .callout(-key|-tip|-warn)  .fig + .cells(.vertical) + .cell(.is-hl|.is-ghost, data-i, data-ptr)
+    pre[data-lang="python"][data-title] + pre.stdin(입력 예시, 선택) + pre.output  .table-wrap  .bigo(.b-const|.b-log|.b-linear|.b-nlogn|.b-quad)
+    .problem + details.reveal  .recall  .summary-list  <mark>
+-->
+<body data-chapter="10">
+<a class="skip-link" href="#content">본문으로 건너뛰기</a>
+<div class="progress" aria-hidden="true"><span></span></div>
+<header class="topbar" id="topbar"></header>
+
+<div class="shell">
+  <aside class="sidebar" id="sidebar" aria-label="책 목차"></aside>
+
+  <main class="main" id="content">
+    <article class="chapter">
+      <p class="notice">이 페이지는 장 견본입니다. 실제 10장을 쓰면 이 내용은 바뀝니다.</p>
+
+      <header class="chapter-head">
+        <a class="part-pill"></a>
+        <span class="chapter-label"></span>
+        <h1>스택</h1>
+        <p class="lede">접시를 쌓듯 맨 위에만 넣고 맨 위에서만 꺼내는 자료구조입니다. 파이썬에서는 리스트 하나로 바로 쓸 수 있습니다.</p>
+        <div class="chapter-meta">
+          <span class="chip">LIFO</span><span class="chip">push · pop</span><span class="chip">list</span><span class="chip">괄호 검사</span>
+        </div>
+      </header>
+
+      <div class="goals">
+        <p class="goals-title">이 장에서 배울 것</p>
+        <ul>
+          <li>스택이 왜 "나중에 넣은 것을 먼저 꺼내는" 구조인지 설명할 수 있다</li>
+          <li>파이썬 리스트로 push, pop, peek을 쓸 수 있다</li>
+          <li>스택 연산의 시간복잡도와, 리스트를 잘못 써서 느려지는 경우를 안다</li>
+          <li>괄호 짝 맞추기 문제를 스택으로 풀 수 있다</li>
+        </ul>
+      </div>
+
+      <section id="what-is-stack">
+        <h2>스택이란</h2>
+        <div class="callout callout-key">
+          <span class="callout-title">핵심</span>
+          <p class="callout-big">스택은 <mark>마지막에 넣은 것이 가장 먼저 나오는</mark> 자료구조다. 이 성질을 LIFO(Last In, First Out)라고 부른다.</p>
+        </div>
+        <p>식당에서 접시를 쌓는 모습을 떠올리면 쉽다. 새 접시는 맨 위에 올리고, 꺼낼 때도 맨 위부터 집는다. 가운데 접시를 빼려면 그 위의 접시를 모두 먼저 치워야 한다.</p>
+        <p>그래서 스택이 하는 일은 사실상 세 가지뿐이다.</p>
+        <ul>
+          <li><strong>push</strong> — 맨 위에 넣는다</li>
+          <li><strong>pop</strong> — 맨 위에서 꺼낸다</li>
+          <li><strong>peek</strong> — 꺼내지 않고 맨 위만 본다</li>
+        </ul>
+
+        <figure class="fig">
+          <div class="fig-steps">
+            <div class="fig-state">
+              <div class="cells vertical">
+                <div class="cell">1</div>
+                <div class="cell" data-ptr="top">2</div>
+              </div>
+              <span class="fig-state-label">처음</span>
+            </div>
+            <div class="fig-arrow">push(3)</div>
+            <div class="fig-state">
+              <div class="cells vertical">
+                <div class="cell">1</div>
+                <div class="cell">2</div>
+                <div class="cell is-hl" data-ptr="top">3</div>
+              </div>
+              <span class="fig-state-label">push 후</span>
+            </div>
+            <div class="fig-arrow">pop()</div>
+            <div class="fig-state">
+              <div class="cells vertical">
+                <div class="cell">1</div>
+                <div class="cell" data-ptr="top">2</div>
+                <div class="cell is-ghost">3</div>
+              </div>
+              <span class="fig-state-label">pop 후</span>
+            </div>
+          </div>
+          <figcaption><b>그림 10-1</b> push는 맨 위에 쌓고, pop은 맨 위에서 꺼낸다.</figcaption>
+        </figure>
+      </section>
+
+      <section id="python-stack">
+        <h2>파이썬 리스트로 스택 쓰기</h2>
+        <p>파이썬에는 스택 전용 자료형이 따로 없다. 리스트의 <strong>끝</strong>을 스택의 맨 위로 삼으면 그대로 스택이 된다.</p>
+
+<pre data-lang="python" data-title="stack_basic.py"><code>
+stack = []
+
+stack.append(1)        # push
+stack.append(2)
+stack.append(3)
+print(stack)
+
+top = stack[-1]        # peek: 꺼내지 않고 맨 위만 본다
+print(top)
+
+print(stack.pop())     # pop: 맨 위를 꺼낸다
+print(stack)
+print(len(stack) == 0) # 비었는지 확인
+</code></pre>
+<pre class="output">
+[1, 2, 3]
+3
+3
+[1, 2]
+False
+</pre>
+
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>스택 연산</th><th>리스트 코드</th><th>하는 일</th></tr></thead>
+            <tbody>
+              <tr><td>push</td><td><code>stack.append(x)</code></td><td>끝에 붙인다</td></tr>
+              <tr><td>pop</td><td><code>stack.pop()</code></td><td>끝 원소를 꺼내서 돌려준다</td></tr>
+              <tr><td>peek</td><td><code>stack[-1]</code></td><td>끝 원소를 보기만 한다</td></tr>
+              <tr><td>비었는지 확인</td><td><code>not stack</code></td><td>빈 리스트는 조건식에서 거짓이 된다</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div class="callout callout-tip">
+          <span class="callout-title">팁</span>
+          <p>비었는지 확인할 때는 <code>len(stack) == 0</code>보다 <code>if not stack:</code>이 더 파이썬다운 표현이다. 빈 리스트는 조건식에서 <code>False</code>로 취급된다.</p>
+        </div>
+      </section>
+
+      <section id="complexity">
+        <h2>연산별 시간복잡도</h2>
+        <p>스택 연산은 모두 리스트의 끝에서만 일어난다. 끝에서 넣고 빼면 다른 원소를 옮길 필요가 없어서, 원소가 몇 개든 거의 같은 시간이 걸린다.</p>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>연산</th><th>코드</th><th>시간</th><th>이유</th></tr></thead>
+            <tbody>
+              <tr><td>push</td><td><code>append(x)</code></td><td><span class="bigo b-const">O(1)*</span></td><td>끝에 붙이기만 한다</td></tr>
+              <tr><td>pop</td><td><code>pop()</code></td><td><span class="bigo b-const">O(1)</span></td><td>끝에서 떼어 내기만 한다</td></tr>
+              <tr><td>peek</td><td><code>stack[-1]</code></td><td><span class="bigo b-const">O(1)</span></td><td>인덱스로 바로 찾아간다</td></tr>
+              <tr><td>값 찾기</td><td><code>x in stack</code></td><td><span class="bigo b-linear">O(n)</span></td><td>처음부터 하나씩 비교한다</td></tr>
+              <tr><td>맨 앞에서 꺼내기</td><td><code>pop(0)</code></td><td><span class="bigo b-linear">O(n)</span></td><td>뒤의 원소를 모두 한 칸씩 당긴다</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <p>* <code>append</code>는 가끔 내부 공간을 늘리느라 원소를 통째로 옮기지만, 여러 번에 걸쳐 나눠 보면 한 번에 평균 O(1)이다. 이렇게 평균 내어 따지는 방식을 <strong>분할 상환(amortized) 분석</strong>이라고 한다.</p>
+      </section>
+
+      <section id="pitfalls">
+        <h2>자주 하는 실수</h2>
+        <div class="callout callout-warn">
+          <span class="callout-title">빈 스택에서 꺼내기</span>
+          <p>빈 리스트에 <code>pop()</code>을 하면 <code>IndexError: pop from empty list</code>가 난다. <code>stack[-1]</code>도 마찬가지로 에러가 난다. 꺼내기 전에 <code>if stack:</code>으로 확인한다.</p>
+        </div>
+        <div class="callout callout-warn">
+          <span class="callout-title">pop(0)으로 순서 뒤집기</span>
+          <p><code>pop(0)</code>은 맨 앞을 꺼내므로 스택이 아니라 큐처럼 동작하고, 매번 O(n)이 걸린다. 먼저 넣은 것을 먼저 꺼내야 한다면 <code>collections.deque</code>의 <code>popleft()</code>를 쓴다. 11장에서 다룬다.</p>
+        </div>
+      </section>
+
+      <section id="problem">
+        <h2>대표 문제</h2>
+        <div class="problem">
+          <div class="problem-head">
+            <div class="problem-kicker"><b>Problem</b><span class="chip">쉬움</span><span class="chip">스택</span></div>
+            <h3>괄호 짝 맞추기</h3>
+          </div>
+          <div class="problem-body">
+            <p>괄호 <code>(</code> <code>)</code> <code>[</code> <code>]</code> <code>{</code> <code>}</code>로만 이루어진 문자열 <code>s</code>가 주어진다. 모든 괄호가 올바른 순서로 닫히면 <code>True</code>, 아니면 <code>False</code>를 돌려주는 함수를 작성하라.</p>
+            <div class="table-wrap">
+              <table>
+                <thead><tr><th>입력</th><th>출력</th><th>이유</th></tr></thead>
+                <tbody>
+                  <tr><td><code>"([]{})"</code></td><td><code>True</code></td><td>안쪽부터 차례로 닫힌다</td></tr>
+                  <tr><td><code>"([)]"</code></td><td><code>False</code></td><td><code>[</code>가 닫히기 전에 <code>)</code>가 온다</td></tr>
+                  <tr><td><code>"(("</code></td><td><code>False</code></td><td>닫히지 않은 괄호가 남는다</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <details class="reveal">
+            <summary>접근 방법<span class="reveal-hint">먼저 생각해 보고 펼치세요</span></summary>
+            <div class="reveal-body">
+              <p>닫는 괄호는 언제나 <mark>가장 최근에 연 괄호</mark>와 짝이 맞아야 한다. "가장 최근 것부터 처리"는 정확히 스택이 하는 일이다.</p>
+              <ol>
+                <li>여는 괄호를 만나면 스택에 넣는다.</li>
+                <li>닫는 괄호를 만나면 스택에서 하나 꺼내 짝이 맞는지 본다. 스택이 비어 있거나 짝이 다르면 바로 실패다.</li>
+                <li>끝까지 읽은 뒤 스택이 비어 있어야 성공이다.</li>
+              </ol>
+            </div>
+          </details>
+
+          <details class="reveal">
+            <summary>풀이 코드</summary>
+            <div class="reveal-body">
+<pre data-lang="python" data-title="valid_brackets.py"><code>
+def is_valid(s: str) -> bool:
+    pairs = {')': '(', ']': '[', '}': '{'}
+    stack = []
+
+    for ch in s:
+        if ch in pairs:                       # 닫는 괄호
+            if not stack or stack.pop() != pairs[ch]:
+                return False
+        else:                                 # 여는 괄호
+            stack.append(ch)
+
+    return not stack                          # 남은 괄호가 없어야 한다
+
+
+print(is_valid("([]{})"))
+print(is_valid("([)]"))
+print(is_valid("(("))
+</code></pre>
+<pre class="output">
+True
+False
+False
+</pre>
+            </div>
+          </details>
+
+          <details class="reveal">
+            <summary>복잡도</summary>
+            <div class="reveal-body">
+              <dl class="cx">
+                <dt>시간</dt><dd><span class="bigo b-linear">O(n)</span> 문자를 한 번씩만 본다.</dd>
+                <dt>공간</dt><dd><span class="bigo b-linear">O(n)</span> 모든 문자가 여는 괄호라면 전부 스택에 쌓인다.</dd>
+              </dl>
+            </div>
+          </details>
+        </div>
+      </section>
+
+      <section id="recall">
+        <h2>스스로 확인</h2>
+        <div class="recall">
+          <details>
+            <summary>리스트로 스택을 만들 때, 리스트의 앞이 아니라 끝을 맨 위로 삼는 이유는?</summary>
+            <div class="answer"><p>끝에서 넣고 빼면 다른 원소를 옮기지 않아 O(1)이다. 앞을 맨 위로 삼으면 <code>insert(0, x)</code>와 <code>pop(0)</code>이 매번 나머지 원소를 모두 옮겨 O(n)이 된다.</p></div>
+          </details>
+          <details>
+            <summary><code>"(()"</code>를 <code>is_valid</code>에 넣으면 어디에서 False가 결정되는가?</summary>
+            <div class="answer"><p>반복문 안에서는 실패하지 않는다. 문자열을 다 읽은 뒤 스택에 <code>(</code>가 하나 남아 있어서, 마지막 <code>return not stack</code>이 <code>False</code>를 돌려준다.</p></div>
+          </details>
+          <details>
+            <summary>빈 스택에서 <code>stack[-1]</code>로 peek하면 어떻게 되는가?</summary>
+            <div class="answer"><p><code>IndexError: list index out of range</code>가 난다. pop과 마찬가지로 먼저 비었는지 확인해야 한다.</p></div>
+          </details>
+        </div>
+      </section>
+
+      <section id="summary">
+        <h2>정리</h2>
+        <ol class="summary-list">
+          <li>스택은 마지막에 넣은 것을 먼저 꺼내는 LIFO 구조다.</li>
+          <li>파이썬에서는 리스트의 끝을 맨 위로 삼아 <code>append</code>, <code>pop</code>, <code>[-1]</code>로 쓴다.</li>
+          <li>push, pop, peek은 모두 O(1)이다. <code>pop(0)</code>은 O(n)이니, 앞에서 꺼내야 하면 <code>deque</code>를 쓴다.</li>
+          <li>"가장 최근 것과 짝을 맞추는" 문제(괄호 검사, 되돌리기 등)를 만나면 스택을 먼저 떠올린다.</li>
+        </ol>
+      </section>
+
+      <nav class="pager" aria-label="이전 장과 다음 장"></nav>
+    </article>
+  </main>
+
+  <aside class="rail" aria-label="이 페이지 목차">
+    <p class="rail-title">이 페이지</p>
+    <nav id="onthispage"></nav>
+  </aside>
+</div>
+<div class="backdrop" id="backdrop"></div>
+
+<script src="assets/book.js"></script>
+<script src="assets/app.js"></script>
+<script src="assets/code.js"></script>
+</body>
+</html>

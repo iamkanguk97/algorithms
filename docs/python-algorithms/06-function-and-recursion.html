@@ -1,0 +1,660 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>06. 함수와 재귀 — 파이썬 알고리즘 노트</title>
+<script src="assets/theme.js"></script>
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body data-chapter="06">
+<a class="skip-link" href="#content">본문으로 건너뛰기</a>
+<div class="progress" aria-hidden="true"><span></span></div>
+<header class="topbar" id="topbar"></header>
+
+<div class="shell">
+  <aside class="sidebar" id="sidebar" aria-label="책 목차"></aside>
+
+  <main class="main" id="content">
+    <article class="chapter">
+      <header class="chapter-head">
+        <a class="part-pill"></a>
+        <span class="chapter-label"></span>
+        <h1>함수와 재귀</h1>
+        <p class="lede">함수는 코드 묶음에 이름을 붙여 몇 번이고 다시 쓰게 해 주는 도구입니다. 이 장에서는 함수의 규칙을 정리한 뒤, 함수가 자기 자신을 부르는 재귀까지 다룹니다.</p>
+        <div class="chapter-meta">
+          <span class="chip">def · return</span><span class="chip">lambda</span><span class="chip">스코프</span><span class="chip">재귀</span><span class="chip">호출 스택</span>
+        </div>
+      </header>
+
+      <div class="goals">
+        <p class="goals-title">이 장에서 배울 것</p>
+        <ul>
+          <li>함수를 정의하고 기본값, 키워드 인자, 가변 인자를 쓸 수 있다</li>
+          <li>가변 기본값 함정과 스코프 규칙(<code>global</code>, <code>nonlocal</code>)을 설명할 수 있다</li>
+          <li>함수를 값처럼 넘기고, <code>lambda</code>를 정렬 기준으로 쓸 수 있다</li>
+          <li>재귀 함수를 기저 조건과 재귀 단계로 나눠 짤 수 있다</li>
+          <li>재귀 깊이 제한과 메모이제이션이 왜 필요한지 안다</li>
+        </ul>
+      </div>
+
+      <section id="functions">
+        <h2>함수 정의와 호출</h2>
+        <div class="callout callout-key">
+          <span class="callout-title">핵심</span>
+          <p class="callout-big">함수는 <mark>입력(인자)을 받아 일을 하고 결과 하나를 돌려주는</mark> 이름 붙은 코드 묶음이다.</p>
+        </div>
+        <p><code>def</code>로 함수를 만들고, <code>return</code>으로 결과를 돌려준다. 함수를 정의할 때 괄호 안에 적는 이름을 <strong>매개변수</strong>, 호출할 때 실제로 넘기는 값을 <strong>인자</strong>라고 한다.</p>
+
+<pre data-lang="python" data-title="function_basics.py"><code>
+def add(a, b):
+    return a + b
+
+
+def greet(name):
+    print(f'안녕, {name}')     # return 이 없다
+
+
+def min_max(numbers):
+    return min(numbers), max(numbers)   # 튜플 하나를 돌려준다
+
+
+print(add(2, 3))
+result = greet('파이썬')
+print(result)
+
+pair = min_max([4, 1, 7])
+print(pair)
+low, high = min_max([4, 1, 7])     # 받자마자 풀어 담는다
+print(low, high)
+</code></pre>
+<pre class="output">
+5
+안녕, 파이썬
+None
+(1, 7)
+1 7
+</pre>
+
+        <p><code>return</code>이 없는 함수도 <code>None</code>이라는 값을 돌려준다. 여러 값을 돌려주는 것처럼 보이는 <code>return a, b</code>는 사실 <strong>튜플 하나</strong>를 돌려주는 것이고, 받는 쪽에서 <code>low, high = ...</code>로 풀어 담는다(언패킹, 3장).</p>
+
+        <h3>기본값과 키워드 인자</h3>
+        <p>매개변수에 <code>=값</code>을 붙이면 기본값이 된다. <code>def power(base, exp=2):</code>라면 <code>power(3)</code>은 <code>exp</code>를 2로 계산해 9를 돌려준다. 인자를 <code>이름=값</code> 꼴로 넘기는 것을 <strong>키워드 인자</strong>라고 하는데, <code>power(exp=3, base=2)</code>처럼 순서를 바꿔 넘겨도 된다.</p>
+        <p>기본값이 있는 매개변수는 기본값이 없는 매개변수보다 뒤에 와야 한다. <code>def f(x, y=1, z):</code>처럼 쓰면 <code>SyntaxError</code>가 난다. 어떤 값이 어느 매개변수로 갈지 정할 수 없기 때문이다.</p>
+
+        <h3>인자를 몇 개든 받기: *args와 **kwargs</h3>
+        <p>매개변수 이름 앞에 <code>*</code>를 붙이면 남은 위치 인자를 모두 <strong>튜플</strong>로 묶어 받는다. <code>**</code>를 붙이면 남은 키워드 인자를 <strong>딕셔너리</strong>로 묶어 받는다. 이름은 관례상 <code>args</code>, <code>kwargs</code>를 많이 쓴다.</p>
+
+<pre data-lang="python" data-title="args.py"><code>
+def total(*numbers):
+    print(numbers)          # 위치 인자들이 튜플 하나로 묶인다
+    return sum(numbers)
+
+
+print(total(1, 2, 3))
+nums = [4, 5, 6]
+print(total(*nums))         # 호출할 때 * 는 리스트를 풀어서 넘긴다
+</code></pre>
+<pre class="output">
+(1, 2, 3)
+6
+(4, 5, 6)
+15
+</pre>
+
+        <h3>타입 힌트는 검사하지 않는다</h3>
+        <p><code>def double(x: int) -&gt; int:</code>처럼 매개변수와 반환값에 자료형을 적을 수 있다. 이것을 <strong>타입 힌트</strong>라고 한다. 다만 파이썬은 실행할 때 힌트를 확인하지 않는다. 이 함수에 <code>'ab'</code>를 넘겨도 에러 없이 <code>'abab'</code>를 돌려준다. 힌트는 읽는 사람과 편집기, mypy 같은 검사 도구를 위한 표시다.</p>
+      </section>
+
+      <section id="mutable-default">
+        <h2>기본값 함정</h2>
+        <p>기본값에 리스트나 딕셔너리처럼 <strong>바뀔 수 있는(가변) 객체</strong>를 쓰면 예상과 다르게 동작한다. 아래 함수는 호출할 때마다 빈 리스트에서 시작할 것처럼 보이지만 그렇지 않다.</p>
+
+<pre data-lang="python" data-title="mutable_default.py"><code>
+def add_item(item, items=[]):
+    items.append(item)
+    return items
+
+
+print(add_item('a'))
+print(add_item('b'))         # ['b'] 를 기대했지만…
+print(add_item('c', []))     # 리스트를 직접 넘기면 괜찮다
+print(add_item('d'))
+print(add_item.__defaults__) # 기본값은 함수에 붙어 있다
+</code></pre>
+<pre class="output">
+['a']
+['a', 'b']
+['c']
+['a', 'b', 'd']
+(['a', 'b', 'd'],)
+</pre>
+
+        <p>이유는 기본값이 만들어지는 시점에 있다. <mark>기본값은 <code>def</code> 문이 실행될 때 딱 한 번 만들어져 함수에 저장된다.</mark> 호출할 때마다 새로 만드는 것이 아니다. 그래서 기본값을 쓰는 호출은 모두 같은 리스트 하나를 함께 쓰고, 앞선 호출에서 넣은 값이 다음 호출에 남는다. 마지막 줄의 <code>__defaults__</code>가 함수에 붙어 있는 바로 그 리스트다.</p>
+        <p>해결책은 기본값을 <code>None</code>으로 두고, 함수 안에서 새 리스트를 만드는 것이다. 함수 본문은 호출할 때마다 실행되므로 매번 새 리스트가 생긴다.</p>
+
+<pre data-lang="python" data-title="mutable_default_fixed.py"><code>
+def add_item(item, items=None):
+    if items is None:        # 호출할 때마다 새 리스트를 만든다
+        items = []
+    items.append(item)
+    return items
+
+
+print(add_item('a'))
+print(add_item('b'))
+</code></pre>
+<pre class="output">
+['a']
+['b']
+</pre>
+
+        <div class="callout callout-tip">
+          <span class="callout-title">팁</span>
+          <p>숫자, 문자열, 튜플, <code>None</code>처럼 바뀌지 않는(불변) 값은 기본값으로 써도 안전하다(가변과 불변은 2장).</p>
+        </div>
+      </section>
+
+      <section id="lambda">
+        <h2>함수도 값이다: 람다</h2>
+        <p>파이썬에서 함수는 숫자나 리스트와 똑같은 값이다. 변수에 담을 수 있고, 다른 함수의 인자로 넘길 수 있고, 함수의 결과로 돌려줄 수도 있다. 이런 성질을 <strong>일급 객체</strong>라고 부른다.</p>
+
+<pre data-lang="python" data-title="first_class.py"><code>
+def square(x):
+    return x * x
+
+
+f = square            # 괄호가 없으면 호출하지 않고 함수 자체를 담는다
+print(f(5))
+print(list(map(square, [1, 2, 3])))   # 모든 원소에 square 를 적용
+</code></pre>
+<pre class="output">
+25
+[1, 4, 9]
+</pre>
+
+        <p><code>square</code>와 <code>square()</code>의 차이가 중요하다. 괄호를 붙이면 함수를 <em>실행</em>해서 그 결과를 쓰고, 괄호가 없으면 함수 <em>그 자체</em>를 가리킨다. <code>map</code>, <code>sorted</code>, <code>max</code>처럼 함수를 받는 함수에는 괄호 없이 넘긴다.</p>
+
+        <h3>lambda: 이름 없는 한 줄 함수</h3>
+        <p>정렬 기준처럼 한 번만 쓰고 버릴 짧은 함수를 위해 <code>def</code>로 이름까지 붙이기는 번거롭다. 이럴 때 <code>lambda 매개변수: 식</code>으로 그 자리에서 함수를 만든다. <code>lambda x: x * x</code>는 <code>def</code>로 만든 <code>square</code>와 같은 일을 한다. 콜론 뒤의 식을 계산한 값이 곧 반환값이라 <code>return</code>을 쓰지 않는다.</p>
+
+<pre data-lang="python" data-title="lambda_basics.py"><code>
+words = ['pear', 'kiwi', 'apple', 'fig']
+print(sorted(words, key=len))                     # 길이 순
+print(sorted(words, key=lambda w: (len(w), w)))   # 길이, 같으면 사전 순
+
+points = [(1, 3), (2, 1), (0, 2)]
+print(max(points, key=lambda p: p[1]))     # 두 번째 값이 가장 큰 점
+print(list(map(lambda x: x * 10, [1, 2, 3])))
+</code></pre>
+<pre class="output">
+['fig', 'pear', 'kiwi', 'apple']
+['fig', 'kiwi', 'pear', 'apple']
+(1, 3)
+[10, 20, 30]
+</pre>
+
+        <p><code>key</code>에 넘긴 함수는 원소마다 한 번씩 불려 "비교에 쓸 값"을 만든다. 두 번째 정렬은 <code>(길이, 단어)</code> 튜플을 비교하므로 길이가 같은 <code>pear</code>와 <code>kiwi</code>를 사전 순으로 정한다. 정렬 기준은 3장에서 더 다룬다.</p>
+        <p>lambda에는 <strong>식 하나</strong>만 쓸 수 있다. 대입이나 <code>for</code>, 여러 줄짜리 <code>if</code> 문은 넣을 수 없다(<code>a if 조건 else b</code> 같은 조건식은 식이라서 된다). 로직이 한 줄을 넘거나, 여러 곳에서 다시 쓰거나, 이름을 붙여야 읽기 쉬워진다면 <code>def</code>로 만든다.</p>
+      </section>
+
+      <section id="scope">
+        <h2>스코프: 이름이 보이는 범위</h2>
+        <p>변수 이름이 통하는 범위를 <strong>스코프</strong>라고 한다. 함수 안에서 만든 변수는 <strong>지역 변수</strong>로, 그 함수 안에서만 보인다. 함수 밖, 파일 맨 바깥에서 만든 변수는 <strong>전역 변수</strong>다.</p>
+        <p>파이썬은 이름을 <em>지역 → 감싸는 함수 → 전역 → 내장</em>(<code>print</code>, <code>len</code> 같은 기본 이름) 순서로 찾는다. 그래서 전역 변수를 <em>읽기만</em> 하는 것은 문제가 없다. 문제는 대입할 때 생긴다.</p>
+
+<pre data-lang="python" data-title="scope_read.py"><code>
+count = 0
+
+
+def show():
+    print(count)          # 읽기만 하면 바깥 변수를 그대로 쓴다
+
+
+def increase():
+    count += 1            # 대입이 있으면 count 는 지역 변수가 된다
+
+
+show()
+try:
+    increase()
+except UnboundLocalError as e:
+    print(f'{type(e).__name__}: {e}')
+</code></pre>
+<pre class="output">
+0
+UnboundLocalError: cannot access local variable 'count' where it is not associated with a value
+</pre>
+
+        <p><mark>함수 안 어디에서든 어떤 이름에 대입하면, 그 이름은 함수 전체에서 지역 변수로 취급된다.</mark> 파이썬은 함수를 실행하기 전에 이것을 정해 둔다. <code>count += 1</code>은 <code>count = count + 1</code>이므로 <code>count</code>는 지역 변수가 되고, 오른쪽에서 아직 값이 없는 지역 변수 <code>count</code>를 읽으려다 에러가 난다.</p>
+
+        <h3>global과 nonlocal</h3>
+        <p>바깥 변수에 정말로 대입하고 싶다면 그 사실을 밝혀야 한다. 함수 첫머리에 전역 변수라면 <code>global count</code>, 한 단계 바깥 함수의 변수라면 <code>nonlocal count</code>라고 쓴다. 위 <code>increase</code>에 <code>global count</code> 한 줄을 넣으면 에러 없이 1이 늘어난다.</p>
+        <p>코딩 테스트에서는 <code>nonlocal</code>을 더 자주 만난다. 함수 안에 보조 함수를 두고, 보조 함수가 바깥의 결과 변수를 고치는 코드를 자주 쓰기 때문이다. 13장의 깊이 우선 탐색(DFS)이 대표적이다. 이때 무엇에 <code>nonlocal</code>이 필요한지 헷갈리기 쉽다.</p>
+
+<pre data-lang="python" data-title="nested_helper.py"><code>
+def summarize(numbers: list[int]) -&gt; tuple[list[int], int]:
+    evens = []
+    total = 0
+
+    def visit(x: int) -&gt; None:
+        nonlocal total        # total 에는 새 값을 대입하므로 필요하다
+        if x % 2 == 0:
+            evens.append(x)   # 리스트 내용만 바꾸므로 필요 없다
+            total += x
+
+    for x in numbers:
+        visit(x)
+    return evens, total
+
+
+print(summarize([3, 8, 5, 2, 6]))
+</code></pre>
+<pre class="output">
+([8, 2, 6], 16)
+</pre>
+
+        <p>기준은 하나다. <strong>이름에 대입하느냐</strong>를 본다. <code>total += x</code>는 이름 <code>total</code>에 새 숫자를 대입하므로 <code>nonlocal</code>이 필요하다. <code>evens.append(x)</code>는 이름 <code>evens</code>가 가리키는 리스트의 내용을 바꿀 뿐, 이름에 대입하지 않으므로 필요 없다.</p>
+      </section>
+
+      <section id="recursion">
+        <h2>재귀의 두 요소</h2>
+        <p>함수가 자기 자신을 호출하는 것을 <strong>재귀</strong>라고 한다. 처음 보면 끝없이 돌 것 같지만, 두 가지만 갖추면 반드시 멈춘다.</p>
+        <ul>
+          <li><strong>기저 조건</strong> — 더 쪼개지 않고 바로 답을 돌려주는 가장 작은 경우</li>
+          <li><strong>재귀 단계</strong> — 문제를 <em>한 단계 더 작은</em> 같은 문제로 바꿔 자기 자신에게 맡기는 부분</li>
+        </ul>
+        <p>팩토리얼이 가장 흔한 예다. <code>5! = 5 × 4!</code>이고, <code>4! = 4 × 3!</code>이다. 큰 문제의 답이 한 단계 작은 같은 문제의 답으로 표현된다.</p>
+
+<pre data-lang="python" data-title="factorial.py"><code>
+def factorial(n: int) -&gt; int:
+    if n &lt;= 1:                    # 기저 조건: 바로 답한다
+        return 1
+    return n * factorial(n - 1)   # 재귀 단계: 작은 문제에 맡긴다
+
+
+print(factorial(5))
+print(factorial(20))
+</code></pre>
+<pre class="output">
+120
+2432902008176640000
+</pre>
+
+        <p>재귀 함수를 짤 때는 호출이 어떻게 이어지는지 끝까지 따라가지 않는 편이 낫다. 대신 <mark>"한 단계 작은 호출은 이미 정답을 돌려준다"고 믿고, 그 답으로 지금 단계의 답을 만드는 것만 생각한다.</mark> <code>factorial(n - 1)</code>이 <code>(n-1)!</code>을 정확히 돌려준다고 믿으면, 남은 일은 거기에 <code>n</code>을 곱하는 것뿐이다. 기저 조건이 맞고 매 단계 문제가 작아진다면 이 믿음은 실제로 성립한다. 수학적 귀납법과 같은 구조다.</p>
+        <p>재귀로 짤 수 있는 것은 모두 반복문으로도 짤 수 있다. 그래도 재귀를 배우는 이유는 트리(15장)나 분할 정복(24장)처럼 <strong>문제 안에 같은 모양의 작은 문제가 들어 있는</strong> 경우에 재귀가 훨씬 자연스럽게 읽히기 때문이다.</p>
+      </section>
+
+      <section id="call-stack">
+        <h2>호출 스택</h2>
+        <p>함수를 호출하면 파이썬은 그 호출의 지역 변수와 "끝나면 돌아갈 위치"를 담은 기록을 하나 만든다. 이 기록을 <strong>프레임</strong>이라고 하고, 프레임이 쌓이는 곳을 <strong>호출 스택</strong>이라고 한다. 이름 그대로 스택(10장)처럼 동작한다. 새 호출은 맨 위에 쌓이고, 함수가 끝나면 맨 위 프레임이 빠진다.</p>
+
+        <figure class="fig">
+          <div class="fig-steps">
+            <div class="fig-state">
+              <div class="cells vertical">
+                <div class="cell">f(3)</div>
+                <div class="cell">f(2)</div>
+                <div class="cell is-hl" data-ptr="실행">f(1)</div>
+              </div>
+              <span class="fig-state-label">호출이 쌓임</span>
+            </div>
+            <div class="fig-arrow">1 반환</div>
+            <div class="fig-state">
+              <div class="cells vertical">
+                <div class="cell">f(3)</div>
+                <div class="cell is-hl" data-ptr="실행">f(2)</div>
+                <div class="cell is-ghost">f(1)</div>
+              </div>
+              <span class="fig-state-label">2×1 계산</span>
+            </div>
+            <div class="fig-arrow">2 반환</div>
+            <div class="fig-state">
+              <div class="cells vertical">
+                <div class="cell is-hl" data-ptr="실행">f(3)</div>
+                <div class="cell is-ghost">f(2)</div>
+              </div>
+              <span class="fig-state-label">3×2 계산</span>
+            </div>
+          </div>
+          <figcaption><b>그림 6-1</b> <code>factorial(3)</code>의 호출 스택. 가장 늦게 불린 <code>f(1)</code>이 가장 먼저 끝난다.</figcaption>
+        </figure>
+
+        <p><code>factorial(3)</code>은 <code>3 * factorial(2)</code>를 계산하다가 멈추고 기다린다. <code>factorial(2)</code>도 <code>factorial(1)</code>을 기다린다. 기저 조건인 <code>factorial(1)</code>이 1을 돌려주면, 그제야 기다리던 프레임이 차례로 깨어나 곱셈을 마친다. 들여쓰기로 깊이를 표시해 직접 확인해 보자.</p>
+
+<pre data-lang="python" data-title="trace_factorial.py"><code>
+def factorial(n: int, depth: int = 0) -&gt; int:
+    indent = '  ' * depth
+    print(f'{indent}factorial({n}) 호출')
+    if n &lt;= 1:
+        result = 1
+    else:
+        result = n * factorial(n - 1, depth + 1)
+    print(f'{indent}factorial({n}) = {result} 반환')
+    return result
+
+
+factorial(3)
+</code></pre>
+<pre class="output">
+factorial(3) 호출
+  factorial(2) 호출
+    factorial(1) 호출
+    factorial(1) = 1 반환
+  factorial(2) = 2 반환
+factorial(3) = 6 반환
+</pre>
+
+        <p>각 프레임은 자기만의 <code>n</code>과 <code>indent</code>를 따로 가진다. 그래서 같은 이름의 변수가 여러 단계에 동시에 있어도 섞이지 않는다.</p>
+      </section>
+
+      <section id="recursion-limit">
+        <h2>재귀 깊이 제한</h2>
+        <p>프레임은 메모리를 차지한다. 기저 조건을 잘못 써서 재귀가 끝나지 않으면 프레임이 한없이 쌓인다. 파이썬은 이를 막으려고 <strong>재귀 깊이</strong>, 즉 동시에 쌓일 수 있는 파이썬 함수 호출 수에 한도를 둔다. 기본값은 1000이고, 넘으면 <code>RecursionError</code>가 난다.</p>
+
+<pre data-lang="python" data-title="recursion_limit.py"><code>
+import sys
+
+
+def depth(n: int) -&gt; int:
+    if n == 0:
+        return 0
+    return depth(n - 1) + 1
+
+
+print(sys.getrecursionlimit())
+print(depth(900))
+try:
+    depth(5000)
+except RecursionError as e:
+    print(f'{type(e).__name__}: {e}')
+</code></pre>
+<pre class="output">
+1000
+900
+RecursionError: maximum recursion depth exceeded
+</pre>
+
+        <p>코드가 틀리지 않았는데도 입력이 크면 한도에 걸린다. 예를 들어 노드가 10만 개인 일자 모양 그래프를 재귀 DFS로 돌면 깊이도 10만이 된다. 그래서 코딩 테스트 풀이에서는 파일 맨 위에 한도를 올리는 한 줄을 넣는 경우가 많다.</p>
+
+<pre data-lang="python" data-title="raise_limit.py"><code>
+import sys
+
+sys.setrecursionlimit(10**6)   # 한도를 100만으로 올린다
+
+
+def depth(n: int) -&gt; int:
+    if n == 0:
+        return 0
+    return depth(n - 1) + 1
+
+
+print(depth(100_000))
+</code></pre>
+<pre class="output">
+100000
+</pre>
+
+        <p>한도를 올린다고 문제가 모두 사라지지는 않는다. 이 노트를 쓴 환경(Python 3.13)에서 실험한 결과는 이렇다.</p>
+        <ul>
+          <li>단순한 재귀는 한도를 충분히 올리면 깊이 100만까지 돌았다. 다만 깊이 100만에서 메모리를 100MB 넘게 썼다.</li>
+          <li>뒤에서 볼 <code>@cache</code>를 붙인 재귀는 한도를 100만으로 올려도 깊이 몇천에서 <code>RecursionError</code>가 났다. <code>cache</code>는 C로 만들어져 있고, C 코드를 거치는 호출에는 <code>setrecursionlimit</code>과 상관없는 별도 한도가 걸린다.</li>
+        </ul>
+        <p>파이썬 3.10 이하는 파이썬 함수끼리의 호출에도 C 스택을 써서, 한도만 크게 올리고 깊이 들어가면 에러 메시지 없이 프로그램이 죽기도 했다. 채점 환경의 버전에 따라 결과가 다를 수 있다.</p>
+
+        <div class="callout callout-tip">
+          <span class="callout-title">깊이가 수만을 넘을 수 있다면</span>
+          <p>재귀 대신 반복문과 직접 만든 스택(리스트)으로 바꾸는 편이 안전하다. 호출 스택이 하던 일을 리스트가 대신하므로 재귀 한도에 걸리지 않는다. 13장에서 DFS를 이렇게 바꾸는 방법을 다룬다.</p>
+        </div>
+      </section>
+
+      <section id="memoization">
+        <h2>같은 계산 다시 하지 않기</h2>
+        <p>피보나치 수열은 앞의 두 수를 더해 다음 수를 만든다(0, 1, 1, 2, 3, 5, 8, …). 정의를 그대로 재귀로 옮기면 짧고 읽기 쉽지만, 아주 느리다. 함수가 몇 번 불리는지 세어 보자.</p>
+
+<pre data-lang="python" data-title="fib_naive.py"><code>
+calls = 0
+
+
+def fib(n: int) -&gt; int:
+    global calls
+    calls += 1
+    if n &lt; 2:
+        return n
+    return fib(n - 1) + fib(n - 2)
+
+
+print(fib(20), calls)
+</code></pre>
+<pre class="output">
+6765 21891
+</pre>
+
+        <p>21번이면 될 계산을 21,891번 한다. <code>fib(20)</code>은 <code>fib(19)</code>와 <code>fib(18)</code>을 부르는데, <code>fib(19)</code>도 다시 <code>fib(18)</code>을 부른다. 같은 인자의 호출이 가지를 칠 때마다 겹치고, 그 겹침이 아래로 갈수록 불어난다.</p>
+
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>n</th><th>단순 재귀의 호출 수</th><th>답을 저장해 두면</th></tr></thead>
+            <tbody>
+              <tr><td>10</td><td>177</td><td>11</td></tr>
+              <tr><td>20</td><td>21,891</td><td>21</td></tr>
+              <tr><td>30</td><td>2,692,537</td><td>31</td></tr>
+              <tr><td>시간</td><td><span class="bigo b-quad">O(1.62ⁿ)</span> 지수 시간</td><td><span class="bigo b-linear">O(n)</span></td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <p>해결책은 간단하다. 한 번 구한 답을 저장해 두고, 같은 인자로 다시 불리면 저장한 답을 돌려준다. 이것을 <strong>메모이제이션</strong>이라고 한다. 파이썬에서는 <code>functools.cache</code>를 함수 위에 붙이기만 하면 된다. 함수 위에 <code>@이름</code>을 적어 함수에 기능을 덧씌우는 문법을 <strong>데코레이터</strong>라고 한다.</p>
+
+<pre data-lang="python" data-title="fib_cache.py"><code>
+from functools import cache
+
+calls = 0
+
+
+@cache
+def fib(n: int) -&gt; int:
+    global calls
+    calls += 1            # 저장된 답이 없을 때만 본문이 실행된다
+    if n &lt; 2:
+        return n
+    return fib(n - 1) + fib(n - 2)
+
+
+print(fib(20), calls)
+print(fib(90))
+</code></pre>
+<pre class="output">
+6765 21
+2880067194370816120
+</pre>
+
+        <p>본문은 <code>n</code>마다 한 번씩, 모두 21번만 실행된다. 단순 재귀로는 엄두도 못 낼 <code>fib(90)</code>도 바로 나온다. 이 "겹치는 작은 문제의 답을 저장해 다시 쓰는" 생각이 25장 다이나믹 프로그래밍의 출발점이다.</p>
+        <p><code>@cache</code>는 인자를 딕셔너리의 키로 써서 답을 저장한다. 그래서 인자가 리스트면 <code>TypeError: unhashable type: 'list'</code>가 난다(4장). 리스트 대신 튜플을 넘긴다. 깊이가 몇천을 넘는 문제라면 앞 절의 한도 문제 때문에 반복문으로 표를 채우는 방식(25장)을 쓴다.</p>
+      </section>
+
+      <section id="pitfalls">
+        <h2>자주 하는 실수</h2>
+        <div class="callout callout-warn">
+          <span class="callout-title">재귀 호출의 결과를 return 하지 않기</span>
+          <p>재귀 단계에서 호출만 하고 <code>return</code>을 빠뜨리면, 깊은 곳에서 찾은 답이 위로 전달되지 않고 버려진다. 함수 끝까지 <code>return</code> 없이 내려오므로 결과는 <code>None</code>이다.</p>
+        </div>
+
+<pre data-lang="python" data-title="missing_return.py"><code>
+def find(numbers: list[int], target: int, i: int = 0) -&gt; int:
+    if i == len(numbers):
+        return -1
+    if numbers[i] == target:
+        return i
+    find(numbers, target, i + 1)       # return 이 빠졌다
+
+
+print(find([5, 3, 8], 8))   # 2 를 기대했다
+</code></pre>
+<pre class="output">
+None
+</pre>
+        <p>마지막 줄을 <code>return find(numbers, target, i + 1)</code>로 고치면 <code>2</code>가 나온다. 재귀 호출의 결과를 그대로 위로 넘겨야 하는 자리라면 <code>return</code>이 빠지지 않았는지 먼저 확인한다.</p>
+
+        <div class="callout callout-warn">
+          <span class="callout-title">기저 조건에 닿지 않기</span>
+          <p>기저 조건이 있어도 재귀 단계가 그 조건을 건너뛰면 소용없다. <code>n == 0</code>에서 멈추는 함수가 <code>n - 2</code>로 내려가면, 홀수에서 시작했을 때 0을 지나쳐 음수로 끝없이 내려가다 <code>RecursionError</code>가 난다. 조건을 <code>n &lt;= 0</code>처럼 넓게 잡는다.</p>
+        </div>
+        <div class="callout callout-warn">
+          <span class="callout-title">가변 객체를 기본값으로 쓰기</span>
+          <p><code>def f(x, memo={})</code>나 <code>def f(x, path=[])</code>는 호출 사이에 값이 남는다. 재귀 함수에 경로나 메모를 넘길 때 특히 자주 실수한다.</p>
+        </div>
+        <div class="callout callout-warn">
+          <span class="callout-title">함수 안에서 바깥 변수에 대입하기</span>
+          <p>보조 함수 안의 <code>answer += 1</code>이나 <code>best = max(best, x)</code>는 <code>UnboundLocalError</code>를 낸다. <code>nonlocal</code>이나 <code>global</code>을 선언한다.</p>
+        </div>
+        <div class="callout callout-warn">
+          <span class="callout-title">입력이 커지면 재귀 한도에 걸린다</span>
+          <p>예제에서 잘 돌던 재귀가 큰 입력에서 <code>RecursionError</code>를 낸다면 깊이를 의심한다. <code>sys.setrecursionlimit</code>으로 한도를 올리고, 그래도 깊이가 수만을 넘을 수 있으면 반복문과 스택으로 바꾼다.</p>
+        </div>
+      </section>
+
+      <section id="problem">
+        <h2>대표 문제</h2>
+        <div class="problem">
+          <div class="problem-head">
+            <div class="problem-kicker"><b>Problem</b><span class="chip">보통</span><span class="chip">재귀</span></div>
+            <h3>하노이 탑</h3>
+          </div>
+          <div class="problem-body">
+            <p>기둥 세 개에 1, 2, 3번이 붙어 있다. 1번 기둥에는 크기가 모두 다른 원판 <code>n</code>개가 큰 것이 아래로 가도록 쌓여 있다. 다음 규칙을 지키며 모든 원판을 3번 기둥으로 옮기려 한다.</p>
+            <ul>
+              <li>한 번에 원판 하나만 옮긴다.</li>
+              <li>각 기둥의 맨 위 원판만 옮길 수 있다.</li>
+              <li>작은 원판 위에 큰 원판을 올릴 수 없다.</li>
+            </ul>
+            <p>가장 적게 옮기는 방법을 출력하라. 첫 줄에는 옮긴 횟수를, 다음 줄부터는 한 번 옮길 때마다 "출발 기둥 도착 기둥"을 한 줄씩 쓴다. <code>n</code>은 1 이상 20 이하이다.</p>
+            <div class="table-wrap">
+              <table>
+                <thead><tr><th>입력</th><th>출력</th><th>설명</th></tr></thead>
+                <tbody>
+                  <tr><td><code>1</code></td><td><code>1</code><br><code>1 3</code></td><td>원판 하나는 바로 옮긴다</td></tr>
+                  <tr><td><code>2</code></td><td><code>3</code><br><code>1 2</code><br><code>1 3</code><br><code>2 3</code></td><td>작은 원판을 2번에 비켜 두고, 큰 원판을 옮긴 뒤, 작은 원판을 다시 올린다</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <details class="reveal">
+            <summary>접근 방법<span class="reveal-hint">먼저 생각해 보고 펼치세요</span></summary>
+            <div class="reveal-body">
+              <p>가장 큰 원판에 집중한다. 가장 큰 원판을 3번으로 옮기려면 그 순간 1번에는 그 원판만 있고, 3번은 비어 있어야 한다. 즉 나머지 <code>n-1</code>개는 모두 2번에 가 있어야 한다. 그러면 할 일은 세 단계로 정리된다.</p>
+              <ol>
+                <li>위의 <code>n-1</code>개를 1번에서 2번으로 옮긴다. 3번을 거쳐 가는 기둥으로 쓴다.</li>
+                <li>가장 큰 원판을 1번에서 3번으로 옮긴다.</li>
+                <li>2번에 있는 <code>n-1</code>개를 3번으로 옮긴다. 이번에는 1번을 거쳐 간다.</li>
+              </ol>
+              <p>1단계와 3단계는 "원판 <code>n-1</code>개를 한 기둥에서 다른 기둥으로 옮기기"로, 원래 문제와 모양은 같고 크기만 하나 작다. <mark>작은 호출이 <code>n-1</code>개를 알아서 옮겨 준다고 믿으면</mark>, 지금 단계에서는 가장 큰 원판 하나만 옮기면 된다. 원판이 0개면 할 일이 없으니 그것을 기저 조건으로 삼는다.</p>
+              <p>옮기는 횟수를 <code>T(n)</code>이라 하면 <code>T(n) = 2·T(n-1) + 1</code>, <code>T(0) = 0</code>이다. 풀면 <code>T(n) = 2ⁿ - 1</code>이다.</p>
+            </div>
+          </details>
+
+          <details class="reveal">
+            <summary>풀이 코드</summary>
+            <div class="reveal-body">
+<pre data-lang="python" data-title="hanoi.py"><code>
+import sys
+
+input = sys.stdin.readline
+
+
+def hanoi(n: int, start: int, goal: int, via: int,
+          moves: list[str]) -&gt; None:
+    if n == 0:                               # 옮길 원판이 없다
+        return
+    hanoi(n - 1, start, via, goal, moves)    # n-1개를 비켜 둔다
+    moves.append(f'{start} {goal}')          # 가장 큰 원판
+    hanoi(n - 1, via, goal, start, moves)    # n-1개를 다시 올린다
+
+
+n = int(input())
+moves = []
+hanoi(n, 1, 3, 2, moves)
+print(len(moves))
+print('\n'.join(moves))     # 한 번에 모아 출력해야 빠르다
+</code></pre>
+<pre class="stdin">
+3
+</pre>
+<pre class="output">
+7
+1 3
+1 2
+3 2
+1 3
+2 1
+2 3
+1 3
+</pre>
+              <p><code>start</code>, <code>goal</code>, <code>via</code>(출발, 도착, 거쳐 가는 기둥)의 자리만 바꿔 넘기는 것이 핵심이다. <code>n</code>이 20이면 이동이 100만 줄을 넘으므로 리스트에 모아 한 번에 출력한다(1장).</p>
+            </div>
+          </details>
+
+          <details class="reveal">
+            <summary>복잡도</summary>
+            <div class="reveal-body">
+              <dl class="cx">
+                <dt>시간</dt><dd><span class="bigo b-quad">O(2ⁿ)</span> 이동이 정확히 2ⁿ - 1번 일어난다. 출력해야 할 줄 수 자체가 그만큼이라 이보다 빠를 수 없다.</dd>
+                <dt>공간</dt><dd><span class="bigo b-quad">O(2ⁿ)</span> 이동 기록을 모두 모아 두기 때문이다. 재귀 깊이는 <code>n + 1</code>단계를 넘지 않아 호출 스택은 O(n)만 쓴다.</dd>
+              </dl>
+            </div>
+          </details>
+        </div>
+      </section>
+
+      <section id="recall">
+        <h2>스스로 확인</h2>
+        <div class="recall">
+          <details>
+            <summary><code>def f(x, items=[])</code>로 만든 함수를 여러 번 호출하면 왜 앞선 호출의 값이 남는가?</summary>
+            <div class="answer"><p>기본값은 <code>def</code> 문이 실행될 때 한 번만 만들어져 함수에 저장되고, 기본값을 쓰는 호출은 모두 그 리스트 하나를 함께 쓴다. 기본값을 <code>None</code>으로 두고 함수 안에서 새 리스트를 만든다.</p></div>
+          </details>
+          <details>
+            <summary>보조 함수 안에서 바깥 리스트에 <code>append</code>할 때는 괜찮은데, 바깥 정수에 <code>+= 1</code>을 하면 에러가 나는 이유는?</summary>
+            <div class="answer"><p><code>+= 1</code>은 이름에 대입하므로 그 이름이 보조 함수의 지역 변수가 되고, 값이 없는 지역 변수를 읽다가 <code>UnboundLocalError</code>가 난다. <code>append</code>는 이름에 대입하지 않고 리스트 내용만 바꾼다. 정수 쪽은 <code>nonlocal</code>을 선언한다.</p></div>
+          </details>
+          <details>
+            <summary><code>@cache</code>를 붙이면 <code>fib(20)</code>의 본문이 21,891번에서 21번으로 줄어드는 이유는?</summary>
+            <div class="answer"><p>단순 재귀는 같은 인자의 호출을 가지마다 다시 계산한다. <code>@cache</code>는 인자별로 답을 저장해 두고 두 번째부터는 저장한 답을 돌려주므로, 본문은 <code>fib(0)</code>부터 <code>fib(20)</code>까지 인자마다 한 번씩, 모두 21번만 실행된다.</p></div>
+          </details>
+          <details>
+            <summary>원판이 4개인 하노이 탑은 최소 몇 번 옮겨야 하는가?</summary>
+            <div class="answer"><p>15번이다. <code>T(n) = 2·T(n-1) + 1</code>이므로 <code>T(1) = 1</code>, <code>T(2) = 3</code>, <code>T(3) = 7</code>, <code>T(4) = 15</code>이고, 일반식 <code>2ⁿ - 1</code>에 넣어도 <code>2⁴ - 1 = 15</code>다.</p></div>
+          </details>
+        </div>
+      </section>
+
+      <section id="summary">
+        <h2>정리</h2>
+        <ol class="summary-list">
+          <li><code>return</code>이 없는 함수는 <code>None</code>을 돌려주고, <code>return a, b</code>는 튜플 하나를 돌려준다.</li>
+          <li>기본값은 <code>def</code> 때 한 번만 만들어진다. 리스트나 딕셔너리 대신 <code>None</code>을 기본값으로 쓴다.</li>
+          <li>함수도 값이라 변수에 담고 인자로 넘길 수 있다. 한 번 쓰고 버릴 짧은 함수는 <code>lambda</code>로 그 자리에서 만든다.</li>
+          <li>함수 안에서 이름에 대입하면 그 이름은 지역 변수가 된다. 바깥 변수에 대입하려면 <code>global</code>이나 <code>nonlocal</code>을 선언한다.</li>
+          <li>재귀는 기저 조건과, 문제를 한 단계 작게 만드는 재귀 단계로 이루어진다. 작은 호출이 정답을 준다고 믿고 지금 단계만 생각한다.</li>
+          <li>호출마다 프레임이 호출 스택에 쌓인다. 기본 한도는 1000이고, 깊으면 <code>sys.setrecursionlimit</code>으로 올리되 수만을 넘으면 반복문과 스택으로 바꾼다.</li>
+          <li>같은 인자로 반복해서 불리는 재귀는 <code>@cache</code>로 답을 저장해 중복 계산을 없앤다. 피보나치는 지수 시간이 선형 시간으로 줄어든다.</li>
+        </ol>
+      </section>
+
+      <nav class="pager" aria-label="이전 장과 다음 장"></nav>
+    </article>
+  </main>
+
+  <aside class="rail" aria-label="이 페이지 목차">
+    <p class="rail-title">이 페이지</p>
+    <nav id="onthispage"></nav>
+  </aside>
+</div>
+<div class="backdrop" id="backdrop"></div>
+
+<script src="assets/book.js"></script>
+<script src="assets/app.js"></script>
+<script src="assets/code.js"></script>
+</body>
+</html>
