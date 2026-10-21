@@ -26,7 +26,7 @@ window.BOOK = {
       desc: '데이터를 한 줄로 늘어놓는 구조. 배열에서 시작해 해시 테이블까지.',
       chapters: [
         { no: '08', slug: '08-array', title: '배열', desc: '연속된 메모리, 인덱스 접근, 동적 배열이 커지는 방식', isWritten: true },
-        { no: '09', slug: '09-linked-list', title: '연결 리스트', desc: '노드와 포인터, 삽입과 삭제, 뒤집기', isWritten: false },
+        { no: '09', slug: '09-linked-list', title: '연결 리스트', desc: '노드와 포인터, 삽입과 삭제, 뒤집기', isWritten: true },
         { no: '10', slug: '10-stack', title: '스택', desc: '나중에 넣은 것을 먼저 꺼내는 구조(LIFO)', isWritten: false },
         { no: '11', slug: '11-queue-and-deque', title: '큐와 데크', desc: '먼저 넣은 것을 먼저 꺼내는 구조(FIFO)와 양방향 데크', isWritten: false },
         { no: '12', slug: '12-hash-table', title: '해시 테이블', desc: '해시 함수와 충돌 처리, 딕셔너리가 빠른 이유', isWritten: false }
