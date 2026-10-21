@@ -1,0 +1,678 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>20. 이진 탐색 — 파이썬 알고리즘 노트</title>
+<script src="assets/theme.js"></script>
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body data-chapter="20">
+<a class="skip-link" href="#content">본문으로 건너뛰기</a>
+<div class="progress" aria-hidden="true"><span></span></div>
+<header class="topbar" id="topbar"></header>
+
+<div class="shell">
+  <aside class="sidebar" id="sidebar" aria-label="책 목차"></aside>
+
+  <main class="main" id="content">
+    <article class="chapter">
+      <header class="chapter-head">
+        <a class="part-pill"></a>
+        <span class="chapter-label"></span>
+        <h1>이진 탐색</h1>
+        <p class="lede">정렬된 범위에서 가운데를 보고 절반을 버리는 일을 되풀이해, 100만 개 중 하나를 20번 남짓한 비교로 찾는 방법입니다. 이 장에서는 값 찾기에서 시작해 "답을 찾는 문제"를 "가능한지 묻는 문제"로 바꾸는 파라메트릭 서치까지 다룹니다.</p>
+        <div class="chapter-meta">
+          <span class="chip">정렬된 배열</span><span class="chip">lower bound</span><span class="chip">bisect</span><span class="chip">파라메트릭 서치</span><span class="chip">O(log n)</span>
+        </div>
+      </header>
+
+      <div class="goals">
+        <p class="goals-title">이 장에서 배울 것</p>
+        <ul>
+          <li>이진 탐색이 왜 O(log n)인지, 어떤 조건에서만 쓸 수 있는지 설명할 수 있다</li>
+          <li><code>while lo &lt;= hi</code> 꼴의 이진 탐색을 직접 짤 수 있다</li>
+          <li>lower bound와 upper bound를 구현하고 <code>bisect</code>와 대응시킬 수 있다</li>
+          <li>최댓값·최솟값을 묻는 문제를 "x가 가능한가?" 판정으로 바꿔 풀 수 있다</li>
+          <li><code>lo</code>, <code>hi</code>의 초기값과 반복 조건을 실수 없이 잡는 법을 안다</li>
+        </ul>
+      </div>
+
+      <section id="idea">
+        <h2>절반씩 줄여 찾기</h2>
+        <div class="callout callout-key">
+          <span class="callout-title">핵심</span>
+          <p class="callout-big">답이 될 수 있는 범위가 <mark>정렬(단조)돼 있으면, 가운데 하나만 보고 절반을 통째로 버릴 수 있다.</mark> 그래서 O(log n)에 찾는다.</p>
+        </div>
+        <p>1부터 100 사이의 수를 맞히는 업다운 게임에서 50부터 부르는 것과 같은 원리다. "업"이라는 답 한 번으로 1~50이 모두 지워진다.</p>
+        <p>정렬된 리스트에서 값 <code>x</code>를 찾을 때도 같다. 찾는 범위의 왼쪽 끝을 <code>lo</code>, 오른쪽 끝을 <code>hi</code>, 가운데를 <code>mid</code>라고 하자. <code>a[mid]</code>가 <code>x</code>보다 작으면, 리스트가 정렬돼 있으니 <code>mid</code>와 그 왼쪽은 모두 <code>x</code>보다 작다. 볼 필요가 없으므로 <code>lo</code>를 <code>mid + 1</code>로 옮긴다. 크면 반대로 <code>hi</code>를 <code>mid - 1</code>로 옮긴다.</p>
+
+        <figure class="fig">
+          <div class="fig-steps">
+            <div class="fig-state">
+              <div class="cells">
+                <div class="cell" data-i="0" data-ptr="lo">3</div>
+                <div class="cell" data-i="1">7</div>
+                <div class="cell" data-i="2">11</div>
+                <div class="cell is-hl" data-i="3" data-ptr="mid">15</div>
+                <div class="cell" data-i="4">19</div>
+                <div class="cell" data-i="5">24</div>
+                <div class="cell" data-i="6" data-ptr="hi">30</div>
+              </div>
+              <span class="fig-state-label">1회: 15 &lt; 19</span>
+            </div>
+          </div>
+          <div class="fig-steps">
+            <div class="fig-arrow">오른쪽 절반</div>
+            <div class="fig-state">
+              <div class="cells">
+                <div class="cell is-ghost" data-i="0">3</div>
+                <div class="cell is-ghost" data-i="1">7</div>
+                <div class="cell is-ghost" data-i="2">11</div>
+                <div class="cell is-ghost" data-i="3">15</div>
+                <div class="cell" data-i="4" data-ptr="lo">19</div>
+                <div class="cell is-hl" data-i="5" data-ptr="mid">24</div>
+                <div class="cell" data-i="6" data-ptr="hi">30</div>
+              </div>
+              <span class="fig-state-label">2회: 24 &gt; 19</span>
+            </div>
+          </div>
+          <div class="fig-steps">
+            <div class="fig-arrow">왼쪽 절반</div>
+            <div class="fig-state">
+              <div class="cells">
+                <div class="cell is-ghost" data-i="0">3</div>
+                <div class="cell is-ghost" data-i="1">7</div>
+                <div class="cell is-ghost" data-i="2">11</div>
+                <div class="cell is-ghost" data-i="3">15</div>
+                <div class="cell is-hl" data-i="4" data-ptr="mid">19</div>
+                <div class="cell is-ghost" data-i="5">24</div>
+                <div class="cell is-ghost" data-i="6">30</div>
+              </div>
+              <span class="fig-state-label">3회: 찾음</span>
+            </div>
+          </div>
+          <figcaption><b>그림 20-1</b> 19 찾기. 한 번 비교할 때마다 남은 칸이 7 → 3 → 1로 절반씩 준다. 마지막 단계에서는 <code>lo</code>, <code>mid</code>, <code>hi</code>가 모두 인덱스 4다.</figcaption>
+        </figure>
+
+        <p>범위가 매번 절반이 되므로, n개가 1개로 줄어들 때까지의 횟수는 log₂ n번 정도다(로그는 2장). 직접 세어 보자.</p>
+
+<pre data-lang="python" data-title="halving.py"><code>
+def halving_count(n: int) -&gt; int:
+    """n개를 절반씩 버려 1개가 남을 때까지 몇 번 걸리는지."""
+    count = 0
+    while n &gt; 1:
+        n = (n + 1) // 2      # 홀수면 큰 쪽이 남는다고 본다
+        count += 1
+    return count
+
+
+for n in (8, 1000, 1_000_000, 10**9):
+    print(n, halving_count(n))
+</code></pre>
+<pre class="output">
+8 3
+1000 10
+1000000 20
+1000000000 30
+</pre>
+
+        <p>10억 개도 30번이면 끝난다. 앞에서부터 하나씩 보는 순차 탐색은 최악에 10억 번이다. 대신 이진 탐색에는 <strong>범위가 정렬돼 있어야 한다</strong>는 조건이 붙는다. 정렬이 깨지면 "왼쪽은 모두 작다"는 판단이 틀려서 엉뚱한 절반을 버린다.</p>
+      </section>
+
+      <section id="implement">
+        <h2>직접 구현하기</h2>
+        <p>가장 기본형은 <code>lo</code>와 <code>hi</code>를 <strong>둘 다 포함하는</strong> 닫힌 구간 <code>[lo, hi]</code>로 보는 방식이다. 구간에 원소가 하나라도 남아 있는 동안(<code>lo &lt;= hi</code>) 반복하고, 찾으면 위치를, 구간이 비면 -1을 돌려준다.</p>
+
+<pre data-lang="python" data-title="binary_search.py"><code>
+def binary_search(a: list[int], x: int) -&gt; int:
+    """정렬된 a에서 x의 위치를 돌려준다. 없으면 -1."""
+    lo, hi = 0, len(a) - 1
+    while lo &lt;= hi:
+        mid = (lo + hi) // 2
+        if a[mid] == x:
+            return mid
+        if a[mid] &lt; x:
+            lo = mid + 1        # x 는 오른쪽 절반에 있다
+        else:
+            hi = mid - 1        # x 는 왼쪽 절반에 있다
+    return -1
+
+
+a = [3, 7, 11, 15, 19, 24, 30]
+print(binary_search(a, 24))
+print(binary_search(a, 3))
+print(binary_search(a, 30))
+print(binary_search(a, 20))
+</code></pre>
+<pre class="output">
+5
+0
+6
+-1
+</pre>
+
+        <p><code>mid</code>는 이미 확인했으므로 다음 구간에서 뺀다. 그래서 <code>mid</code>가 아니라 <code>mid + 1</code>, <code>mid - 1</code>로 옮긴다. 이 한 칸 덕분에 구간이 매번 반드시 줄어들고, 반복이 끝난다. 그림 20-1의 과정을 출력해 보면 이렇다.</p>
+
+<pre data-lang="python" data-title="binary_search_trace.py"><code>
+def binary_search_trace(a: list[int], x: int) -&gt; int:
+    lo, hi = 0, len(a) - 1
+    while lo &lt;= hi:
+        mid = (lo + hi) // 2
+        print(f'lo={lo} mid={mid} hi={hi}  a[mid]={a[mid]}')
+        if a[mid] == x:
+            return mid
+        if a[mid] &lt; x:
+            lo = mid + 1
+        else:
+            hi = mid - 1
+    return -1
+
+
+a = [3, 7, 11, 15, 19, 24, 30]
+print('찾은 위치:', binary_search_trace(a, 19))
+</code></pre>
+<pre class="output">
+lo=0 mid=3 hi=6  a[mid]=15
+lo=4 mid=5 hi=6  a[mid]=24
+lo=4 mid=4 hi=4  a[mid]=19
+찾은 위치: 4
+</pre>
+
+        <p>원소가 100만 개일 때 비교를 몇 번 하는지도 세어 보자. 없는 값을 찾을 때가 가장 오래 걸리는데, 그래도 20번 안팎이다.</p>
+
+<pre data-lang="python" data-title="count_compares.py"><code>
+def binary_search_count(a: list[int], x: int) -&gt; tuple[int, int]:
+    """(위치, 비교 횟수)를 돌려준다."""
+    lo, hi = 0, len(a) - 1
+    compares = 0
+    while lo &lt;= hi:
+        mid = (lo + hi) // 2
+        compares += 1
+        if a[mid] == x:
+            return mid, compares
+        if a[mid] &lt; x:
+            lo = mid + 1
+        else:
+            hi = mid - 1
+    return -1, compares
+
+
+a = list(range(0, 2_000_000, 2))           # 0, 2, 4, … 짝수 100만 개
+print(binary_search_count(a, 1_999_998))   # 맨 끝 값
+print(binary_search_count(a, 1))           # 없는 값
+print(a.index(1_999_998) + 1)              # 앞에서부터 보면 이만큼 비교한다
+</code></pre>
+<pre class="output">
+(999999, 20)
+(-1, 20)
+1000000
+</pre>
+
+        <div class="callout callout-tip">
+          <span class="callout-title">mid 계산과 오버플로</span>
+          <p>C++이나 Java 책에서는 <code>lo + (hi - lo) // 2</code>로 쓰라고 한다. <code>lo + hi</code>가 정수 범위를 넘을 수 있어서다. 파이썬 정수는 크기 제한이 없어(2장) <code>(lo + hi) // 2</code>로 써도 된다.</p>
+        </div>
+      </section>
+
+      <section id="bounds">
+        <h2>lower bound와 upper bound</h2>
+        <p>값이 여러 개 들어 있으면 "있는지"보다 "어디부터 어디까지인지"가 더 궁금하다. 이때 쓰는 두 가지 위치가 있다.</p>
+        <ul>
+          <li><strong>lower bound</strong> — <code>x</code> <em>이상</em>인 값이 처음 나오는 위치</li>
+          <li><strong>upper bound</strong> — <code>x</code> <em>초과</em>인 값이 처음 나오는 위치</li>
+        </ul>
+        <p>둘 다 "조건을 처음 만족하는 위치"를 찾는다. 답이 <code>len(a)</code>(모든 값이 조건을 만족하지 않음)일 수도 있으므로 <code>hi</code>를 <code>len(a)</code>로 잡고, 구간을 <code>[lo, hi)</code>처럼 오른쪽 끝을 빼는 반열린 구간으로 본다. <code>lo == hi</code>가 되면 후보가 하나로 좁혀진 것이라 멈춘다.</p>
+
+<pre data-lang="python" data-title="bounds.py"><code>
+def lower_bound(a: list[int], x: int) -&gt; int:
+    """a[i] &gt;= x 인 첫 i. 모두 x 보다 작으면 len(a)."""
+    lo, hi = 0, len(a)
+    while lo &lt; hi:
+        mid = (lo + hi) // 2
+        if a[mid] &lt; x:
+            lo = mid + 1        # mid 는 답이 아니다
+        else:
+            hi = mid            # mid 가 답일 수 있어 남겨 둔다
+    return lo
+
+
+def upper_bound(a: list[int], x: int) -&gt; int:
+    """a[i] &gt; x 인 첫 i. 모두 x 이하면 len(a)."""
+    lo, hi = 0, len(a)
+    while lo &lt; hi:
+        mid = (lo + hi) // 2
+        if a[mid] &lt;= x:
+            lo = mid + 1
+        else:
+            hi = mid
+    return lo
+
+
+a = [1, 3, 3, 3, 5, 8, 8, 10]
+print(lower_bound(a, 3), upper_bound(a, 3))     # 3 이 차지한 구간 [1, 4)
+print(upper_bound(a, 3) - lower_bound(a, 3))    # 3 의 개수
+print(lower_bound(a, 4), upper_bound(a, 4))     # 없는 값이면 둘이 같다
+print(lower_bound(a, 11), upper_bound(a, 0))    # 양 끝을 벗어난 값
+</code></pre>
+<pre class="output">
+1 4
+3
+4 4
+8 0
+</pre>
+
+        <figure class="fig">
+          <div class="fig-steps">
+            <div class="fig-state">
+              <div class="cells">
+                <div class="cell" data-i="0">1</div>
+                <div class="cell is-hl" data-i="1" data-ptr="lower">3</div>
+                <div class="cell is-hl" data-i="2">3</div>
+                <div class="cell is-hl" data-i="3">3</div>
+                <div class="cell" data-i="4" data-ptr="upper">5</div>
+                <div class="cell" data-i="5">8</div>
+                <div class="cell" data-i="6">8</div>
+                <div class="cell" data-i="7">10</div>
+              </div>
+            </div>
+          </div>
+          <figcaption><b>그림 20-2</b> x = 3일 때. lower bound는 3이 시작하는 칸, upper bound는 3이 끝난 바로 다음 칸이다. 둘의 차 4 - 1 = 3이 3의 개수다.</figcaption>
+        </figure>
+
+        <p>두 함수는 비교 하나만 다르다. lower bound는 <code>a[mid] &lt; x</code>일 때, upper bound는 <code>a[mid] &lt;= x</code>일 때 오른쪽으로 간다. 그리고 <mark>upper bound − lower bound = x의 개수</mark>다. 정렬된 리스트에서 개수 세기를 O(log n)에 할 수 있다.</p>
+      </section>
+
+      <section id="bisect">
+        <h2>bisect 모듈</h2>
+        <p>7장에서 본 <code>bisect_left</code>와 <code>bisect_right</code>가 바로 앞 절의 <code>lower_bound</code>, <code>upper_bound</code>다. 동작이 같으니 실전에서는 직접 짜지 말고 이것을 쓴다. C로 구현돼 있어 더 빠르다.</p>
+
+<pre data-lang="python" data-title="bisect_again.py"><code>
+from bisect import bisect_left, bisect_right, insort
+
+a = [1, 3, 3, 3, 5, 8, 8, 10]
+print(bisect_left(a, 3), bisect_right(a, 3))    # lower_bound, upper_bound
+print(bisect_left(a, 4), bisect_right(a, 4))
+
+insort(a, 4)                                    # 자리를 찾아 끼워 넣는다
+print(a)
+
+i = bisect_left(a, 8)                           # 정확히 8 이 있는지
+print(i &lt; len(a) and a[i] == 8)
+i = bisect_left(a, 9)
+print(i &lt; len(a) and a[i] == 9)
+</code></pre>
+<pre class="output">
+1 4
+4 4
+[1, 3, 3, 3, 4, 5, 8, 8, 10]
+True
+False
+</pre>
+
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>하고 싶은 일</th><th>직접 구현</th><th>bisect</th></tr></thead>
+            <tbody>
+              <tr><td>x 이상이 처음 나오는 위치</td><td><code>lower_bound(a, x)</code></td><td><code>bisect_left(a, x)</code></td></tr>
+              <tr><td>x 초과가 처음 나오는 위치</td><td><code>upper_bound(a, x)</code></td><td><code>bisect_right(a, x)</code></td></tr>
+              <tr><td>x가 있는지</td><td><code>binary_search(a, x) != -1</code></td><td><code>i &lt; len(a) and a[i] == x</code></td></tr>
+              <tr><td>정렬을 유지하며 넣기</td><td>자리 찾기 + <code>insert</code></td><td><code>insort(a, x)</code> (넣기 때문에 O(n))</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <p><code>bisect</code>는 값이 있는지 직접 알려 주지 않는다. 돌려받은 위치가 범위 안인지, 그 자리의 값이 <code>x</code>인지 두 가지를 확인한다. <code>key=</code> 인자와 <code>insort</code>의 비용은 7장에서 다뤘다.</p>
+      </section>
+
+      <section id="parametric">
+        <h2>파라메트릭 서치</h2>
+        <p>이진 탐색은 리스트 안의 값만 찾는 도구가 아니다. <strong>답의 범위</strong>를 대상으로도 쓸 수 있다. "조건을 만족하는 최댓값(최솟값)을 구하라"는 문제를 "x로 하면 조건을 만족하는가?"라는 예/아니오 질문으로 바꾸고, 그 답이 바뀌는 경계를 이진 탐색으로 찾는다. 이것을 <strong>파라메트릭 서치</strong>(parametric search)라고 한다.</p>
+        <p>예를 들어 보자. 무게가 <code>[7, 2, 5, 10, 8, 3, 6]</code>인 짐을 <strong>순서대로</strong> 상자에 담는다. 상자 하나의 용량을 정하면, 짐을 앞에서부터 넣다가 넘치면 새 상자를 연다. 상자를 2개 이하로 쓰려면 용량이 최소 얼마여야 할까?</p>
+        <p>최솟값을 바로 계산하기는 어렵다. 하지만 "용량이 c일 때 2개로 되는가?"는 짐을 한 번 훑으면 O(n)에 알 수 있다. 용량 20부터 27까지 물어보자.</p>
+
+<pre data-lang="python" data-title="feasible_table.py"><code>
+def boxes_needed(weights: list[int], capacity: int) -&gt; int:
+    """용량이 capacity 인 상자에 순서대로 담을 때 필요한 상자 수."""
+    boxes, load = 1, 0
+    for w in weights:
+        if load + w &gt; capacity:    # 안 들어가면 새 상자를 연다
+            boxes += 1
+            load = 0
+        load += w
+    return boxes
+
+
+weights = [7, 2, 5, 10, 8, 3, 6]
+for capacity in range(20, 28):
+    print(capacity, boxes_needed(weights, capacity) &lt;= 2)
+</code></pre>
+<pre class="output">
+20 False
+21 False
+22 False
+23 False
+24 True
+25 True
+26 True
+27 True
+</pre>
+
+        <figure class="fig">
+          <div class="fig-steps">
+            <div class="fig-state">
+              <div class="cells">
+                <div class="cell is-ghost" data-i="20">F</div>
+                <div class="cell is-ghost" data-i="21">F</div>
+                <div class="cell is-ghost" data-i="22">F</div>
+                <div class="cell is-ghost" data-i="23">F</div>
+                <div class="cell is-hl" data-i="24" data-ptr="답">T</div>
+                <div class="cell" data-i="25">T</div>
+                <div class="cell" data-i="26">T</div>
+                <div class="cell" data-i="27">T</div>
+              </div>
+            </div>
+          </div>
+          <figcaption><b>그림 20-3</b> 용량(아래 숫자)별 판정 결과. 용량이 클수록 담기 쉬우므로 False가 이어지다 한 번 True로 바뀌면 끝까지 True다. 답은 첫 True다.</figcaption>
+        </figure>
+
+        <p>용량이 커지면 상자 수는 줄면 줄었지 늘지 않는다. 그래서 판정 결과는 <mark><code>False … False True … True</code>처럼 한 번만 바뀐다.</mark> 이렇게 한쪽 방향으로만 변하는 성질을 <strong>단조성</strong>이라고 한다. 단조이면 결과 줄 전체가 "정렬된 배열"과 같으므로, lower bound를 찾듯 첫 True를 이진 탐색으로 찾으면 된다.</p>
+
+<pre data-lang="python" data-title="min_capacity.py"><code>
+def boxes_needed(weights: list[int], capacity: int) -&gt; int:
+    boxes, load = 1, 0
+    for w in weights:
+        if load + w &gt; capacity:
+            boxes += 1
+            load = 0
+        load += w
+    return boxes
+
+
+def min_capacity(weights: list[int], m: int) -&gt; int:
+    """상자 m 개 이하로 다 담을 수 있는 가장 작은 용량."""
+    lo, hi = max(weights), sum(weights)       # 답이 있을 수 있는 범위
+    while lo &lt; hi:
+        mid = (lo + hi) // 2
+        if boxes_needed(weights, mid) &lt;= m:   # True: 첫 True 는 mid 이거나 왼쪽
+            hi = mid
+        else:                                 # False: 첫 True 는 오른쪽
+            lo = mid + 1
+    return lo
+
+
+weights = [7, 2, 5, 10, 8, 3, 6]
+for m in (1, 2, 3, 7):
+    print(m, min_capacity(weights, m))
+</code></pre>
+<pre class="output">
+1 41
+2 24
+3 17
+7 10
+</pre>
+
+        <p>판정 한 번이 O(n)이고 답의 범위 크기가 W라면 전체는 O(n log W)다. 용량을 1부터 하나씩 늘려 보는 O(n·W)와 비교하면, W가 10억일 때 판정 횟수가 10억 번에서 30번으로 준다.</p>
+      </section>
+
+      <section id="setup">
+        <h2>범위와 조건 잡는 법</h2>
+        <p>파라메트릭 서치에서 틀리는 곳은 대부분 세 군데다. 범위, 판정 함수, 반복 조건이다.</p>
+        <h3>lo와 hi는 답이 반드시 그 안에 있게</h3>
+        <p><code>lo</code>는 답이 될 수 있는 가장 작은 값, <code>hi</code>는 가장 큰 값으로 잡는다. 앞 절에서 용량은 가장 무거운 짐보다 작을 수 없으니 <code>lo = max(weights)</code>, 모두 한 상자에 넣는 <code>sum(weights)</code>면 반드시 되니 <code>hi = sum(weights)</code>다. 범위를 넉넉히 잡는 것은 괜찮다. 로그라서 범위를 두 배로 늘려도 반복은 한 번 늘 뿐이다. 반대로 답을 범위 밖에 두면 절대 찾지 못한다.</p>
+        <h3>판정 함수가 단조인지 먼저 확인</h3>
+        <p>코드를 짜기 전에 "x에서 되면 x보다 큰(작은) 값에서도 반드시 되는가?"를 한 문장으로 확인하는 습관을 들인다. 확인이 안 되면 파라메트릭 서치를 쓸 수 없다. 앞 절의 표처럼 작은 범위에서 판정 결과를 찍어 보면 빨리 확인된다.</p>
+        <h3>두 가지 틀</h3>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th></th><th>닫힌 구간 + 답 기록</th><th>반열린 구간</th></tr></thead>
+            <tbody>
+              <tr><td>반복 조건</td><td><code>while lo &lt;= hi</code></td><td><code>while lo &lt; hi</code></td></tr>
+              <tr><td>이동</td><td><code>lo = mid + 1</code>, <code>hi = mid - 1</code></td><td><code>lo = mid + 1</code>, <code>hi = mid</code></td></tr>
+              <tr><td>답</td><td>True일 때 <code>answer = mid</code>로 기록</td><td>끝난 뒤의 <code>lo</code></td></tr>
+              <tr><td>쓰는 곳</td><td>값 찾기, 대표 문제</td><td>lower bound, 첫 True 찾기</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <p>둘 다 맞는 방법이다. 한 문제 안에서 두 틀을 섞지만 않으면 된다.</p>
+        <h3>정수 답과 실수 답</h3>
+        <p>답이 실수라면 <code>mid + 1</code>처럼 한 칸 옮길 수 없다. 이때는 <code>lo = mid</code>, <code>hi = mid</code>로 옮기고, 조건 대신 <strong>횟수</strong>로 반복을 끝낸다. 100번 반으로 나누면 구간이 처음의 2¹⁰⁰분의 1이 되어 실수 오차보다 작아진다.</p>
+
+<pre data-lang="python" data-title="sqrt_bisect.py"><code>
+def sqrt_bisect(n: float) -&gt; float:
+    lo, hi = 0.0, max(1.0, n)      # 1보다 작은 n 의 제곱근은 n 보다 크다
+    for _ in range(100):           # 횟수를 고정하면 끝나지 않을 걱정이 없다
+        mid = (lo + hi) / 2
+        if mid * mid &lt; n:
+            lo = mid
+        else:
+            hi = mid
+    return lo
+
+
+print(f'{sqrt_bisect(2):.6f}')
+print(f'{sqrt_bisect(0.25):.6f}')
+</code></pre>
+<pre class="output">
+1.414214
+0.500000
+</pre>
+      </section>
+
+      <section id="pitfalls">
+        <h2>자주 하는 실수</h2>
+        <div class="callout callout-warn">
+          <span class="callout-title">lo = mid 로 무한 루프</span>
+          <p>정수 이진 탐색에서 <code>lo = mid</code>로 옮기면, <code>lo</code>와 <code>hi</code>가 붙어 있을 때 <code>mid</code>가 <code>lo</code>와 같아져 구간이 줄지 않는다. 확인한 <code>mid</code>는 버리고 <code>mid + 1</code>로 옮긴다.</p>
+        </div>
+
+<pre data-lang="python" data-title="stuck_loop.py"><code>
+a = [1, 3, 5, 7]
+lo, hi = 0, len(a) - 1
+
+for _ in range(4):              # 안전장치: 네 번만 돌려 본다
+    mid = (lo + hi) // 2
+    if a[mid] &lt;= 7:
+        lo = mid                # mid + 1 이어야 한다
+    else:
+        hi = mid - 1
+    print(lo, hi)
+</code></pre>
+<pre class="output">
+1 3
+2 3
+2 3
+2 3
+</pre>
+
+        <div class="callout callout-warn">
+          <span class="callout-title">정렬하지 않은 리스트에 쓰기</span>
+          <p>정렬되지 않은 리스트에서는 에러 없이 틀린 답이 나온다. 그래서 더 찾기 어렵다. 입력이 정렬돼 있다는 말이 없으면 먼저 <code>sort()</code>한다(19장).</p>
+        </div>
+
+<pre data-lang="python" data-title="unsorted.py"><code>
+def binary_search(a: list[int], x: int) -&gt; int:
+    lo, hi = 0, len(a) - 1
+    while lo &lt;= hi:
+        mid = (lo + hi) // 2
+        if a[mid] == x:
+            return mid
+        if a[mid] &lt; x:
+            lo = mid + 1
+        else:
+            hi = mid - 1
+    return -1
+
+
+a = [8, 23, 2, 16, 5]
+print(binary_search(a, 23))           # 분명히 있는데 -1
+print(binary_search(sorted(a), 23))   # 정렬한 리스트에서의 위치
+</code></pre>
+<pre class="output">
+-1
+4
+</pre>
+
+        <div class="callout callout-warn">
+          <span class="callout-title">hi = len(a) 와 len(a) - 1 을 섞기</span>
+          <p>닫힌 구간 틀(<code>while lo &lt;= hi</code>)은 <code>hi = len(a) - 1</code>, 반열린 구간 틀(<code>while lo &lt; hi</code>)은 <code>hi = len(a)</code>와 짝이다. 섞으면 한 칸 차이(off-by-one) 오류가 나고, 아래처럼 범위 밖을 읽기도 한다.</p>
+        </div>
+
+<pre data-lang="python" data-title="off_by_one.py"><code>
+a = [1, 3, 5]
+lo, hi = 0, len(a)              # 닫힌 구간 틀에 반열린 구간의 hi 를 섞었다
+try:
+    while lo &lt;= hi:
+        mid = (lo + hi) // 2
+        if a[mid] &lt; 9:
+            lo = mid + 1
+        else:
+            hi = mid - 1
+except IndexError as e:
+    print(f'{type(e).__name__}: {e}')
+</code></pre>
+<pre class="output">
+IndexError: list index out of range
+</pre>
+
+        <div class="callout callout-warn">
+          <span class="callout-title">단조가 아닌 판정에 적용하기</span>
+          <p>판정 결과가 <code>True False True</code>처럼 오락가락하면 이진 탐색은 경계 하나를 아무렇게나 골라 돌려준다. 예를 들어 "합이 정확히 S인가?"는 단조가 아니다. "합이 S 이상인가?"처럼 단조가 되도록 질문을 바꿀 수 있는지 먼저 본다.</p>
+        </div>
+      </section>
+
+      <section id="problem">
+        <h2>대표 문제</h2>
+        <div class="problem">
+          <div class="problem-head">
+            <div class="problem-kicker"><b>Problem</b><span class="chip">보통</span><span class="chip">파라메트릭 서치</span></div>
+            <h3>막대 자르기</h3>
+          </div>
+          <div class="problem-body">
+            <p>길이가 제각각인 막대 K개가 있다. 이 막대들을 모두 같은 길이 L(양의 정수)로 잘라 토막을 N개 이상 만들려고 한다. 막대를 이어 붙일 수는 없고, L보다 짧게 남는 자투리는 버린다. 가능한 L 중 가장 큰 값을 출력하라. 길이 1로도 N개를 만들 수 없으면 0을 출력하라.</p>
+            <p>첫 줄에 K와 N이, 둘째 줄에 막대 길이 K개가 공백으로 주어진다. K는 1 이상 100,000 이하, N은 1 이상 10억 이하, 막대 길이는 1 이상 10억 이하의 정수다.</p>
+            <div class="table-wrap">
+              <table>
+                <thead><tr><th>입력</th><th>출력</th><th>설명</th></tr></thead>
+                <tbody>
+                  <tr><td><code>5 6</code><br><code>30 42 17 25 50</code></td><td><code>21</code></td><td>21로 자르면 1+2+0+1+2 = 6개. 22부터는 5개다</td></tr>
+                  <tr><td><code>3 4</code><br><code>10 10 10</code></td><td><code>5</code></td><td>5로 자르면 6개, 6으로 자르면 3개뿐이다</td></tr>
+                  <tr><td><code>2 10</code><br><code>3 4</code></td><td><code>0</code></td><td>길이 1로 잘라도 7개다</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <details class="reveal">
+            <summary>접근 방법<span class="reveal-hint">먼저 생각해 보고 펼치세요</span></summary>
+            <div class="reveal-body">
+              <p>L이 짧을수록 토막이 많이 나온다. 그래서 <mark>"길이 L로 N개 이상 만들 수 있는가?"는 L이 커질수록 True에서 False로 한 번만 바뀐다.</mark> 마지막 True를 찾으면 된다.</p>
+              <ol>
+                <li>판정 함수를 만든다. 길이 L일 때 토막 수는 <code>sum(막대 // L)</code>이다.</li>
+                <li>답의 범위를 잡는다. L은 1 이상이고, 가장 긴 막대보다 길면 그 막대에서도 토막이 안 나오므로 <code>hi = max(막대)</code>다.</li>
+                <li>닫힌 구간 틀로 탐색한다. 가능하면 <code>answer = mid</code>로 기록하고 더 긴 쪽(<code>lo = mid + 1</code>), 불가능하면 더 짧은 쪽(<code>hi = mid - 1</code>)을 본다.</li>
+                <li><code>answer</code>를 0으로 시작하면, 한 번도 가능하지 않은 경우 0이 그대로 출력된다.</li>
+              </ol>
+            </div>
+          </details>
+
+          <details class="reveal">
+            <summary>풀이 코드</summary>
+            <div class="reveal-body">
+<pre data-lang="python" data-title="cut_sticks.py"><code>
+import sys
+
+input = sys.stdin.readline
+
+
+def pieces(sticks: list[int], length: int) -&gt; int:
+    """길이 length 로 잘랐을 때 나오는 토막 수."""
+    return sum(stick // length for stick in sticks)
+
+
+k, n = map(int, input().split())
+sticks = list(map(int, input().split()))
+
+lo, hi = 1, max(sticks)
+answer = 0
+while lo &lt;= hi:
+    mid = (lo + hi) // 2
+    if pieces(sticks, mid) &gt;= n:      # 가능하다: 기록하고 더 긴 쪽을 본다
+        answer = mid
+        lo = mid + 1
+    else:                             # 불가능하다: 더 짧은 쪽을 본다
+        hi = mid - 1
+print(answer)
+</code></pre>
+<pre class="stdin">
+5 6
+30 42 17 25 50
+</pre>
+<pre class="output">
+21
+</pre>
+              <p><code>lo</code>를 0이 아니라 1에서 시작하는 것이 중요하다. <code>mid</code>가 0이 되면 <code>stick // 0</code>에서 <code>ZeroDivisionError</code>가 난다.</p>
+            </div>
+          </details>
+
+          <details class="reveal">
+            <summary>복잡도</summary>
+            <div class="reveal-body">
+              <dl class="cx">
+                <dt>시간</dt><dd><span class="bigo b-nlogn">O(K log M)</span> M은 가장 긴 막대의 길이다. 판정 한 번에 막대 K개를 훑고, 판정은 log₂ M ≈ 30번 한다.</dd>
+                <dt>공간</dt><dd><span class="bigo b-linear">O(K)</span> 막대 길이를 담는 리스트뿐이다.</dd>
+              </dl>
+            </div>
+          </details>
+        </div>
+      </section>
+
+      <section id="recall">
+        <h2>스스로 확인</h2>
+        <div class="recall">
+          <details>
+            <summary>정렬된 원소 1,000개에서 이진 탐색으로 값을 찾을 때 비교는 최대 몇 번쯤인가?</summary>
+            <div class="answer"><p>약 10번이다. 2¹⁰ = 1024이므로 1,000개는 절반씩 10번 줄이면 1개가 된다. 순차 탐색은 최악에 1,000번이다.</p></div>
+          </details>
+          <details>
+            <summary><code>bisect_right(a, x) - bisect_left(a, x)</code>는 무엇을 뜻하는가?</summary>
+            <div class="answer"><p>정렬된 <code>a</code>에 들어 있는 <code>x</code>의 개수다. <code>bisect_left</code>는 <code>x</code>가 시작하는 위치, <code>bisect_right</code>는 <code>x</code>가 끝난 다음 위치라서 그 차가 <code>x</code>가 차지한 칸 수다. 없으면 둘이 같아 0이다.</p></div>
+          </details>
+          <details>
+            <summary>파라메트릭 서치를 쓰기 전에 판정 함수에 대해 반드시 확인할 것은?</summary>
+            <div class="answer"><p>단조성이다. x에서 가능하면 x보다 큰(또는 작은) 모든 값에서도 가능해야 한다. 그래야 결과가 <code>False … True …</code>처럼 한 번만 바뀌고, 이진 탐색이 그 경계를 정확히 찾는다.</p></div>
+          </details>
+          <details>
+            <summary>막대 자르기에서 <code>lo</code>를 0으로 시작하면 어떤 일이 생길 수 있는가?</summary>
+            <div class="answer"><p>탐색 중 <code>mid</code>가 0이 되면 <code>stick // 0</code>을 계산하다 <code>ZeroDivisionError</code>가 난다. 예를 들어 길이 1로도 N개가 안 되는 입력에서는 <code>hi</code>가 계속 줄어 <code>lo = hi = 0</code>까지 간다. 답의 범위는 실제로 가능한 값(1 이상)으로 잡는다.</p></div>
+          </details>
+        </div>
+      </section>
+
+      <section id="summary">
+        <h2>정리</h2>
+        <ol class="summary-list">
+          <li>이진 탐색은 정렬(단조)된 범위에서 가운데를 보고 절반을 버린다. n개를 O(log n)번 만에 1개로 줄인다.</li>
+          <li>기본형은 <code>lo, hi = 0, len(a) - 1</code>, <code>while lo &lt;= hi</code>, <code>mid ± 1</code>로 옮기기다. 확인한 <code>mid</code>는 다음 구간에서 뺀다.</li>
+          <li>lower bound는 x 이상, upper bound는 x 초과가 처음 나오는 위치다. 둘의 차가 x의 개수다.</li>
+          <li>실전에서는 <code>bisect_left</code>, <code>bisect_right</code>를 쓴다. 값이 있는지는 돌려받은 위치의 값을 한 번 더 확인한다.</li>
+          <li>최댓값·최솟값 문제는 "x로 가능한가?" 판정으로 바꾸고, 판정이 단조이면 경계를 이진 탐색으로 찾는다(파라메트릭 서치).</li>
+          <li><code>lo</code>와 <code>hi</code>는 답이 반드시 안에 있게 잡고, 닫힌 구간과 반열린 구간 틀을 섞지 않는다. 실수 답은 횟수를 정해 반복한다.</li>
+        </ol>
+      </section>
+
+      <nav class="pager" aria-label="이전 장과 다음 장"></nav>
+    </article>
+  </main>
+
+  <aside class="rail" aria-label="이 페이지 목차">
+    <p class="rail-title">이 페이지</p>
+    <nav id="onthispage"></nav>
+  </aside>
+</div>
+<div class="backdrop" id="backdrop"></div>
+
+<script src="assets/book.js"></script>
+<script src="assets/app.js"></script>
+<script src="assets/code.js"></script>
+</body>
+</html>

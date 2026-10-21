@@ -1,0 +1,667 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>19. 정렬 — 파이썬 알고리즘 노트</title>
+<script src="assets/theme.js"></script>
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body data-chapter="19">
+<a class="skip-link" href="#content">본문으로 건너뛰기</a>
+<div class="progress" aria-hidden="true"><span></span></div>
+<header class="topbar" id="topbar"></header>
+
+<div class="shell">
+  <aside class="sidebar" id="sidebar" aria-label="책 목차"></aside>
+
+  <main class="main" id="content">
+    <article class="chapter">
+      <header class="chapter-head">
+        <a class="part-pill"></a>
+        <span class="chapter-label"></span>
+        <h1>정렬</h1>
+        <p class="lede">정렬은 그 자체로 답이 되기보다, 이진 탐색이나 투 포인터, 그리디 같은 풀이를 가능하게 하는 준비 작업입니다. 실전에서는 내장 정렬을 쓰지만, 정렬 알고리즘을 알아야 복잡도와 안정성을 판단할 수 있습니다.</p>
+        <div class="chapter-meta">
+          <span class="chip">선택·삽입 정렬</span><span class="chip">병합 정렬</span><span class="chip">퀵 정렬</span><span class="chip">안정 정렬</span><span class="chip">sort · sorted</span>
+        </div>
+      </header>
+
+      <div class="goals">
+        <p class="goals-title">이 장에서 배울 것</p>
+        <ul>
+          <li>정렬 뒤에 어떤 풀이가 가능해지는지 설명할 수 있다</li>
+          <li>선택·삽입·병합·퀵 정렬을 직접 짜고 각각의 복잡도를 말할 수 있다</li>
+          <li>퀵 정렬이 최악에 O(n²)이 되는 이유를 안다</li>
+          <li>안정 정렬의 뜻과, 그것이 필요한 상황을 안다</li>
+          <li>파이썬 <code>sort</code>로 여러 기준 정렬과 비교 함수 정렬을 할 수 있다</li>
+        </ul>
+      </div>
+
+      <section id="why-sorting">
+        <h2>정렬이 왜 중요한가</h2>
+        <div class="callout callout-key">
+          <span class="callout-title">핵심</span>
+          <p class="callout-big">정렬은 <mark>다른 알고리즘이 쓸 수 있도록 데이터에 순서라는 성질을 만들어 주는</mark> 준비 작업이다.</p>
+        </div>
+        <p>정렬된 리스트에서는 "어떤 값보다 작은 것은 모두 왼쪽에 있다"는 사실이 보장된다. 이 사실 하나로 많은 계산이 쉬워진다. 중앙값은 가운데 원소이고, 상위 k개는 끝의 k개이며, 값이 가장 가까운 두 수는 반드시 서로 이웃한다.</p>
+
+<pre data-lang="python" data-title="why_sorting.py"><code>
+scores = [72, 95, 64, 88, 91, 70, 81]
+ordered = sorted(scores)
+print(ordered)
+print(ordered[len(ordered) // 2])   # 중앙값: 가운데 원소
+print(ordered[-3:])                 # 상위 3개
+
+# 값이 가장 가까운 두 수는 정렬하면 이웃해 있다
+gaps = [ordered[i + 1] - ordered[i] for i in range(len(ordered) - 1)]
+print(min(gaps))
+</code></pre>
+<pre class="output">
+[64, 70, 72, 81, 88, 91, 95]
+81
+[88, 91, 95]
+2
+</pre>
+
+        <p>정렬하지 않았다면 가장 가까운 두 수를 찾으려고 모든 쌍을 비교해야 한다. 그러면 O(n²)이다. 정렬하면 O(n log n) + O(n)으로 끝난다. 4부의 여러 기법도 정렬을 전제로 한다.</p>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>정렬 뒤에 가능해지는 것</th><th>쓰는 성질</th><th>다루는 장</th></tr></thead>
+            <tbody>
+              <tr><td>이진 탐색</td><td>가운데 값을 보면 절반을 버릴 수 있다</td><td>20장</td></tr>
+              <tr><td>투 포인터</td><td>포인터를 한 방향으로만 움직여도 된다</td><td>21장</td></tr>
+              <tr><td>그리디</td><td>끝나는 시간 순처럼 "고를 순서"가 정해진다</td><td>24장</td></tr>
+              <tr><td>중복 제거·묶기</td><td>같은 값이 붙어 있다</td><td>이 장</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <p>한 줄로 정리하면, 문제를 보고 "정렬하면 무엇이 쉬워지는가"를 먼저 묻는 습관이 필요하다.</p>
+      </section>
+
+      <section id="selection-and-insertion">
+        <h2>선택 정렬과 삽입 정렬</h2>
+        <p>가장 단순한 두 정렬이다. 둘 다 O(n²)이라 실전에서 직접 쓸 일은 드물다. 하지만 "앞부분은 이미 정렬됐다"는 생각이 모든 정렬의 기본이라 먼저 본다.</p>
+        <p><strong>선택 정렬</strong>은 남은 구간에서 가장 작은 값을 골라 맨 앞으로 가져오기를 반복한다.</p>
+
+<pre data-lang="python" data-title="selection_sort.py"><code>
+def selection_sort(a: list[int]) -&gt; list[int]:
+    a = a[:]                                  # 원본을 건드리지 않는다
+    n = len(a)
+    for i in range(n - 1):
+        min_index = i
+        for j in range(i + 1, n):             # 남은 구간에서 최솟값 찾기
+            if a[j] &lt; a[min_index]:
+                min_index = j
+        a[i], a[min_index] = a[min_index], a[i]   # i 자리로 가져온다
+    return a
+
+
+print(selection_sort([5, 2, 4, 6, 1, 3]))
+</code></pre>
+<pre class="output">
+[1, 2, 3, 4, 5, 6]
+</pre>
+
+        <p>입력이 어떻든 바깥 반복마다 남은 원소를 모두 훑는다. 비교 횟수는 항상 n(n-1)/2다.</p>
+        <p><strong>삽입 정렬</strong>은 카드를 손에 쥐고 정리하는 방식이다. 새 카드를 한 장 집어, 이미 정렬된 앞부분에서 제자리를 찾아 끼운다.</p>
+
+<pre data-lang="python" data-title="insertion_sort.py"><code>
+def insertion_sort(a: list[int]) -&gt; list[int]:
+    a = a[:]
+    for i in range(1, len(a)):
+        key = a[i]                        # 이번에 끼워 넣을 값
+        j = i - 1
+        while j &gt;= 0 and a[j] &gt; key:      # key 보다 큰 값은 한 칸씩 뒤로
+            a[j + 1] = a[j]
+            j -= 1
+        a[j + 1] = key                    # 비워 둔 자리에 넣는다
+    return a
+
+
+print(insertion_sort([5, 2, 4, 6, 1, 3]))
+</code></pre>
+<pre class="output">
+[1, 2, 3, 4, 5, 6]
+</pre>
+
+        <figure class="fig">
+          <div class="fig-steps">
+            <div class="fig-state">
+              <div class="cells">
+                <div class="cell" data-i="0">2</div>
+                <div class="cell" data-i="1">4</div>
+                <div class="cell" data-i="2">5</div>
+                <div class="cell" data-i="3">6</div>
+                <div class="cell is-hl" data-i="4">1</div>
+              </div>
+              <span class="fig-state-label">key = 1</span>
+            </div>
+            <div class="fig-arrow">밀기</div>
+            <div class="fig-state">
+              <div class="cells">
+                <div class="cell is-ghost" data-i="0"></div>
+                <div class="cell is-hl" data-i="1">2</div>
+                <div class="cell is-hl" data-i="2">4</div>
+                <div class="cell is-hl" data-i="3">5</div>
+                <div class="cell is-hl" data-i="4">6</div>
+              </div>
+              <span class="fig-state-label">큰 값 4개를 뒤로</span>
+            </div>
+          </div>
+          <div class="fig-steps">
+            <div class="fig-arrow">넣기</div>
+            <div class="fig-state">
+              <div class="cells">
+                <div class="cell is-hl" data-i="0">1</div>
+                <div class="cell" data-i="1">2</div>
+                <div class="cell" data-i="2">4</div>
+                <div class="cell" data-i="3">5</div>
+                <div class="cell" data-i="4">6</div>
+              </div>
+              <span class="fig-state-label">앞 5칸 정렬됨</span>
+            </div>
+          </div>
+          <figcaption><b>그림 19-1</b> 삽입 정렬의 한 패스(<code>i = 4</code>). key보다 큰 값을 뒤로 밀고 빈자리에 key를 넣는다. 이번 패스와 상관없는 마지막 칸은 생략했다.</figcaption>
+        </figure>
+
+        <p>삽입 정렬은 선택 정렬과 달리 <mark>입력이 거의 정렬돼 있으면 거의 밀지 않는다.</mark> 미는 횟수는 "순서가 뒤바뀐 쌍"의 수와 같기 때문이다. 원소 1000개로 확인해 보자.</p>
+
+<pre data-lang="python" data-title="insertion_nearly_sorted.py"><code>
+def count_shifts(a: list[int]) -&gt; int:
+    a = a[:]
+    shifts = 0
+    for i in range(1, len(a)):
+        key = a[i]
+        j = i - 1
+        while j &gt;= 0 and a[j] &gt; key:
+            a[j + 1] = a[j]
+            j -= 1
+            shifts += 1
+        a[j + 1] = key
+    return shifts
+
+
+nearly = list(range(1, 1001))
+nearly[10], nearly[11] = nearly[11], nearly[10]       # 두 곳만 어긋남
+nearly[500], nearly[501] = nearly[501], nearly[500]
+print(count_shifts(nearly))
+print(count_shifts(list(range(1000, 0, -1))))         # 거꾸로 정렬됨
+</code></pre>
+<pre class="output">
+2
+499500
+</pre>
+
+        <p>거의 정렬된 입력에서는 사실상 O(n), 거꾸로 된 입력에서는 n(n-1)/2번을 민다. 이 성질은 뒤에서 볼 파이썬의 Timsort가 그대로 활용한다.</p>
+      </section>
+
+      <section id="merge-sort">
+        <h2>병합 정렬</h2>
+        <p><strong>병합 정렬</strong>은 리스트를 반으로 나눠 각각 정렬한 뒤, 정렬된 두 리스트를 하나로 합친다. 반쪽을 정렬하는 일은 같은 함수에 맡긴다(재귀, 6장). 원소가 하나 이하면 이미 정렬된 것이니 그것이 기저 조건이다.</p>
+        <p>핵심은 합치기다. 두 리스트가 이미 정렬돼 있으니 각각의 맨 앞만 비교해 작은 쪽을 꺼내면 된다. 그래서 합치기는 O(n)이다.</p>
+
+<pre data-lang="python" data-title="merge_sort.py"><code>
+def merge(left: list[int], right: list[int]) -&gt; list[int]:
+    merged = []
+    i = j = 0
+    while i &lt; len(left) and j &lt; len(right):
+        if left[i] &lt;= right[j]:           # 같으면 왼쪽 먼저: 안정 정렬
+            merged.append(left[i])
+            i += 1
+        else:
+            merged.append(right[j])
+            j += 1
+    merged.extend(left[i:])               # 한쪽이 끝나면 남은 것을 그대로
+    merged.extend(right[j:])
+    return merged
+
+
+def merge_sort(a: list[int]) -&gt; list[int]:
+    if len(a) &lt;= 1:                       # 기저 조건
+        return a
+    mid = len(a) // 2
+    left = merge_sort(a[:mid])
+    right = merge_sort(a[mid:])
+    return merge(left, right)
+
+
+print(merge([1, 4, 7], [2, 3, 9]))
+print(merge_sort([38, 27, 43, 3, 9, 82, 10]))
+</code></pre>
+<pre class="output">
+[1, 2, 3, 4, 7, 9]
+[3, 9, 10, 27, 38, 43, 82]
+</pre>
+
+        <figure class="fig">
+          <div class="fig-steps">
+            <div class="fig-state">
+              <div class="cells">
+                <div class="cell">38</div>
+                <div class="cell">27</div>
+                <div class="cell">43</div>
+                <div class="cell">3</div>
+              </div>
+              <span class="fig-state-label">처음</span>
+            </div>
+            <div class="fig-arrow">반씩 정렬</div>
+            <div class="fig-state">
+              <div class="cells">
+                <div class="cell is-hl">27</div>
+                <div class="cell is-hl">38</div>
+                <div class="cell">3</div>
+                <div class="cell">43</div>
+              </div>
+              <span class="fig-state-label">왼쪽 | 오른쪽</span>
+            </div>
+          </div>
+          <div class="fig-steps">
+            <div class="fig-arrow">합치기</div>
+            <div class="fig-state">
+              <div class="cells">
+                <div class="cell">3</div>
+                <div class="cell is-hl">27</div>
+                <div class="cell is-hl">38</div>
+                <div class="cell">43</div>
+              </div>
+              <span class="fig-state-label">맨 앞끼리 비교해 꺼냄</span>
+            </div>
+          </div>
+          <figcaption><b>그림 19-2</b> 병합 정렬. 정렬된 두 반쪽의 맨 앞만 비교하면 합칠 수 있다.</figcaption>
+        </figure>
+
+        <p>복잡도는 단계 수로 따진다. 반으로 나누기를 반복하면 약 log n 단계 만에 길이 1이 된다. 각 단계에서 합치는 원소는 모두 합쳐 n개다. 그래서 전체는 <span class="bigo b-nlogn">O(n log n)</span>이고, 입력 모양과 상관없이 항상 그렇다. 대신 합친 결과를 담을 리스트가 필요해 추가 메모리 <span class="bigo b-linear">O(n)</span>을 쓴다.</p>
+        <p>"나누고, 각각 풀고, 합친다"는 틀은 정렬 밖에서도 쓰인다. 25장 분할 정복에서 이 코드를 다시 본다.</p>
+      </section>
+
+      <section id="quick-sort">
+        <h2>퀵 정렬</h2>
+        <p><strong>퀵 정렬</strong>은 기준값 하나를 고르고, 나머지를 기준보다 작은 쪽과 큰 쪽으로 나눈다. 이 기준값을 <strong>피벗(pivot)</strong>이라고 한다. 나눈 뒤에는 피벗이 이미 최종 자리에 있으니, 양쪽만 같은 방법으로 정렬하면 된다. 병합 정렬이 합칠 때 일하고 퀵 정렬은 나눌 때 일한다.</p>
+
+<pre data-lang="python" data-title="quick_sort.py"><code>
+def quick_sort(a: list[int]) -&gt; list[int]:
+    if len(a) &lt;= 1:
+        return a
+    pivot = a[len(a) // 2]                    # 가운데 값을 피벗으로
+    smaller = [x for x in a if x &lt; pivot]
+    equal = [x for x in a if x == pivot]
+    larger = [x for x in a if x &gt; pivot]
+    return quick_sort(smaller) + equal + quick_sort(larger)
+
+
+print(quick_sort([3, 8, 1, 5, 4, 7, 2, 6]))
+</code></pre>
+<pre class="output">
+[1, 2, 3, 4, 5, 6, 7, 8]
+</pre>
+
+        <figure class="fig">
+          <div class="fig-steps">
+            <div class="fig-state">
+              <div class="cells">
+                <div class="cell">3</div>
+                <div class="cell">8</div>
+                <div class="cell">1</div>
+                <div class="cell">5</div>
+                <div class="cell is-hl" data-ptr="pivot">4</div>
+                <div class="cell">7</div>
+                <div class="cell">2</div>
+                <div class="cell">6</div>
+              </div>
+              <span class="fig-state-label">피벗 = 4</span>
+            </div>
+          </div>
+          <div class="fig-steps">
+            <div class="fig-arrow">분할</div>
+            <div class="fig-state">
+              <div class="cells">
+                <div class="cell">3</div>
+                <div class="cell">1</div>
+                <div class="cell">2</div>
+                <div class="cell is-hl" data-ptr="제자리">4</div>
+                <div class="cell">8</div>
+                <div class="cell">5</div>
+                <div class="cell">7</div>
+                <div class="cell">6</div>
+              </div>
+              <span class="fig-state-label">작은 것 | 피벗 | 큰 것</span>
+            </div>
+          </div>
+          <figcaption><b>그림 19-3</b> 퀵 정렬의 분할. 피벗은 최종 위치에 놓이고, 양쪽은 따로 정렬한다.</figcaption>
+        </figure>
+
+        <p>피벗이 매번 가운데쯤 값이면 양쪽이 절반씩 줄어 병합 정렬처럼 log n 단계, 평균 <span class="bigo b-nlogn">O(n log n)</span>이다. 하지만 피벗이 매번 가장 작은 값이면 한쪽은 비고 다른 쪽은 하나만 줄어든다. 단계가 n개가 되어 최악 <span class="bigo b-quad">O(n²)</span>이다. 이미 정렬된 입력에서 맨 앞 원소를 피벗으로 고르면 정확히 이 일이 생긴다. 분할에서 훑는 원소 수를 세어 보자.</p>
+
+<pre data-lang="python" data-title="quick_sort_worst.py"><code>
+def partition_work(a: list[int], pivot_at_middle: bool) -&gt; int:
+    if len(a) &lt;= 1:
+        return 0
+    pivot = a[len(a) // 2] if pivot_at_middle else a[0]
+    smaller = [x for x in a if x &lt; pivot]
+    larger = [x for x in a if x &gt; pivot]
+    return len(a) + partition_work(smaller, pivot_at_middle) \
+                  + partition_work(larger, pivot_at_middle)
+
+
+already_sorted = list(range(1, 501))
+print(partition_work(already_sorted, pivot_at_middle=False))   # 맨 앞 피벗
+print(partition_work(already_sorted, pivot_at_middle=True))    # 가운데 피벗
+</code></pre>
+<pre class="output">
+125249
+3753
+</pre>
+
+        <p>원소 500개에 약 n²/2인 12만 번과, 약 n log n인 4천 번의 차이다. 그래서 실제 구현은 가운데 값이나 무작위 값을 피벗으로 고른다. 위 코드는 읽기 쉬운 대신 새 리스트를 계속 만들어 추가 메모리 O(n)을 쓴다. 교과서의 퀵 정렬은 리스트 안에서 자리를 바꿔 분할해 추가 메모리가 재귀 깊이만큼(평균 O(log n))만 든다.</p>
+      </section>
+
+      <section id="stability">
+        <h2>안정 정렬</h2>
+        <p>정렬 기준 값이 같은 원소끼리 원래 순서를 지키는 정렬을 <strong>안정 정렬(stable sort)</strong>이라고 한다. 숫자만 정렬할 때는 같은 값끼리 구별이 안 되니 상관없다. (이름, 점수)처럼 기준 밖의 정보가 붙어 있을 때 차이가 드러난다.</p>
+
+<pre data-lang="python" data-title="stability.py"><code>
+def selection_sort_by_score(records: list[tuple[str, int]]) -&gt; list[tuple[str, int]]:
+    a = records[:]
+    for i in range(len(a) - 1):
+        min_index = i
+        for j in range(i + 1, len(a)):
+            if a[j][1] &lt; a[min_index][1]:
+                min_index = j
+        a[i], a[min_index] = a[min_index], a[i]
+    return a
+
+
+records = [('민수', 90), ('지아', 90), ('하늘', 80)]
+print(selection_sort_by_score(records))          # 선택 정렬: 불안정
+print(sorted(records, key=lambda r: r[1]))       # 파이썬 정렬: 안정
+</code></pre>
+<pre class="output">
+[('하늘', 80), ('지아', 90), ('민수', 90)]
+[('하늘', 80), ('민수', 90), ('지아', 90)]
+</pre>
+
+        <p>원래는 민수가 지아보다 앞이었다. 선택 정렬은 첫 단계에서 하늘을 맨 앞으로 가져오며 민수와 <em>멀리 떨어진 자리끼리</em> 맞바꾼다. 그 바람에 민수가 지아 뒤로 넘어갔다. 이렇게 멀리 건너뛰는 교환이 있으면 불안정해지기 쉽다.</p>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>정렬</th><th>안정?</th><th>이유</th></tr></thead>
+            <tbody>
+              <tr><td>선택 정렬</td><td>아니다</td><td>멀리 떨어진 두 원소를 맞바꾼다</td></tr>
+              <tr><td>삽입 정렬</td><td>그렇다</td><td>key보다 <em>큰</em> 값만 밀어서, 같은 값을 넘지 않는다</td></tr>
+              <tr><td>병합 정렬</td><td>그렇다</td><td>같으면 왼쪽 것을 먼저 꺼낸다(<code>&lt;=</code>)</td></tr>
+              <tr><td>퀵 정렬</td><td>보통 아니다</td><td>제자리 분할이 원소를 멀리 옮긴다</td></tr>
+              <tr><td>파이썬 <code>sort</code></td><td>그렇다</td><td>문서로 보장한다</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <p>안정성 덕분에 "덜 중요한 기준부터 여러 번 정렬하기"가 가능하다(3장). 정리하면, 기준 밖의 정보가 원래 순서에 의미를 가질 때 안정 정렬이 필요하다.</p>
+      </section>
+
+      <section id="python-sort">
+        <h2>파이썬의 sort와 Timsort</h2>
+        <p>파이썬의 <code>list.sort()</code>와 <code>sorted()</code>는 <strong>Timsort</strong>라는 알고리즘을 쓴다. 병합 정렬과 삽입 정렬을 섞은 것이다. 먼저 입력에서 이미 정렬된 구간(오름차순이나 엄격한 내림차순)을 찾고, 짧은 구간은 삽입 정렬로 늘린 다음, 구간들을 병합 정렬처럼 합친다. 그래서 거의 정렬된 입력에서 특히 빠르다. 비교 횟수를 세어 확인해 보자.</p>
+
+<pre data-lang="python" data-title="timsort_comparisons.py"><code>
+comparisons = 0
+
+
+class Counted:
+    """비교할 때마다 횟수를 센다."""
+
+    def __init__(self, value: int) -&gt; None:
+        self.value = value
+
+    def __lt__(self, other: 'Counted') -&gt; bool:
+        global comparisons
+        comparisons += 1
+        return self.value &lt; other.value
+
+
+def count_comparisons(values: list[int]) -&gt; int:
+    global comparisons
+    comparisons = 0
+    sorted(Counted(v) for v in values)
+    return comparisons
+
+
+n = 1000
+print(count_comparisons(list(range(n))))                 # 이미 정렬됨
+print(count_comparisons(list(range(n, 0, -1))))          # 거꾸로 정렬됨
+print(count_comparisons([i * 37 % n for i in range(n)])) # 뒤섞임
+</code></pre>
+<pre class="output">
+999
+999
+7686
+</pre>
+
+        <p>정렬됐거나 거꾸로 된 입력은 n - 1번의 비교로 끝난다. 뒤섞인 입력은 n log₂ n(약 1만)에 가까운 횟수가 든다. 게다가 이 모든 일이 C로 구현돼 있어서, 파이썬으로 직접 짠 병합 정렬보다 수십 배 빠르다. <mark>코딩 테스트에서는 직접 짜지 말고 내장 정렬을 쓴다.</mark></p>
+
+        <h3>여러 기준과 reverse</h3>
+        <p>기준이 여럿이면 <code>key</code>가 튜플을 돌려주게 하고, 숫자 기준을 뒤집을 때는 부호를 바꾼다(3장). 전체를 내림차순으로 하려면 <code>reverse=True</code>를 쓴다. <code>reverse=True</code>도 안정성을 지켜, 같은 값끼리는 원래 순서로 남는다.</p>
+
+<pre data-lang="python" data-title="sort_multi_key.py"><code>
+students = [('하늘', 3, 88), ('민수', 1, 92), ('지아', 3, 92), ('도윤', 1, 75)]
+
+# 반 오름차순, 같은 반이면 점수 내림차순
+print(sorted(students, key=lambda s: (s[1], -s[2])))
+# 점수 내림차순. 92점 동점은 원래 순서(민수, 지아)를 지킨다
+print(sorted(students, key=lambda s: s[2], reverse=True))
+</code></pre>
+<pre class="output">
+[('민수', 1, 92), ('도윤', 1, 75), ('지아', 3, 92), ('하늘', 3, 88)]
+[('민수', 1, 92), ('지아', 3, 92), ('하늘', 3, 88), ('도윤', 1, 75)]
+</pre>
+
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>정렬</th><th>평균</th><th>최악</th><th>추가 메모리</th><th>안정</th></tr></thead>
+            <tbody>
+              <tr><td>선택 정렬</td><td><span class="bigo b-quad">O(n²)</span></td><td><span class="bigo b-quad">O(n²)</span></td><td><span class="bigo b-const">O(1)</span></td><td>아니다</td></tr>
+              <tr><td>삽입 정렬</td><td><span class="bigo b-quad">O(n²)</span></td><td><span class="bigo b-quad">O(n²)</span></td><td><span class="bigo b-const">O(1)</span></td><td>그렇다</td></tr>
+              <tr><td>병합 정렬</td><td><span class="bigo b-nlogn">O(n log n)</span></td><td><span class="bigo b-nlogn">O(n log n)</span></td><td><span class="bigo b-linear">O(n)</span></td><td>그렇다</td></tr>
+              <tr><td>퀵 정렬</td><td><span class="bigo b-nlogn">O(n log n)</span></td><td><span class="bigo b-quad">O(n²)</span></td><td><span class="bigo b-log">O(log n)</span></td><td>아니다</td></tr>
+              <tr><td>Timsort</td><td><span class="bigo b-nlogn">O(n log n)</span></td><td><span class="bigo b-nlogn">O(n log n)</span></td><td><span class="bigo b-linear">O(n)</span></td><td>그렇다</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <p>삽입 정렬과 Timsort는 거의 정렬된 입력에서 O(n)까지 빨라진다. 퀵 정렬의 추가 메모리는 제자리 분할 기준이다. 결국 내장 정렬은 n이 수백만이어도 쓸 수 있는 O(n log n)이고, 같은 값의 순서도 지킨다.</p>
+      </section>
+
+      <section id="pitfalls">
+        <h2>자주 하는 실수</h2>
+        <div class="callout callout-warn">
+          <span class="callout-title">a = a.sort()</span>
+          <p><code>sort()</code>는 리스트를 제자리에서 바꾸고 <code>None</code>을 돌려준다. 결과를 변수에 담으면 리스트를 잃는다(3장). 새 리스트가 필요하면 <code>sorted(a)</code>를 쓴다.</p>
+        </div>
+        <div class="callout callout-warn">
+          <span class="callout-title">숫자를 문자열인 채로 정렬하기</span>
+          <p>문자열은 앞 글자부터 하나씩 비교하므로 <code>'10' &lt; '9'</code>가 참이다. <code>input().split()</code>으로 읽은 값을 <code>int</code>로 바꾸지 않고 정렬하면 이런 순서가 나온다.</p>
+        </div>
+
+<pre data-lang="python" data-title="sort_numeric_strings.py"><code>
+nums = ['10', '9', '100', '2']
+print('10' &lt; '9')
+print(sorted(nums))              # 사전 순
+print(sorted(nums, key=int))     # 수의 크기 순
+</code></pre>
+<pre class="output">
+True
+['10', '100', '2', '9']
+['2', '9', '10', '100']
+</pre>
+
+        <div class="callout callout-warn">
+          <span class="callout-title">문자열 기준에 -를 붙이기</span>
+          <p>부호를 뒤집는 요령은 숫자에만 통한다. 문자열 기준을 내림차순으로 하려면 안정성을 이용해 덜 중요한 기준부터 두 번 정렬한다.</p>
+        </div>
+
+<pre data-lang="python" data-title="sort_desc_string.py"><code>
+people = [('지아', 80), ('민수', 90), ('하늘', 80)]
+try:
+    sorted(people, key=lambda p: (p[1], -p[0]))
+except TypeError as e:
+    print(f'{type(e).__name__}: {e}')
+
+# 점수 오름차순, 같으면 이름 내림차순
+by_name_desc = sorted(people, key=lambda p: p[0], reverse=True)
+print(sorted(by_name_desc, key=lambda p: p[1]))
+</code></pre>
+<pre class="output">
+TypeError: bad operand type for unary -: 'str'
+[('하늘', 80), ('지아', 80), ('민수', 90)]
+</pre>
+
+        <div class="callout callout-warn">
+          <span class="callout-title">두 원소를 비교해야만 순서가 정해지는 경우</span>
+          <p>"이어 붙였을 때 가장 큰 수 만들기"처럼 원소 하나만 보고는 key를 만들 수 없는 문제가 있다. 이때는 두 원소를 받아 음수(a가 먼저), 0, 양수(b가 먼저)를 돌려주는 비교 함수를 짜고 <code>functools.cmp_to_key</code>로 key로 바꾼다.</p>
+        </div>
+
+<pre data-lang="python" data-title="cmp_to_key.py"><code>
+from functools import cmp_to_key
+
+
+def compare(a: str, b: str) -&gt; int:
+    if a + b &gt; b + a:        # a 를 앞에 둔 쪽이 크면 a 가 먼저
+        return -1
+    if a + b &lt; b + a:
+        return 1
+    return 0
+
+
+numbers = ['3', '30', '34', '5', '9']
+print(''.join(sorted(numbers, key=cmp_to_key(compare))))
+</code></pre>
+<pre class="output">
+9534330
+</pre>
+      </section>
+
+      <section id="problem">
+        <h2>대표 문제</h2>
+        <div class="problem">
+          <div class="problem-head">
+            <div class="problem-kicker"><b>Problem</b><span class="chip">쉬움</span><span class="chip">정렬</span></div>
+            <h3>좌표 정렬</h3>
+          </div>
+          <div class="problem-body">
+            <p>평면 위의 점 <code>N</code>개가 주어진다. 점을 x좌표가 작은 순으로, x좌표가 같으면 y좌표가 작은 순으로 정렬해 출력하라.</p>
+            <p>첫 줄에 <code>N</code>(1 이상 100,000 이하)이 주어지고, 다음 <code>N</code>줄에 각 점의 x, y가 공백으로 구분되어 주어진다. 좌표는 -100,000 이상 100,000 이하의 정수다. 정렬한 점을 한 줄에 하나씩 "x y" 꼴로 출력한다.</p>
+            <div class="table-wrap">
+              <table>
+                <thead><tr><th>입력</th><th>출력</th><th>설명</th></tr></thead>
+                <tbody>
+                  <tr><td><code>2</code><br><code>4 1</code><br><code>-2 7</code></td><td><code>-2 7</code><br><code>4 1</code></td><td>x가 작은 점이 먼저다</td></tr>
+                  <tr><td><code>3</code><br><code>0 5</code><br><code>0 -3</code><br><code>0 2</code></td><td><code>0 -3</code><br><code>0 2</code><br><code>0 5</code></td><td>x가 모두 같으면 y 순서로 정한다</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <details class="reveal">
+            <summary>접근 방법<span class="reveal-hint">먼저 생각해 보고 펼치세요</span></summary>
+            <div class="reveal-body">
+              <p><mark>튜플은 첫 원소끼리 비교하고, 같으면 다음 원소를 비교한다.</mark> 점을 <code>(x, y)</code> 튜플로 담으면 기본 정렬이 곧 문제의 기준이다.</p>
+              <ol>
+                <li>각 줄을 <code>int</code>로 바꿔 <code>(x, y)</code> 튜플로 읽는다. 문자열인 채로 두면 <code>'-2'</code>와 <code>'10'</code>의 비교가 틀어진다.</li>
+                <li>key 없이 <code>sort()</code>한다.</li>
+                <li>N이 10만이므로 출력을 모아 한 번에 쓴다(1장).</li>
+              </ol>
+            </div>
+          </details>
+
+          <details class="reveal">
+            <summary>풀이 코드</summary>
+            <div class="reveal-body">
+<pre data-lang="python" data-title="sort_points.py"><code>
+import sys
+
+input = sys.stdin.readline
+
+n = int(input())
+points = [tuple(map(int, input().split())) for _ in range(n)]
+points.sort()                     # (x, y) 튜플: x 먼저, 같으면 y
+print('\n'.join(f'{x} {y}' for x, y in points))
+</code></pre>
+<pre class="stdin">
+5
+3 4
+1 1
+1 -1
+2 2
+3 3
+</pre>
+<pre class="output">
+1 -1
+1 1
+2 2
+3 3
+3 4
+</pre>
+              <p>기준을 일부러 드러내고 싶다면 <code>points.sort(key=lambda p: (p[0], p[1]))</code>로 써도 결과는 같다. 문제가 "y 순, 같으면 x 순"으로 바뀌면 <code>key=lambda p: (p[1], p[0])</code>로 튜플 순서만 바꾼다.</p>
+            </div>
+          </details>
+
+          <details class="reveal">
+            <summary>복잡도</summary>
+            <div class="reveal-body">
+              <dl class="cx">
+                <dt>시간</dt><dd><span class="bigo b-nlogn">O(N log N)</span> 정렬이 지배한다. 읽기와 출력은 O(N)이다.</dd>
+                <dt>공간</dt><dd><span class="bigo b-linear">O(N)</span> 점 목록과 출력 문자열, Timsort의 보조 공간이다.</dd>
+              </dl>
+            </div>
+          </details>
+        </div>
+      </section>
+
+      <section id="recall">
+        <h2>스스로 확인</h2>
+        <div class="recall">
+          <details>
+            <summary>거의 정렬된 입력에서 삽입 정렬은 빠르고 선택 정렬은 느린 이유는?</summary>
+            <div class="answer"><p>삽입 정렬은 순서가 뒤바뀐 쌍의 수만큼만 원소를 민다. 거의 정렬됐으면 미는 일이 거의 없어 O(n)에 가깝다. 선택 정렬은 입력과 상관없이 매번 남은 구간 전체를 훑어 최솟값을 찾으므로 항상 n(n-1)/2번 비교한다.</p></div>
+          </details>
+          <details>
+            <summary>병합 정렬이 입력 모양과 상관없이 O(n log n)인 이유는?</summary>
+            <div class="answer"><p>항상 정확히 반으로 나누므로 단계 수가 log n이고, 각 단계에서 합치는 원소가 모두 n개다. 피벗 선택에 따라 분할이 한쪽으로 쏠릴 수 있는 퀵 정렬과 다르다.</p></div>
+          </details>
+          <details>
+            <summary>이미 정렬된 리스트에 맨 앞 원소를 피벗으로 쓰는 퀵 정렬을 돌리면 어떻게 되는가?</summary>
+            <div class="answer"><p>피벗이 매번 가장 작은 값이라 작은 쪽은 비고 큰 쪽은 하나만 줄어든다. 단계가 n개가 되어 O(n²)이 된다. 재귀 깊이도 n이라 큰 입력에서는 재귀 한도(6장)에도 걸린다.</p></div>
+          </details>
+          <details>
+            <summary>"점수 오름차순, 같으면 이름 내림차순"을 key 하나로 만들 수 없는 이유와 해결법은?</summary>
+            <div class="answer"><p>문자열에는 <code>-</code>를 붙일 수 없어 이름만 따로 뒤집을 수 없다. 파이썬 정렬이 안정 정렬이라는 점을 이용해, 이름 내림차순으로 먼저 정렬한 뒤 점수 오름차순으로 다시 정렬한다. 비교 함수를 짜서 <code>cmp_to_key</code>로 넘겨도 된다.</p></div>
+          </details>
+        </div>
+      </section>
+
+      <section id="summary">
+        <h2>정리</h2>
+        <ol class="summary-list">
+          <li>정렬은 이진 탐색, 투 포인터, 그리디처럼 순서를 전제로 하는 풀이의 준비 작업이다.</li>
+          <li>선택 정렬과 삽입 정렬은 O(n²)이다. 삽입 정렬은 거의 정렬된 입력에서 O(n)에 가깝다.</li>
+          <li>병합 정렬은 반으로 나눠 정렬하고 O(n)에 합친다. 항상 O(n log n)이고 추가 메모리 O(n)을 쓴다.</li>
+          <li>퀵 정렬은 피벗으로 분할한다. 평균 O(n log n)이지만 피벗이 한쪽 끝 값이면 O(n²)이 된다.</li>
+          <li>안정 정렬은 같은 키의 원래 순서를 지킨다. 파이썬 정렬은 안정이라 여러 번 나눠 정렬할 수 있다.</li>
+          <li>파이썬 정렬은 Timsort로, 최악 O(n log n)이고 이미 정렬된 구간을 살려 빠르다. 코딩 테스트에서는 이것을 쓴다.</li>
+          <li>여러 기준은 튜플 key로, 숫자 내림차순은 부호로, 그 밖의 비교는 <code>cmp_to_key</code>로 처리한다.</li>
+        </ol>
+      </section>
+
+      <nav class="pager" aria-label="이전 장과 다음 장"></nav>
+    </article>
+  </main>
+
+  <aside class="rail" aria-label="이 페이지 목차">
+    <p class="rail-title">이 페이지</p>
+    <nav id="onthispage"></nav>
+  </aside>
+</div>
+<div class="backdrop" id="backdrop"></div>
+
+<script src="assets/book.js"></script>
+<script src="assets/app.js"></script>
+<script src="assets/code.js"></script>
+</body>
+</html>

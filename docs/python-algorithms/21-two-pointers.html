@@ -1,0 +1,639 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>21. 투 포인터와 슬라이딩 윈도우 — 파이썬 알고리즘 노트</title>
+<script src="assets/theme.js"></script>
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body data-chapter="21">
+<a class="skip-link" href="#content">본문으로 건너뛰기</a>
+<div class="progress" aria-hidden="true"><span></span></div>
+<header class="topbar" id="topbar"></header>
+
+<div class="shell">
+  <aside class="sidebar" id="sidebar" aria-label="책 목차"></aside>
+
+  <main class="main" id="content">
+    <article class="chapter">
+      <header class="chapter-head">
+        <a class="part-pill"></a>
+        <span class="chapter-label"></span>
+        <h1>투 포인터와 슬라이딩 윈도우</h1>
+        <p class="lede">배열 위의 두 위치를 앞으로만 움직이며 한 번에 훑는 기법입니다. 중첩 반복문으로 O(n²)이 걸리던 쌍 찾기와 구간 문제를 O(n)으로 줄입니다.</p>
+        <div class="chapter-meta">
+          <span class="chip">투 포인터</span><span class="chip">양끝 포인터</span><span class="chip">고정 창</span><span class="chip">가변 창</span><span class="chip">O(n)</span>
+        </div>
+      </header>
+
+      <div class="goals">
+        <p class="goals-title">이 장에서 배울 것</p>
+        <ul>
+          <li>두 포인터가 되돌아가지 않으면 왜 O(n)이 되는지 설명할 수 있다</li>
+          <li>같은 방향 포인터와 양끝 포인터를 문제에 맞게 고를 수 있다</li>
+          <li>고정 길이 창의 합을 더하고 빼기로 갱신할 수 있다</li>
+          <li>가변 길이 창을 늘리고 줄이며 최소·최대 길이를 구할 수 있다</li>
+          <li>음수가 섞이거나 정렬이 안 된 경우처럼 이 기법이 통하지 않는 때를 안다</li>
+        </ul>
+      </div>
+
+      <section id="idea">
+        <h2>왜 두 위치인가</h2>
+        <div class="callout callout-key">
+          <span class="callout-title">핵심</span>
+          <p class="callout-big">두 위치가 <mark>각각 앞으로만 움직이면</mark> 둘이 합쳐 많아야 2n번 움직이므로, O(n²)이던 탐색이 O(n)이 된다.</p>
+        </div>
+        <p><strong>포인터</strong>는 여기서 "배열의 몇 번 칸을 보고 있는지"를 담은 인덱스 변수다. 투 포인터는 이런 변수 두 개를 두고, 조건에 따라 한쪽씩 움직이는 기법이다.</p>
+        <p>정렬된 배열에서 합이 14인 두 수를 찾는다고 하자. 가장 쉬운 방법은 모든 쌍을 보는 중첩 반복이다.</p>
+
+<pre data-lang="python" data-title="pair_nested.py"><code>
+def find_pair_nested(a: list[int], target: int):
+    compared = 0
+    for i in range(len(a)):
+        for j in range(i + 1, len(a)):
+            compared += 1
+            if a[i] + a[j] == target:
+                return (a[i], a[j]), compared
+    return None, compared
+
+
+a = [1, 3, 6, 8, 11, 15]
+print(find_pair_nested(a, 14))
+print(find_pair_nested(a, 100))
+</code></pre>
+<pre class="output">
+((3, 11), 8)
+(None, 15)
+</pre>
+
+        <p>답이 없으면 n(n-1)/2개의 쌍을 모두 본다. 원소가 10만 개면 약 50억 번이다. 중첩 반복이 느린 진짜 이유는 <code>j</code>가 <code>i</code>가 바뀔 때마다 처음부터 다시 시작한다는 데 있다. 뒤로 돌아갈 필요가 없다는 근거만 찾으면, 두 인덱스를 각자 한 방향으로만 보내도 된다.</p>
+
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>방식</th><th>안쪽 인덱스의 움직임</th><th>전체 이동 횟수</th><th>시간</th></tr></thead>
+            <tbody>
+              <tr><td>중첩 반복</td><td>바깥이 바뀔 때마다 처음으로 돌아간다</td><td>약 n²/2</td><td><span class="bigo b-quad">O(n²)</span></td></tr>
+              <tr><td>투 포인터</td><td>되돌아가지 않는다</td><td>많아야 2n</td><td><span class="bigo b-linear">O(n)</span></td></tr>
+            </tbody>
+          </table>
+        </div>
+        <p>투 포인터의 모양은 두 가지다. 두 포인터가 같은 방향으로 가는 경우(2절, 4~5절의 창)와, 양 끝에서 서로를 향해 오는 경우(3절)다. 문제에서 다음 말이 보이면 먼저 떠올린다.</p>
+        <ul>
+          <li><strong>정렬된 배열</strong>에서 조건을 만족하는 <strong>두 수</strong>를 찾는다 → 양끝 포인터</li>
+          <li>정렬된 리스트 <strong>두 개</strong>를 한 번에 훑는다 → 같은 방향 포인터</li>
+          <li><strong>연속한 구간</strong>의 합·개수·길이를 묻고, n이 10만 이상이다 → 슬라이딩 윈도우</li>
+        </ul>
+      </section>
+
+      <section id="same-direction">
+        <h2>같은 방향 두 포인터</h2>
+        <p>정렬된 리스트 두 개를 하나로 합치는 문제가 가장 기본적인 예다. 각 리스트에 포인터를 하나씩 두고, 두 포인터가 가리키는 값 중 작은 쪽을 꺼내 결과에 붙인 뒤 그 포인터만 한 칸 옮긴다.</p>
+
+<pre data-lang="python" data-title="merge_sorted.py"><code>
+def merge(a: list[int], b: list[int]) -&gt; list[int]:
+    i = j = 0
+    merged = []
+    while i &lt; len(a) and j &lt; len(b):
+        if a[i] &lt;= b[j]:
+            merged.append(a[i])
+            i += 1
+        else:
+            merged.append(b[j])
+            j += 1
+    merged.extend(a[i:])     # 남은 쪽은 이미 정렬돼 있다
+    merged.extend(b[j:])
+    return merged
+
+
+print(merge([1, 4, 9], [2, 3, 10, 12]))
+print(merge([], [5, 6]))
+</code></pre>
+<pre class="output">
+[1, 2, 3, 4, 9, 10, 12]
+[5, 6]
+</pre>
+
+        <p>매 반복에서 <code>i</code>나 <code>j</code> 중 하나가 반드시 한 칸 나아가므로, 길이가 n, m이면 O(n + m)이다. 이 함수가 19장 병합 정렬의 "합치기" 단계다.</p>
+
+        <h3>읽는 포인터와 쓰는 포인터</h3>
+        <p>한 리스트 안에서도 두 포인터를 쓸 수 있다. 정렬된 리스트에서 중복을 제자리에서 지울 때, <code>read</code>는 모든 칸을 읽고 <code>write</code>는 남길 값을 쓸 다음 자리를 가리킨다.</p>
+
+<pre data-lang="python" data-title="dedupe_sorted.py"><code>
+def dedupe_sorted(a: list[int]) -&gt; int:
+    if not a:
+        return 0
+    write = 1
+    for read in range(1, len(a)):
+        if a[read] != a[write - 1]:   # 마지막으로 남긴 값과 다르면
+            a[write] = a[read]
+            write += 1
+    return write                      # 앞의 write 칸이 결과다
+
+
+nums = [1, 1, 2, 3, 3, 3, 5]
+n = dedupe_sorted(nums)
+print(n, nums[:n])
+</code></pre>
+<pre class="output">
+4 [1, 2, 3, 5]
+</pre>
+
+        <p>정렬돼 있으니 같은 값은 붙어 있고, 마지막으로 남긴 값 하나와만 비교하면 된다. <code>write</code>는 <code>read</code>를 앞지르지 않으므로 아직 읽지 않은 칸을 덮어쓰지 않는다.</p>
+      </section>
+
+      <section id="both-ends">
+        <h2>양끝 포인터</h2>
+        <p>다시 정렬된 배열에서 합이 목표인 두 수를 찾아 보자. 이번에는 <code>lo</code>를 맨 앞에, <code>hi</code>를 맨 뒤에 두고 두 값의 합을 본다.</p>
+        <ul>
+          <li>합이 목표보다 <strong>크면</strong> 합을 줄여야 하니 <code>hi</code>를 왼쪽으로 옮긴다.</li>
+          <li>합이 목표보다 <strong>작으면</strong> 합을 키워야 하니 <code>lo</code>를 오른쪽으로 옮긴다.</li>
+          <li>같으면 찾았다. <code>lo</code>와 <code>hi</code>가 만나면 답이 없다.</li>
+        </ul>
+
+        <figure class="fig">
+          <div class="fig-steps">
+            <div class="fig-state">
+              <div class="cells">
+                <div class="cell is-hl" data-i="0" data-ptr="lo">1</div>
+                <div class="cell" data-i="1">3</div>
+                <div class="cell" data-i="2">6</div>
+                <div class="cell" data-i="3">8</div>
+                <div class="cell" data-i="4">11</div>
+                <div class="cell is-hl" data-i="5" data-ptr="hi">15</div>
+              </div>
+              <span class="fig-state-label">1 + 15 = 16</span>
+            </div>
+          </div>
+          <div class="fig-steps">
+            <div class="fig-arrow">hi 왼쪽</div>
+            <div class="fig-state">
+              <div class="cells">
+                <div class="cell is-hl" data-i="0" data-ptr="lo">1</div>
+                <div class="cell" data-i="1">3</div>
+                <div class="cell" data-i="2">6</div>
+                <div class="cell" data-i="3">8</div>
+                <div class="cell is-hl" data-i="4" data-ptr="hi">11</div>
+                <div class="cell is-ghost" data-i="5">15</div>
+              </div>
+              <span class="fig-state-label">1 + 11 = 12</span>
+            </div>
+          </div>
+          <div class="fig-steps">
+            <div class="fig-arrow">lo 오른쪽</div>
+            <div class="fig-state">
+              <div class="cells">
+                <div class="cell is-ghost" data-i="0">1</div>
+                <div class="cell is-hl" data-i="1" data-ptr="lo">3</div>
+                <div class="cell" data-i="2">6</div>
+                <div class="cell" data-i="3">8</div>
+                <div class="cell is-hl" data-i="4" data-ptr="hi">11</div>
+                <div class="cell is-ghost" data-i="5">15</div>
+              </div>
+              <span class="fig-state-label">3 + 11 = 14</span>
+            </div>
+          </div>
+          <figcaption><b>그림 21-1</b> 목표 14. 합이 크면 <code>hi</code>를, 작으면 <code>lo</code>를 옮긴다. 흐린 칸은 다시 볼 필요가 없어진 값이다.</figcaption>
+        </figure>
+
+<pre data-lang="python" data-title="pair_two_pointers.py"><code>
+def find_pair(a: list[int], target: int):
+    lo, hi = 0, len(a) - 1
+    compared = 0
+    while lo &lt; hi:                 # 같은 칸을 두 번 쓰지 않는다
+        compared += 1
+        total = a[lo] + a[hi]
+        if total == target:
+            return (a[lo], a[hi]), compared
+        if total &lt; target:
+            lo += 1
+        else:
+            hi -= 1
+    return None, compared
+
+
+a = [1, 3, 6, 8, 11, 15]
+print(find_pair(a, 14))
+print(find_pair(a, 100))
+</code></pre>
+<pre class="output">
+((3, 11), 3)
+(None, 5)
+</pre>
+
+        <p>답이 없을 때 비교 횟수가 15번에서 5번으로 줄었다. 매번 <code>lo</code>와 <code>hi</code> 사이가 한 칸 좁아지므로 많아야 n-1번이다.</p>
+        <p>버린 값을 다시 볼 필요가 없는 이유는 정렬에 있다. <code>1 + 15</code>가 이미 목표보다 크다면, 15는 <code>1</code>보다 큰 어떤 값과 짝지어도 더 커질 뿐이다. 그러니 <mark>15가 들어간 쌍은 전부 답이 될 수 없고</mark>, <code>hi</code>를 옮겨 15를 버려도 놓치는 답이 없다. 작은 쪽도 마찬가지다. 이 "한쪽을 통째로 버릴 수 있다"는 판단이 포인터가 되돌아가지 않아도 되는 근거다.</p>
+      </section>
+
+      <section id="fixed-window">
+        <h2>고정 길이 창</h2>
+        <p>같은 방향 투 포인터의 두 끝 사이를 하나의 구간으로 보면 <strong>슬라이딩 윈도우</strong>(sliding window)가 된다. 창문을 옆으로 밀듯 구간을 한 칸씩 옮기며 본다는 뜻이다. 창의 길이가 k로 정해져 있으면 고정 창이다.</p>
+        <p>길이 k인 구간의 합 중 최댓값을 구해 보자. 창을 한 칸 옮길 때 바뀌는 것은 <mark>오른쪽에 새로 들어오는 값 하나와 왼쪽에서 빠지는 값 하나</mark>뿐이다. 그러니 합을 처음부터 다시 구하지 않고 더하고 빼기만 한다.</p>
+
+        <figure class="fig">
+          <div class="fig-steps">
+            <div class="fig-state">
+              <div class="cells">
+                <div class="cell is-hl" data-i="0">2</div>
+                <div class="cell is-hl" data-i="1">5</div>
+                <div class="cell is-hl" data-i="2">1</div>
+                <div class="cell" data-i="3">8</div>
+                <div class="cell" data-i="4">3</div>
+              </div>
+              <span class="fig-state-label">합 8</span>
+            </div>
+            <div class="fig-arrow">+8 −2</div>
+            <div class="fig-state">
+              <div class="cells">
+                <div class="cell is-ghost" data-i="0">2</div>
+                <div class="cell is-hl" data-i="1">5</div>
+                <div class="cell is-hl" data-i="2">1</div>
+                <div class="cell is-hl" data-i="3">8</div>
+                <div class="cell" data-i="4">3</div>
+              </div>
+              <span class="fig-state-label">합 14</span>
+            </div>
+          </div>
+          <figcaption><b>그림 21-2</b> 아래 코드의 배열 중 앞 다섯 칸. 길이 3인 창을 한 칸 옮기면 8이 들어오고 2가 빠진다.</figcaption>
+        </figure>
+
+<pre data-lang="python" data-title="fixed_window.py"><code>
+a = [2, 5, 1, 8, 3, 7]
+k = 3
+
+window = sum(a[:k])                 # 첫 창만 직접 더한다
+best = window
+print(f'[0, {k - 1}] 합 {window}')
+for right in range(k, len(a)):
+    window += a[right] - a[right - k]   # 들어온 값 더하고, 빠진 값 빼고
+    best = max(best, window)
+    print(f'[{right - k + 1}, {right}] 합 {window}')
+print(best)
+</code></pre>
+<pre class="output">
+[0, 2] 합 8
+[1, 3] 합 14
+[2, 4] 합 12
+[3, 5] 합 18
+18
+</pre>
+
+        <p>첫 창에 O(k), 이후 한 칸마다 O(1)이라 전체 O(n)이다. 같은 문제를 23장의 누적합으로도 O(n)에 풀 수 있다. 질의가 여러 번이면 누적합이, 창을 한 번 훑으면 되면 이 방식이 간단하다.</p>
+
+        <h3>합이 아닌 상태를 들고 다니기</h3>
+        <p>창이 들고 다니는 값은 합이 아니어도 된다. 들어온 값을 반영하고 빠진 값을 되돌릴 수만 있으면 된다. 길이 k인 창마다 서로 다른 값이 몇 종류인지 세려면 값별 개수를 딕셔너리(4장)에 담는다. 개수가 0이 된 키를 지워야 <code>len</code>이 종류 수가 된다.</p>
+
+<pre data-lang="python" data-title="distinct_in_window.py"><code>
+from collections import Counter
+
+
+def distinct_counts(a: list[int], k: int) -&gt; list[int]:
+    counts = Counter(a[:k])
+    result = [len(counts)]
+    for right in range(k, len(a)):
+        counts[a[right]] += 1            # 들어온 값
+        out = a[right - k]
+        counts[out] -= 1                 # 빠진 값
+        if counts[out] == 0:
+            del counts[out]              # 0 개짜리 키를 남기지 않는다
+        result.append(len(counts))
+    return result
+
+
+print(distinct_counts([1, 2, 1, 3, 3, 2, 2], 3))
+</code></pre>
+<pre class="output">
+[2, 3, 2, 2, 2]
+</pre>
+      </section>
+
+      <section id="variable-window">
+        <h2>가변 길이 창</h2>
+        <p>창의 길이가 정해져 있지 않을 때도 있다. "양의 정수 배열에서 합이 S 이상인 가장 짧은 구간"이 대표적이다. 이때 창은 두 동작을 번갈아 한다.</p>
+        <ul>
+          <li><strong>늘리기</strong> — <code>right</code>를 한 칸 옮겨 값을 더한다.</li>
+          <li><strong>줄이기</strong> — 합이 S 이상인 동안 답을 기록하고 <code>left</code>를 옮겨 값을 뺀다.</li>
+        </ul>
+        <p>줄이기를 <code>while</code>로 반복한다는 점이 중요하다. 한 번 늘렸을 때 여러 칸을 줄여야 할 수도 있다.</p>
+
+<pre data-lang="python" data-title="variable_window.py"><code>
+def min_length_at_least(a: list[int], s: int) -&gt; int:
+    best = 0                       # 0 은 "아직 못 찾음"
+    window = 0
+    left = 0
+    for right in range(len(a)):
+        window += a[right]                 # 늘리기
+        while window &gt;= s:                 # 조건을 만족하는 동안 줄이기
+            length = right - left + 1
+            if best == 0 or length &lt; best:
+                best = length
+            window -= a[left]
+            left += 1
+        print(f'right={right} 창=[{left}, {right}] 합={window} 최소={best}')
+    return best
+
+
+print(min_length_at_least([2, 1, 4, 3, 1, 5, 4], 8))
+</code></pre>
+<pre class="output">
+right=0 창=[0, 0] 합=2 최소=0
+right=1 창=[0, 1] 합=3 최소=0
+right=2 창=[0, 2] 합=7 최소=0
+right=3 창=[2, 3] 합=7 최소=3
+right=4 창=[3, 4] 합=4 최소=3
+right=5 창=[4, 5] 합=6 최소=3
+right=6 창=[6, 6] 합=4 최소=2
+2
+</pre>
+
+        <p><code>while</code>이 <code>for</code> 안에 있어 O(n²)처럼 보이지만 그렇지 않다. <code>left</code>는 전체 실행 동안 0에서 n까지 한 방향으로만 가므로, <code>while</code> 본문은 <strong>모두 합쳐</strong> 많아야 n번 돈다. <code>right</code>의 n번과 더해 O(n)이다.</p>
+
+        <h3>서로 다른 문자로만 된 가장 긴 부분 문자열</h3>
+        <p>창 안의 상태를 합 대신 집합(4장)으로 들고 있을 수도 있다. 새 문자가 이미 창 안에 있으면, 그 문자가 빠질 때까지 왼쪽을 줄인다. 집합의 <code>in</code>, <code>add</code>, <code>remove</code>는 평균 O(1)이다.</p>
+
+<pre data-lang="python" data-title="longest_unique.py"><code>
+def longest_unique(s: str) -&gt; int:
+    seen = set()
+    best = 0
+    left = 0
+    for right, ch in enumerate(s):
+        while ch in seen:            # 겹치는 문자가 빠질 때까지 줄인다
+            seen.remove(s[left])
+            left += 1
+        seen.add(ch)
+        best = max(best, right - left + 1)
+    return best
+
+
+print(longest_unique('bananas'))
+print(longest_unique('coding'))
+print(longest_unique('aaaa'))
+</code></pre>
+<pre class="output">
+3
+6
+1
+</pre>
+
+        <p>최소 길이를 구할 때는 "조건을 만족하는 동안" 줄이며 답을 기록하고, 최대 길이를 구할 때는 "조건이 깨진 동안" 줄인 뒤 답을 기록한다. 줄이는 조건과 답을 기록하는 위치가 반대라는 점만 기억하면 두 모양 모두 같은 틀이다.</p>
+
+        <div class="callout callout-tip">
+          <span class="callout-title">가변 창의 뼈대</span>
+          <p><code>for right</code>로 한 칸 늘려 상태에 반영한다 → <code>while</code> 줄여야 하는 동안 <code>a[left]</code>를 상태에서 빼고 <code>left += 1</code> → 답을 갱신한다. 문제마다 바뀌는 것은 "상태"(합, 집합, 개수 딕셔너리)와 <code>while</code>의 조건, 답을 갱신하는 자리 셋뿐이다.</p>
+        </div>
+      </section>
+
+      <section id="when-not">
+        <h2>언제 안 되는가</h2>
+        <p>투 포인터는 "한쪽으로 옮기면 값이 한 방향으로만 변한다"는 성질, 즉 <strong>단조성</strong>에 기대고 있다. 가변 창에서는 창을 늘리면 합이 커지고 줄이면 작아진다는 것이 그 성질이다. 배열에 음수가 섞이면 이 성질이 깨진다.</p>
+
+<pre data-lang="python" data-title="negative_breaks.py"><code>
+def min_length_window(a: list[int], s: int) -&gt; int:
+    best = 0
+    window = 0
+    left = 0
+    for right in range(len(a)):
+        window += a[right]
+        while window &gt;= s:
+            if best == 0 or right - left + 1 &lt; best:
+                best = right - left + 1
+            window -= a[left]
+            left += 1
+    return best
+
+
+def min_length_brute(a: list[int], s: int) -&gt; int:
+    best = 0
+    for i in range(len(a)):
+        total = 0
+        for j in range(i, len(a)):
+            total += a[j]
+            if total &gt;= s and (best == 0 or j - i + 1 &lt; best):
+                best = j - i + 1
+    return best
+
+
+a = [3, -5, 7, 1]
+print(min_length_window(a, 7), min_length_brute(a, 7))
+</code></pre>
+<pre class="output">
+0 1
+</pre>
+
+        <p>답은 <code>[7]</code> 하나로 길이 1인데, 창은 0을 낸다. 창이 <code>[3, -5, 7]</code>일 때 합은 5라서 줄이지 않는다. 그런데 실제로는 왼쪽의 3과 -5를 빼야 합이 7로 커진다. 줄이면 합이 커질 수도 있으니 "합이 모자라면 늘린다"는 판단이 틀린 것이다. 음수가 있는 구간 합 문제는 23장의 누적합과 다른 방법으로 푼다.</p>
+
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>문제 모양</th><th>정렬</th><th>이유</th></tr></thead>
+            <tbody>
+              <tr><td>합이 목표인 두 수 (양끝 포인터)</td><td>필요하다</td><td>정렬돼야 한쪽을 통째로 버릴 수 있다. 정렬에 <span class="bigo b-nlogn">O(n log n)</span>이 든다</td></tr>
+              <tr><td>연속 구간의 합·길이 (창)</td><td>하면 안 된다</td><td>정렬하면 "연속"이라는 조건이 사라져 다른 문제가 된다</td></tr>
+              <tr><td>정렬된 두 리스트 합치기</td><td>이미 돼 있어야 한다</td><td>입력이 정렬돼 있다는 전제로 작은 값부터 꺼낸다</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <p>두 수의 합 문제에서 원래 위치를 답해야 한다면, 정렬하면 위치가 섞인다. 정렬하기 전에 <code>(값, 인덱스)</code> 튜플로 묶어 두면 튜플은 첫 값부터 비교되므로 값 순서로 정렬되고(3장), 원래 인덱스는 함께 따라온다.</p>
+
+<pre data-lang="python" data-title="pair_with_index.py"><code>
+def find_pair_index(a: list[int], target: int):
+    items = sorted((value, i) for i, value in enumerate(a))
+    lo, hi = 0, len(items) - 1
+    while lo &lt; hi:
+        total = items[lo][0] + items[hi][0]
+        if total == target:
+            return sorted((items[lo][1], items[hi][1]))
+        if total &lt; target:
+            lo += 1
+        else:
+            hi -= 1
+    return None
+
+
+print(find_pair_index([8, 15, 3, 11, 1, 6], 14))
+</code></pre>
+<pre class="output">
+[2, 3]
+</pre>
+
+        <p>정렬 없이 풀고 싶다면 지나온 값을 집합에 넣고 <code>target - x</code>가 있는지 보는 O(n) 방법(4장)도 있다. 투 포인터는 정렬이 이미 돼 있거나, 쌍을 여러 개 세야 할 때 더 빛난다.</p>
+      </section>
+
+      <section id="pitfalls">
+        <h2>자주 하는 실수</h2>
+        <div class="callout callout-warn">
+          <span class="callout-title">창을 줄이는 while을 if로 쓰기</span>
+          <p>한 번 늘릴 때 한 칸만 줄이면, 여러 칸을 줄일 수 있는 순간을 놓쳐 더 짧은 답을 찾지 못한다.</p>
+        </div>
+
+<pre data-lang="python" data-title="if_instead_of_while.py"><code>
+def min_length_wrong(a: list[int], s: int) -&gt; int:
+    best = 0
+    window = 0
+    left = 0
+    for right in range(len(a)):
+        window += a[right]
+        if window &gt;= s:                # while 이어야 한다
+            if best == 0 or right - left + 1 &lt; best:
+                best = right - left + 1
+            window -= a[left]
+            left += 1
+    return best
+
+
+print(min_length_wrong([2, 1, 4, 3, 1, 5, 4], 8))   # 2 를 기대했다
+</code></pre>
+<pre class="output">
+4
+</pre>
+        <p>창이 한 번 길이 4가 된 뒤로는 한 칸 늘고 한 칸 줄기만 해서 길이가 4에 머문다. <code>while</code>로 바꾸면 2가 나온다.</p>
+
+        <div class="callout callout-warn">
+          <span class="callout-title">포인터 이동 조건을 뒤바꾸기</span>
+          <p>양끝 포인터에서 합이 작은데 <code>hi</code>를 줄이면 합이 더 작아져 답을 지나친다. "작으면 <code>lo</code>를 키우고, 크면 <code>hi</code>를 줄인다"를 그림 21-1처럼 한 번 손으로 따라가 보고 쓴다.</p>
+        </div>
+        <div class="callout callout-warn">
+          <span class="callout-title">빈 창과 끝 처리</span>
+          <p>답이 없을 때 무엇을 출력할지 정한다. 최솟값을 <code>float('inf')</code>로 시작했다면 끝에서 0으로 바꾸는 것을 잊지 않는다. 양끝 포인터는 <code>while lo &lt; hi</code>로 써야 한 원소를 두 번 쓰지 않는다. 합치기에서는 반복이 끝난 뒤 남은 원소를 붙이는 줄을 빠뜨리기 쉽다.</p>
+        </div>
+        <div class="callout callout-warn">
+          <span class="callout-title">슬라이스로 합을 다시 구하기</span>
+          <p>창을 옮길 때마다 <code>sum(a[i:i + k])</code>를 부르면 슬라이스가 k칸을 복사하고(3장) <code>sum</code>이 다시 k칸을 더한다. 한 칸에 O(k), 전체 O(nk)라 k가 n에 가까우면 O(n²)이다.</p>
+        </div>
+
+<pre data-lang="python" data-title="slice_window_slow.py"><code>
+best = max(sum(a[i:i + k]) for i in range(len(a) - k + 1))   # O(nk)
+</code></pre>
+      </section>
+
+      <section id="problem">
+        <h2>대표 문제</h2>
+        <div class="problem">
+          <div class="problem-head">
+            <div class="problem-kicker"><b>Problem</b><span class="chip">보통</span><span class="chip">슬라이딩 윈도우</span></div>
+            <h3>짧은 구간 찾기</h3>
+          </div>
+          <div class="problem-body">
+            <p>양의 정수 N개로 된 수열과 정수 S가 주어진다. 연속한 원소들의 합이 S 이상인 구간 중 가장 짧은 구간의 길이를 출력하라. 그런 구간이 없으면 0을 출력하라.</p>
+            <p>첫 줄에 N과 S가 주어진다(1 ≤ N ≤ 100,000, 1 ≤ S ≤ 1,000,000,000). 둘째 줄에 수열의 원소 N개가 공백으로 구분되어 주어진다. 각 원소는 1 이상 10,000 이하이다.</p>
+            <div class="table-wrap">
+              <table>
+                <thead><tr><th>입력</th><th>출력</th><th>설명</th></tr></thead>
+                <tbody>
+                  <tr><td><code>7 12</code><br><code>4 2 6 1 3 7 5</code></td><td><code>2</code></td><td><code>7 + 5 = 12</code>가 가장 짧다</td></tr>
+                  <tr><td><code>4 5</code><br><code>1 6 2 1</code></td><td><code>1</code></td><td>6 하나로 충분하다</td></tr>
+                  <tr><td><code>3 10</code><br><code>1 2 3</code></td><td><code>0</code></td><td>전체 합이 6이라 만들 수 없다</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <details class="reveal">
+            <summary>접근 방법<span class="reveal-hint">먼저 생각해 보고 펼치세요</span></summary>
+            <div class="reveal-body">
+              <p>원소가 모두 양수라서 <mark>창을 늘리면 합이 커지고, 줄이면 합이 작아진다.</mark> 그래서 왼쪽 끝은 되돌아갈 필요가 없고 가변 창으로 O(n)에 풀린다. 모든 구간을 보면 약 50억 쌍이라 시간 안에 끝나지 않는다.</p>
+              <ol>
+                <li><code>right</code>를 0부터 한 칸씩 옮기며 창의 합에 더한다.</li>
+                <li>합이 S 이상인 동안, 현재 길이 <code>right - left + 1</code>로 최솟값을 갱신하고 <code>a[left]</code>를 빼며 <code>left</code>를 옮긴다.</li>
+                <li>끝까지 돈 뒤 한 번도 갱신되지 않았다면 0을 출력한다.</li>
+              </ol>
+            </div>
+          </details>
+
+          <details class="reveal">
+            <summary>풀이 코드</summary>
+            <div class="reveal-body">
+<pre data-lang="python" data-title="shortest_window.py"><code>
+import sys
+
+input = sys.stdin.readline
+
+n, s = map(int, input().split())
+a = list(map(int, input().split()))
+
+best = 0                    # 0 은 아직 못 찾았다는 뜻이자, 답이 없을 때의 출력
+window = 0
+left = 0
+for right in range(n):
+    window += a[right]
+    while window &gt;= s:
+        length = right - left + 1
+        if best == 0 or length &lt; best:
+            best = length
+        window -= a[left]
+        left += 1
+
+print(best)
+</code></pre>
+<pre class="stdin">
+7 12
+4 2 6 1 3 7 5
+</pre>
+<pre class="output">
+2
+</pre>
+              <p>길이는 1 이상이라 0을 "못 찾음" 표시로 겸해 쓸 수 있다. 덕분에 끝에서 따로 바꿀 필요가 없다. 원소가 하나뿐인 창이 S 이상이면 <code>left</code>가 <code>right + 1</code>이 되어 창이 빈다. 이때 합은 0이라 <code>while</code>이 저절로 멈춘다.</p>
+            </div>
+          </details>
+
+          <details class="reveal">
+            <summary>복잡도</summary>
+            <div class="reveal-body">
+              <dl class="cx">
+                <dt>시간</dt><dd><span class="bigo b-linear">O(n)</span> <code>right</code>와 <code>left</code>가 각각 많아야 n번 움직인다.</dd>
+                <dt>공간</dt><dd><span class="bigo b-linear">O(n)</span> 입력 리스트를 저장한다. 창 자체는 합 하나와 인덱스 둘만 쓴다.</dd>
+              </dl>
+            </div>
+          </details>
+        </div>
+      </section>
+
+      <section id="recall">
+        <h2>스스로 확인</h2>
+        <div class="recall">
+          <details>
+            <summary>정렬된 배열의 양끝 포인터에서 <code>a[lo] + a[hi]</code>가 목표보다 크면 왜 <code>hi</code>를 옮겨도 답을 놓치지 않는가?</summary>
+            <div class="answer"><p>남은 후보 중 가장 작은 <code>a[lo]</code>와 짝지어도 이미 목표보다 크므로, <code>a[hi]</code>가 들어간 다른 쌍은 모두 더 크다. <code>a[hi]</code>는 어떤 답에도 들어갈 수 없어 버려도 된다.</p></div>
+          </details>
+          <details>
+            <summary>길이 k인 창을 한 칸 옮길 때 합을 어떻게 갱신하고, 그 비용은 얼마인가?</summary>
+            <div class="answer"><p>새로 들어온 <code>a[right]</code>를 더하고 빠지는 <code>a[right - k]</code>를 뺀다. 한 칸에 O(1)이고, 처음 창의 합만 O(k)로 구하므로 전체 O(n)이다.</p></div>
+          </details>
+          <details>
+            <summary>가변 창 코드는 <code>for</code> 안에 <code>while</code>이 있는데도 왜 O(n)인가?</summary>
+            <div class="answer"><p><code>while</code> 한 번에 <code>left</code>가 한 칸 나아가고, <code>left</code>는 전체 실행 동안 되돌아가지 않으며 n을 넘지 않는다. 그래서 <code>while</code> 본문은 모두 합쳐 많아야 n번 돌고, <code>for</code>의 n번과 더해 O(n)이다.</p></div>
+          </details>
+          <details>
+            <summary>배열에 음수가 섞이면 "합이 S 이상인 가장 짧은 구간"을 가변 창으로 풀 수 없는 이유는?</summary>
+            <div class="answer"><p>창을 줄이면 합이 작아진다는 성질이 깨지기 때문이다. 왼쪽의 음수를 빼면 오히려 합이 커질 수 있는데, 창은 합이 모자라면 줄이지 않으므로 그 구간을 보지 못한다.</p></div>
+          </details>
+        </div>
+      </section>
+
+      <section id="summary">
+        <h2>정리</h2>
+        <ol class="summary-list">
+          <li>두 포인터가 각각 앞으로만 움직이면 이동은 모두 합쳐 많아야 2n번이라 O(n)이다.</li>
+          <li>포인터가 되돌아가지 않아도 되는 근거, 즉 "버린 쪽에는 답이 없다"는 판단이 서야 투 포인터를 쓸 수 있다.</li>
+          <li>같은 방향 포인터는 정렬된 리스트 합치기와 제자리 중복 제거에 쓴다.</li>
+          <li>양끝 포인터는 정렬된 배열에서 합이 작으면 <code>lo</code>를, 크면 <code>hi</code>를 옮긴다.</li>
+          <li>고정 창은 들어온 값을 더하고 빠진 값을 빼서 갱신한다. 슬라이스로 다시 더하면 O(nk)가 된다.</li>
+          <li>가변 창은 <code>right</code>로 늘리고 <code>while</code>로 <code>left</code>를 줄인다. 원소가 모두 양수일 때처럼 단조성이 있어야 맞다.</li>
+        </ol>
+      </section>
+
+      <nav class="pager" aria-label="이전 장과 다음 장"></nav>
+    </article>
+  </main>
+
+  <aside class="rail" aria-label="이 페이지 목차">
+    <p class="rail-title">이 페이지</p>
+    <nav id="onthispage"></nav>
+  </aside>
+</div>
+<div class="backdrop" id="backdrop"></div>
+
+<script src="assets/book.js"></script>
+<script src="assets/app.js"></script>
+<script src="assets/code.js"></script>
+</body>
+</html>

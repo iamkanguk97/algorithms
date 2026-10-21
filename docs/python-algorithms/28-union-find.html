@@ -1,0 +1,660 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>28. 유니온 파인드 — 파이썬 알고리즘 노트</title>
+<script src="assets/theme.js"></script>
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body data-chapter="28">
+<a class="skip-link" href="#content">본문으로 건너뛰기</a>
+<div class="progress" aria-hidden="true"><span></span></div>
+<header class="topbar" id="topbar"></header>
+
+<div class="shell">
+  <aside class="sidebar" id="sidebar" aria-label="책 목차"></aside>
+
+  <main class="main" id="content">
+    <article class="chapter">
+      <header class="chapter-head">
+        <a class="part-pill"></a>
+        <span class="chapter-label"></span>
+        <h1>유니온 파인드</h1>
+        <p class="lede">유니온 파인드는 원소들을 겹치지 않는 그룹으로 나눠 두고, 두 원소가 같은 그룹인지 묻는 일과 두 그룹을 합치는 일을 거의 상수 시간에 처리하는 자료구조입니다. 리스트 하나와 짧은 함수 두 개로 만들 수 있어서 연결 여부나 사이클을 판별할 때 자주 씁니다.</p>
+        <div class="chapter-meta">
+          <span class="chip">서로소 집합</span><span class="chip">find</span><span class="chip">union</span><span class="chip">경로 압축</span><span class="chip">사이클 판별</span>
+        </div>
+      </header>
+
+      <div class="goals">
+        <p class="goals-title">이 장에서 배울 것</p>
+        <ul>
+          <li>서로소 집합이 무엇이고 유니온 파인드가 답하는 두 질문이 무엇인지 설명할 수 있다</li>
+          <li><code>parent</code> 리스트로 그룹을 트리로 나타내고 find와 union을 짤 수 있다</li>
+          <li>경로 압축과 크기 기준 합치기가 트리 높이를 어떻게 줄이는지 안다</li>
+          <li>유니온 파인드로 무방향 그래프의 사이클을 판별할 수 있다</li>
+          <li>연결 여부를 묻는 질의 문제를 유니온 파인드로 풀 수 있다</li>
+        </ul>
+      </div>
+
+      <section id="idea">
+        <h2>서로소 집합</h2>
+        <div class="callout callout-key">
+          <span class="callout-title">핵심</span>
+          <p class="callout-big">유니온 파인드는 <mark>"같은 그룹인가?"와 "두 그룹을 합친다"</mark> 두 가지만 아주 빠르게 처리하는 자료구조다. 그룹마다 대표 원소 하나를 정해 두고, 그 대표로 그룹 전체를 가리킨다.</p>
+        </div>
+        <p>원소 여러 개가 몇 개의 그룹으로 나뉘어 있고, 한 원소가 두 그룹에 동시에 속하는 일은 없다고 하자. 이렇게 겹치는 원소가 없는 집합들을 <strong>서로소 집합(disjoint set)</strong>이라고 한다. 유니온 파인드가 하는 일은 두 가지뿐이다.</p>
+        <ul>
+          <li><strong>find</strong> — 원소 x가 속한 그룹의 대표를 찾는다. 두 원소의 대표가 같으면 같은 그룹이다.</li>
+          <li><strong>union</strong> — 두 원소가 속한 그룹을 하나로 합친다.</li>
+        </ul>
+        <p>학교의 반에 빗대면 쉽다. 두 학생이 같은 반인지 알려면 각자의 반장이 같은 사람인지만 보면 된다. 유니온 파인드에서 반장 역할을 하는 원소를 <strong>대표</strong>라고 한다.</p>
+
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>문제에서 묻는 것</th><th>유니온 파인드로 바꾸면</th></tr></thead>
+            <tbody>
+              <tr><td>두 정점이 이어져 있는가</td><td><code>find(a) == find(b)</code></td></tr>
+              <tr><td>그룹(연결 요소)이 몇 개인가</td><td>자기 자신이 대표인 원소의 수</td></tr>
+              <tr><td>간선을 넣으면 사이클이 생기는가</td><td>넣기 전에 두 끝이 이미 같은 그룹인가</td></tr>
+              <tr><td>가장 큰 그룹은 몇 명인가</td><td>대표마다 그룹 크기를 적어 둔다</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <p>연결 여부는 13장의 BFS나 DFS로도 알 수 있다. 하지만 탐색은 물을 때마다 그래프를 다시 훑는다. 간선이 하나씩 늘어나고 그 사이사이에 질문이 끼어들면 매번 탐색할 수 없다. 이럴 때 유니온 파인드가 필요하다.</p>
+        <p>가장 먼저 떠오르는 방법은 원소마다 그룹 번호를 적어 두는 것이다. 같은 그룹인지는 번호 두 개만 비교하면 된다. 문제는 합치기다.</p>
+
+<pre data-lang="python" data-title="group_label.py"><code>
+group = [0, 1, 2, 3, 4, 5]   # group[i] = i 가 속한 그룹 번호
+
+
+def merge(a: int, b: int) -&gt; None:
+    old, new = group[b], group[a]
+    for i in range(len(group)):      # b 그룹 원소를 모두 찾아 번호를 고친다
+        if group[i] == old:
+            group[i] = new
+
+
+merge(0, 1)
+merge(2, 3)
+merge(1, 3)
+print(group)
+print(group[0] == group[3], group[0] == group[4])
+</code></pre>
+<pre class="output">
+[0, 0, 0, 0, 4, 5]
+True False
+</pre>
+
+        <p>합칠 때마다 리스트 전체를 훑으니 한 번에 <span class="bigo b-linear">O(n)</span>이고, n번 합치면 <span class="bigo b-quad">O(n²)</span>이다. 유니온 파인드는 번호를 고쳐 쓰지 않는다. 대신 <mark>한쪽 대표가 다른 쪽 대표를 가리키게만</mark> 해서 이 비용을 없앤다.</p>
+      </section>
+
+      <section id="array-representation">
+        <h2>배열로 표현하기</h2>
+        <p>유니온 파인드는 그룹 하나를 <strong>트리</strong> 하나로 나타낸다. 각 원소는 자기 부모 하나만 기억하고, 부모를 계속 따라 올라가면 꼭대기인 <strong>루트</strong>에 닿는다. 이 루트가 그룹의 대표다. 트리는 15장에서 자세히 다루고, 여기서는 "부모를 따라 올라가면 루트가 나온다"는 것만 알면 된다.</p>
+        <p>원소를 0부터 n-1까지 번호로 부르면 부모 정보는 리스트 하나에 담긴다. <code>parent[i]</code>가 i의 부모다. 처음에는 모두 혼자인 그룹이므로 자기 자신이 부모다. 그래서 <mark><code>parent[x] == x</code>인 원소가 루트</mark>라는 규칙이 생긴다.</p>
+
+<pre data-lang="python" data-title="parent_list.py"><code>
+parent = list(range(6))    # 처음엔 모두 자기 자신이 부모(루트)
+print(parent)
+
+parent[1] = 0              # 1의 부모는 0
+parent[2] = 1              # 2의 부모는 1
+parent[4] = 3
+print(parent)
+
+
+def root_of(x: int) -&gt; int:
+    while parent[x] != x:  # 부모가 자기 자신이면 루트다
+        x = parent[x]
+    return x
+
+
+print([root_of(x) for x in range(6)])
+</code></pre>
+<pre class="output">
+[0, 1, 2, 3, 4, 5]
+[0, 0, 1, 3, 3, 5]
+[0, 0, 0, 3, 3, 5]
+</pre>
+
+        <figure class="fig">
+          <div class="fig-steps">
+            <div class="fig-state">
+              <div class="cells">
+                <div class="cell is-hl" data-i="0">0</div>
+                <div class="cell" data-i="1">0</div>
+                <div class="cell" data-i="2">1</div>
+                <div class="cell is-hl" data-i="3">3</div>
+                <div class="cell" data-i="4">3</div>
+                <div class="cell is-hl" data-i="5">5</div>
+              </div>
+              <span class="fig-state-label">parent</span>
+            </div>
+          </div>
+          <div class="fig-steps">
+            <div class="fig-state">
+              <div class="cells vertical">
+                <div class="cell">2</div>
+                <div class="cell">1</div>
+                <div class="cell is-hl" data-ptr="루트">0</div>
+              </div>
+              <span class="fig-state-label">{0, 1, 2}</span>
+            </div>
+            <div class="fig-state">
+              <div class="cells vertical">
+                <div class="cell">4</div>
+                <div class="cell is-hl" data-ptr="루트">3</div>
+              </div>
+              <span class="fig-state-label">{3, 4}</span>
+            </div>
+            <div class="fig-state">
+              <div class="cells vertical">
+                <div class="cell is-hl" data-ptr="루트">5</div>
+              </div>
+              <span class="fig-state-label">{5}</span>
+            </div>
+          </div>
+          <figcaption><b>그림 28-1</b> 위는 <code>parent</code> 리스트로, 칸 아래 회색 숫자가 원소이고 칸 안의 값이 그 부모다. 값이 자기 번호와 같은 0, 3, 5가 루트다. 아래는 같은 리스트를 트리로 그린 것으로, 리스트 하나에 트리 세 개가 들어 있다.</figcaption>
+        </figure>
+
+        <p>트리의 모양은 상관없다. 같은 루트에 닿기만 하면 같은 그룹이다. 원소가 0부터 시작하는 정수가 아니라면 딕셔너리(4장)로 이름을 번호에 대응시킨 뒤 같은 방식으로 쓴다.</p>
+      </section>
+
+      <section id="find-and-union">
+        <h2>find와 union 기본</h2>
+        <p>find는 앞의 <code>root_of</code>와 같다. union은 두 원소의 루트를 각각 찾은 뒤 한쪽 루트의 부모를 다른 쪽 루트로 바꾼다. a와 b를 직접 잇지 않고 <mark>루트끼리 잇는다</mark>는 점이 중요하다. 루트 하나만 바꾸면 그 아래 원소가 모두 따라오므로, 다른 원소는 고칠 필요가 없다.</p>
+
+<pre data-lang="python" data-title="union_find_basic.py"><code>
+def find(parent: list[int], x: int) -&gt; int:
+    while parent[x] != x:
+        x = parent[x]
+    return x
+
+
+def union(parent: list[int], a: int, b: int) -&gt; None:
+    root_a, root_b = find(parent, a), find(parent, b)
+    if root_a != root_b:           # 이미 같은 그룹이면 할 일이 없다
+        parent[root_b] = root_a    # b 쪽 루트를 a 쪽 루트 밑에 붙인다
+
+
+parent = list(range(6))
+union(parent, 0, 1)
+union(parent, 2, 3)
+union(parent, 1, 3)
+print(parent)
+print(find(parent, 3) == find(parent, 0))
+print(find(parent, 4) == find(parent, 0))
+</code></pre>
+<pre class="output">
+[0, 0, 0, 2, 4, 5]
+True
+False
+</pre>
+
+        <p>마지막 <code>union(parent, 1, 3)</code>은 1의 루트 0과 3의 루트 2를 이어 <code>parent[2] = 0</code>으로 만들었다. 3의 부모는 여전히 2지만, 2를 거쳐 0까지 올라가므로 3도 0의 그룹이다.</p>
+
+        <h3>한 줄로 늘어지면 느리다</h3>
+        <p>find의 비용은 루트까지 올라가는 단계 수, 곧 트리의 높이다. 합치는 순서가 나쁘면 트리가 한 줄로 길게 늘어진다.</p>
+
+<pre data-lang="python" data-title="chain_worst.py"><code>
+def find_steps(parent: list[int], x: int) -&gt; tuple[int, int]:
+    steps = 0
+    while parent[x] != x:
+        x = parent[x]
+        steps += 1
+    return x, steps          # (루트, 올라간 단계 수)
+
+
+def union(parent: list[int], a: int, b: int) -&gt; None:
+    root_a, root_b = find_steps(parent, a)[0], find_steps(parent, b)[0]
+    if root_a != root_b:
+        parent[root_b] = root_a
+
+
+n = 8
+parent = list(range(n))
+for i in range(1, n):
+    union(parent, i, i - 1)  # 새 원소가 기존 트리 전체를 밑에 단다
+print(parent)
+print(find_steps(parent, 0))
+</code></pre>
+<pre class="output">
+[1, 2, 3, 4, 5, 6, 7, 7]
+(7, 7)
+</pre>
+
+        <p>0→1→…→7로 한 줄이 되어 <code>find(0)</code>이 7단계를 오른다. 원소가 n개면 n-1단계이니 find 한 번이 <span class="bigo b-linear">O(n)</span>이다. 원소 10만 개에 질문 10만 개라면 최악 100억 단계다. 다음 두 절의 기법이 이 문제를 고친다.</p>
+      </section>
+
+      <section id="path-compression">
+        <h2>경로 압축</h2>
+        <p>find로 루트를 찾고 나면 지나온 노드들이 모두 같은 루트를 가진다는 것을 알게 된다. 그렇다면 이 노드들의 부모를 루트로 바꿔 두자. 다음에는 한 단계 만에 루트에 닿는다. 이것을 <strong>경로 압축(path compression)</strong>이라고 한다.</p>
+        <p>재귀로 쓰면 한 줄이 달라진다. 부모의 루트를 재귀로 구해 오면서 <mark>그 값을 자기 부모 자리에 덮어쓴다.</mark></p>
+
+<pre data-lang="python" data-title="find_recursive.py"><code>
+def find(parent: list[int], x: int) -&gt; int:
+    if parent[x] != x:
+        parent[x] = find(parent, parent[x])   # 루트를 찾아 바로 붙인다
+    return parent[x]
+
+
+parent = [1, 2, 3, 4, 4]      # 0→1→2→3→4 한 줄
+print(find(parent, 0))
+print(parent)
+</code></pre>
+<pre class="output">
+4
+[4, 4, 4, 4, 4]
+</pre>
+
+        <figure class="fig">
+          <div class="fig-steps">
+            <div class="fig-state">
+              <div class="cells">
+                <div class="cell" data-i="0">1</div>
+                <div class="cell" data-i="1">2</div>
+                <div class="cell" data-i="2">3</div>
+                <div class="cell" data-i="3">4</div>
+                <div class="cell" data-i="4">4</div>
+              </div>
+              <span class="fig-state-label">압축 전: 높이 4</span>
+            </div>
+            <div class="fig-arrow">find(0)</div>
+            <div class="fig-state">
+              <div class="cells">
+                <div class="cell is-hl" data-i="0">4</div>
+                <div class="cell is-hl" data-i="1">4</div>
+                <div class="cell is-hl" data-i="2">4</div>
+                <div class="cell" data-i="3">4</div>
+                <div class="cell" data-i="4">4</div>
+              </div>
+              <span class="fig-state-label">압축 후: 높이 1</span>
+            </div>
+          </div>
+          <figcaption><b>그림 28-2</b> <code>find(0)</code>이 지나간 0, 1, 2의 부모가 루트 4로 바뀐다. 3은 이미 4를 가리키고 있었다.</figcaption>
+        </figure>
+
+        <p>find 한 번으로 높이 4였던 트리가 높이 1이 되었다. 압축은 find를 부를 때마다 일어나므로, 자주 찾는 원소일수록 루트 가까이에 붙는다.</p>
+
+        <h3>반복문으로 쓰기</h3>
+        <p>재귀형은 짧지만 트리가 깊으면 재귀 한도(6장)에 걸린다. 반복문으로는 두 번 올라간다. 처음에는 루트를 찾기만 하고, 두 번째에는 다시 올라가며 지나는 노드의 부모를 루트로 바꾼다.</p>
+
+<pre data-lang="python" data-title="find_iterative.py"><code>
+def find(parent: list[int], x: int) -&gt; int:
+    root = x
+    while parent[root] != root:      # 1단계: 루트를 찾는다
+        root = parent[root]
+    while parent[x] != root:         # 2단계: 지나온 노드를 루트에 붙인다
+        next_node = parent[x]
+        parent[x] = root
+        x = next_node
+    return root
+
+
+n = 100_001
+parent = [i + 1 for i in range(n - 1)] + [n - 1]   # 0→1→…→100000 한 줄
+print(find(parent, 0))
+print(parent[0], parent[50_000], parent[99_999])
+</code></pre>
+<pre class="output">
+100000
+100000 100000 100000
+</pre>
+
+        <p>깊이 10만짜리 한 줄도 재귀 한도와 상관없이 처리한다. 다음 절의 크기 기준 합치기를 함께 쓰면 트리가 깊어지지 않아 재귀형도 안전하다. 어느 쪽인지 확신이 없으면 반복형을 쓴다.</p>
+      </section>
+
+      <section id="union-by-size">
+        <h2>크기 기준 합치기</h2>
+        <p>경로 압축은 이미 길어진 길을 나중에 줄인다. 처음부터 트리가 높아지지 않게 막을 수도 있다. 합칠 때 <mark>원소가 적은 트리의 루트를 원소가 많은 트리의 루트 밑에</mark> 붙이는 것이다. 이를 위해 루트마다 그룹의 원소 수를 <code>size</code> 리스트에 적어 둔다.</p>
+
+<pre data-lang="python" data-title="union_by_size.py"><code>
+def find(parent: list[int], x: int) -&gt; int:
+    if parent[x] != x:
+        parent[x] = find(parent, parent[x])
+    return parent[x]
+
+
+def union(parent: list[int], size: list[int], a: int, b: int) -&gt; bool:
+    root_a, root_b = find(parent, a), find(parent, b)
+    if root_a == root_b:
+        return False                     # 이미 같은 그룹
+    if size[root_a] &lt; size[root_b]:
+        root_a, root_b = root_b, root_a  # root_a 가 큰 쪽이 되게 한다
+    parent[root_b] = root_a              # 작은 트리를 큰 트리 밑에
+    size[root_a] += size[root_b]
+    return True
+
+
+n = 6
+parent = list(range(n))
+size = [1] * n
+union(parent, size, 0, 1)
+union(parent, size, 2, 3)
+union(parent, size, 4, 2)    # 4(크기 1)가 2의 그룹(크기 2) 밑으로 간다
+union(parent, size, 3, 1)
+print(parent)
+print(size[find(parent, 0)])                          # 0이 속한 그룹의 크기
+print(sum(1 for x in range(n) if find(parent, x) == x))  # 그룹 수
+</code></pre>
+<pre class="output">
+[2, 0, 2, 2, 2, 5]
+5
+2
+</pre>
+
+        <p>union이 실제로 합쳤는지를 <code>True</code>/<code>False</code>로 돌려주게 했다. 다음 절의 사이클 판별에서 그대로 쓴다. <code>size</code>는 루트 칸의 값만 의미가 있다. 루트가 아닌 원소의 칸에는 합쳐지기 전의 옛 값이 남으므로, 그룹 크기는 반드시 <code>size[find(x)]</code>로 읽는다.</p>
+        <p>작은 쪽을 밑에 붙이면 높이가 얼마나 낮아질까. 어떤 원소의 깊이가 1 늘어나는 것은 그 원소의 트리가 자기보다 크거나 같은 트리 밑으로 들어갈 때뿐이다. 그때마다 그 원소가 속한 그룹의 크기는 적어도 두 배가 된다. 크기는 n을 넘을 수 없으니 두 배가 되는 일은 log₂ n번을 넘지 못한다. 그래서 트리 높이는 log₂ n 이하로 유지된다.</p>
+
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>방법</th><th>find 한 번</th><th>이유</th></tr></thead>
+            <tbody>
+              <tr><td>기본</td><td><span class="bigo b-linear">O(n)</span></td><td>트리가 한 줄로 늘어질 수 있다</td></tr>
+              <tr><td>경로 압축만</td><td><span class="bigo b-log">O(log n)</span> 평균</td><td>긴 길은 한 번 지나가면 짧아진다</td></tr>
+              <tr><td>크기 기준만</td><td><span class="bigo b-log">O(log n)</span></td><td>높이가 log₂ n을 넘지 않는다</td></tr>
+              <tr><td>둘 다</td><td><span class="bigo b-const">O(α(n))</span> 평균</td><td>사실상 상수</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <p>"평균"은 연산 여러 번을 묶어 평균 낸 값(분할 상환)이다. α(n)은 <strong>역 아커만 함수</strong>로, 아주 느리게 자라서 현실의 어떤 n을 넣어도 4를 넘지 않는다. 높이의 상한(rank)을 기준으로 합치는 방법도 있는데 효과는 같다. 코딩 테스트에서는 경로 압축 하나만 써도 대부분 통과하지만, 둘 다 써도 몇 줄 늘지 않는다.</p>
+      </section>
+
+      <section id="cycle-detection">
+        <h2>사이클 판별</h2>
+        <p>무방향 그래프에 간선을 하나씩 넣는다고 하자. 간선 (a, b)를 넣기 전에 a와 b가 이미 같은 그룹이면, 둘 사이에는 이미 다른 길이 있다. 그 길에 새 간선을 더하면 고리가 된다. 즉 <mark>루트가 같은 두 정점을 잇는 간선이 사이클을 만든다.</mark></p>
+
+<pre data-lang="python" data-title="cycle_detection.py"><code>
+def find(parent: list[int], x: int) -&gt; int:
+    if parent[x] != x:
+        parent[x] = find(parent, parent[x])
+    return parent[x]
+
+
+def has_cycle(n: int, edges: list[tuple[int, int]]) -&gt; bool:
+    parent = list(range(n))
+    for a, b in edges:
+        root_a, root_b = find(parent, a), find(parent, b)
+        if root_a == root_b:             # 이미 이어져 있는데 또 잇는다
+            print(f'간선 ({a}, {b})에서 사이클')
+            return True
+        parent[root_b] = root_a
+    return False
+
+
+print(has_cycle(4, [(0, 1), (1, 2), (2, 3)]))
+print(has_cycle(4, [(0, 1), (1, 2), (2, 0), (2, 3)]))
+</code></pre>
+<pre class="output">
+False
+간선 (2, 0)에서 사이클
+True
+</pre>
+
+        <figure class="fig">
+          <div class="fig-steps">
+            <div class="fig-state">
+              <div class="cells">
+                <div class="cell" data-i="0">0</div>
+                <div class="cell" data-i="1">0</div>
+                <div class="cell" data-i="2">2</div>
+                <div class="cell" data-i="3">3</div>
+              </div>
+              <span class="fig-state-label">(0, 1) 뒤</span>
+            </div>
+            <div class="fig-arrow">(1, 2)</div>
+            <div class="fig-state">
+              <div class="cells">
+                <div class="cell" data-i="0">0</div>
+                <div class="cell" data-i="1">0</div>
+                <div class="cell" data-i="2">0</div>
+                <div class="cell" data-i="3">3</div>
+              </div>
+              <span class="fig-state-label">루트 0과 2를 이음</span>
+            </div>
+          </div>
+          <div class="fig-steps">
+            <div class="fig-arrow">(2, 0)</div>
+            <div class="fig-state">
+              <div class="cells">
+                <div class="cell is-hl" data-i="0">0</div>
+                <div class="cell" data-i="1">0</div>
+                <div class="cell is-hl" data-i="2">0</div>
+                <div class="cell" data-i="3">3</div>
+              </div>
+              <span class="fig-state-label">루트가 같다 → 사이클</span>
+            </div>
+          </div>
+          <figcaption><b>그림 28-3</b> <code>parent</code>의 변화. 간선 (2, 0)을 넣기 전에 이미 <code>find(2)</code>와 <code>find(0)</code>이 모두 0이다.</figcaption>
+        </figure>
+
+        <p>이 판별은 29장 크루스칼 알고리즘의 핵심 부품이다. 크루스칼은 비용이 싼 간선부터 보며 사이클을 만들지 않는 간선만 고르는데, 그 "사이클을 만드는가?"를 바로 이 방식으로 묻는다.</p>
+
+        <div class="callout callout-tip">
+          <span class="callout-title">방향 그래프에는 쓸 수 없다</span>
+          <p>유니온 파인드는 간선의 방향을 보지 않는다. 0→1, 0→2, 1→2는 방향을 따라 0으로 돌아올 수 없으니 사이클이 아니다. 하지만 유니온 파인드는 1→2에서 사이클이라고 답한다. 방향 그래프의 사이클은 DFS(13장)로 찾는다.</p>
+        </div>
+      </section>
+
+      <section id="pitfalls">
+        <h2>자주 하는 실수</h2>
+        <div class="callout callout-warn">
+          <span class="callout-title">find에서 부모를 갱신하지 않기</span>
+          <p>재귀형 find를 <code>return find(parent, parent[x])</code>로만 쓰면 답은 맞지만 압축이 일어나지 않는다. 예제는 통과하고 큰 입력에서만 시간 초과가 나서 원인을 찾기 어렵다. <code>parent[x] = find(parent, parent[x])</code>로 덮어쓴 뒤 <code>parent[x]</code>를 돌려준다.</p>
+        </div>
+
+        <div class="callout callout-warn">
+          <span class="callout-title">parent끼리 비교하기</span>
+          <p>같은 그룹인지는 루트를 비교해야 한다. <code>parent[a]</code>는 루트가 아니라 바로 위 부모일 수 있다. 마지막에 그룹을 셀 때도 <code>parent[x]</code>가 아니라 <code>find(x)</code>를 본다.</p>
+        </div>
+
+<pre data-lang="python" data-title="compare_parent.py"><code>
+def find(parent: list[int], x: int) -&gt; int:
+    while parent[x] != x:
+        x = parent[x]
+    return x
+
+
+parent = [0, 0, 1, 3]        # 0←1←2 한 그룹, 3은 따로
+print(parent[0] == parent[2])               # 부모끼리: 틀린 답
+print(find(parent, 0) == find(parent, 2))   # 루트끼리: 맞는 답
+</code></pre>
+<pre class="output">
+False
+True
+</pre>
+
+        <div class="callout callout-warn">
+          <span class="callout-title">1번부터 오는 입력에 n칸 리스트</span>
+          <p>정점 번호가 1부터 N까지인데 <code>parent = list(range(n))</code>로 만들면 N번에서 <code>IndexError</code>가 난다. <code>list(range(n + 1))</code>로 만들고 0번 칸은 쓰지 않는다. <code>size</code>도 같은 길이로 만든다.</p>
+        </div>
+
+        <div class="callout callout-warn">
+          <span class="callout-title">재귀형 find의 깊이 한도</span>
+          <p>크기 기준 합치기 없이 경로 압축만 쓰면, 압축되기 전의 트리가 한 줄로 길어질 수 있다. 그 끝에서 재귀형 find를 부르면 깊이가 기본 한도 1000(6장)을 넘는다.</p>
+        </div>
+
+<pre data-lang="python" data-title="find_depth_limit.py"><code>
+def find(parent: list[int], x: int) -&gt; int:
+    if parent[x] != x:
+        parent[x] = find(parent, parent[x])
+    return parent[x]
+
+
+n = 5_000
+parent = [i + 1 for i in range(n - 1)] + [n - 1]   # 0→1→…→4999 한 줄
+try:
+    print(find(parent, 0))
+except RecursionError as e:
+    print(f'{type(e).__name__}: {e}')
+</code></pre>
+<pre class="output">
+RecursionError: maximum recursion depth exceeded
+</pre>
+        <p>반복형 find로 바꾸거나, 크기 기준 합치기를 함께 써서 높이를 log₂ n 이하로 묶는다. <code>sys.setrecursionlimit</code>으로 한도를 올리는 것은 마지막 수단이다.</p>
+      </section>
+
+      <section id="problem">
+        <h2>대표 문제</h2>
+        <div class="problem">
+          <div class="problem-head">
+            <div class="problem-kicker"><b>Problem</b><span class="chip">쉬움</span><span class="chip">유니온 파인드</span></div>
+            <h3>네트워크 연결</h3>
+          </div>
+          <div class="problem-body">
+            <p>컴퓨터 N대에 1번부터 N번까지 번호가 붙어 있고, 처음에는 서로 하나도 이어져 있지 않다. 명령 M개가 차례로 주어진다. <code>1 a b</code>는 a와 b를 케이블로 잇는 명령이고, <code>2 a b</code>는 지금 a와 b가 통신할 수 있는지 묻는 명령이다. 직접 이어져 있지 않아도 다른 컴퓨터를 거쳐 닿을 수 있으면 통신할 수 있다.</p>
+            <p>첫 줄에 N과 M이 주어지고, 다음 M줄에 명령이 하나씩 주어진다(1 ≤ N, M ≤ 100,000). <code>2</code> 명령마다 통신할 수 있으면 <code>yes</code>, 없으면 <code>no</code>를 한 줄에 하나씩 출력하라.</p>
+            <div class="table-wrap">
+              <table>
+                <thead><tr><th>입력</th><th>출력</th><th>설명</th></tr></thead>
+                <tbody>
+                  <tr><td><code>3 2</code><br><code>1 1 2</code><br><code>2 2 1</code></td><td><code>yes</code></td><td>1과 2를 이었으니 2와 1도 통신한다</td></tr>
+                  <tr><td><code>3 2</code><br><code>1 1 2</code><br><code>2 1 3</code></td><td><code>no</code></td><td>3은 어디에도 이어지지 않았다</td></tr>
+                  <tr><td><code>4 4</code><br><code>1 1 2</code><br><code>1 3 4</code><br><code>1 2 3</code><br><code>2 1 4</code></td><td><code>yes</code></td><td>1-2, 2-3, 3-4를 거쳐 닿는다</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <details class="reveal">
+            <summary>접근 방법<span class="reveal-hint">먼저 생각해 보고 펼치세요</span></summary>
+            <div class="reveal-body">
+              <p>1-2와 2-3이 이어져 있으면 1-3도 통신한다. 연결은 이렇게 번져 나가므로 <mark>"통신할 수 있는가"는 "같은 그룹인가"와 같은 질문</mark>이고, 케이블을 잇는 명령은 두 그룹을 합치는 일이다.</p>
+              <ol>
+                <li>번호가 1부터이므로 <code>parent</code>와 <code>size</code>를 n + 1칸으로 만든다.</li>
+                <li><code>1 a b</code>는 <code>union(a, b)</code>로 처리한다.</li>
+                <li><code>2 a b</code>는 <code>find(a) == find(b)</code>로 yes/no를 정해 모아 둔다.</li>
+                <li>명령이 최대 10만 개이므로 <code>sys.stdin.readline</code>으로 읽고, 답은 모아서 한 번에 출력한다(1장).</li>
+              </ol>
+            </div>
+          </details>
+
+          <details class="reveal">
+            <summary>풀이 코드</summary>
+            <div class="reveal-body">
+<pre data-lang="python" data-title="network.py"><code>
+import sys
+
+input = sys.stdin.readline
+
+
+def find(parent: list[int], x: int) -&gt; int:
+    root = x
+    while parent[root] != root:
+        root = parent[root]
+    while parent[x] != root:          # 지나온 노드를 루트에 붙인다
+        next_node = parent[x]
+        parent[x] = root
+        x = next_node
+    return root
+
+
+def union(parent: list[int], size: list[int], a: int, b: int) -&gt; None:
+    root_a, root_b = find(parent, a), find(parent, b)
+    if root_a == root_b:
+        return
+    if size[root_a] &lt; size[root_b]:
+        root_a, root_b = root_b, root_a
+    parent[root_b] = root_a           # 작은 트리를 큰 트리 밑에
+    size[root_a] += size[root_b]
+
+
+n, m = map(int, input().split())
+parent = list(range(n + 1))           # 번호가 1부터라 n + 1칸
+size = [1] * (n + 1)
+answers = []
+for _ in range(m):
+    op, a, b = map(int, input().split())
+    if op == 1:
+        union(parent, size, a, b)
+    else:
+        answers.append('yes' if find(parent, a) == find(parent, b) else 'no')
+print('\n'.join(answers))
+</code></pre>
+<pre class="stdin">
+5 7
+1 1 2
+2 1 3
+1 3 4
+1 2 4
+2 1 3
+2 1 5
+2 4 4
+</pre>
+<pre class="output">
+no
+yes
+no
+yes
+</pre>
+              <p>두 번째 질문 전에 1-2와 3-4가 각각 묶이고, <code>1 2 4</code>가 두 그룹을 합쳐 1과 3이 통신하게 된다. 같은 번호를 묻는 <code>2 4 4</code>는 루트가 당연히 같으므로 <code>yes</code>다.</p>
+            </div>
+          </details>
+
+          <details class="reveal">
+            <summary>복잡도</summary>
+            <div class="reveal-body">
+              <dl class="cx">
+                <dt>시간</dt><dd><span class="bigo b-linear">O(N + M·α(N))</span> 리스트를 만드는 데 O(N), 명령 하나는 사실상 상수 시간이다.</dd>
+                <dt>공간</dt><dd><span class="bigo b-linear">O(N)</span> <code>parent</code>와 <code>size</code> 두 리스트, 그리고 답을 모으는 리스트를 쓴다.</dd>
+              </dl>
+            </div>
+          </details>
+        </div>
+      </section>
+
+      <section id="recall">
+        <h2>스스로 확인</h2>
+        <div class="recall">
+          <details>
+            <summary><code>parent</code>가 <code>[0, 0, 1, 2, 3]</code>일 때 경로 압축 find로 <code>find(4)</code>를 부르면 <code>parent</code>는 어떻게 되는가?</summary>
+            <div class="answer"><p>4→3→2→1→0으로 올라가 루트 0을 찾고, 지나온 1, 2, 3, 4의 부모를 모두 0으로 바꾼다. 결과는 <code>[0, 0, 0, 0, 0]</code>이다.</p></div>
+          </details>
+          <details>
+            <summary>union에서 <code>parent[b] = a</code>처럼 원소를 직접 이으면 안 되는 이유는?</summary>
+            <div class="answer"><p>b가 루트가 아니면 b의 원래 부모 정보가 사라져, b 위쪽 원소들과 b가 서로 다른 그룹으로 갈라진다. 루트의 부모만 바꿔야 그 아래 원소가 모두 함께 옮겨 가고, 다른 원소의 연결은 그대로 남는다.</p></div>
+          </details>
+          <details>
+            <summary>크기 기준으로 합치면 트리 높이가 log₂ n을 넘지 않는 이유는?</summary>
+            <div class="answer"><p>원소의 깊이는 그 원소의 트리가 크거나 같은 트리 밑으로 들어갈 때만 1 늘고, 그때마다 그 원소가 속한 그룹의 크기는 두 배 이상이 된다. 크기는 n을 넘지 못하므로 깊이가 느는 일은 log₂ n번을 넘을 수 없다.</p></div>
+          </details>
+          <details>
+            <summary>방향 그래프 0→1, 0→2, 1→2를 유니온 파인드로 검사하면 사이클이 있다고 나온다. 왜 틀린 답인가?</summary>
+            <div class="answer"><p>유니온 파인드는 방향을 무시하고 "같은 그룹인가"만 본다. 1→2를 넣을 때 1과 2가 이미 0을 통해 같은 그룹이라 사이클로 판단하지만, 방향을 따라가면 어느 정점도 자기 자신으로 돌아오지 못한다. 방향 그래프의 사이클은 DFS로 찾는다.</p></div>
+          </details>
+        </div>
+      </section>
+
+      <section id="summary">
+        <h2>정리</h2>
+        <ol class="summary-list">
+          <li>유니온 파인드는 서로소 집합에서 "같은 그룹인가"(find)와 "두 그룹을 합친다"(union)를 빠르게 처리한다.</li>
+          <li><code>parent[i]</code>에 부모를 적고, <code>parent[x] == x</code>인 루트가 그룹의 대표다. 처음에는 모두 자기 자신이 부모다.</li>
+          <li>union은 a와 b가 아니라 두 루트를 잇는다. 같은 그룹인지는 <code>parent</code>가 아니라 find가 돌려준 루트로 비교한다.</li>
+          <li>아무 기법 없이 합치면 트리가 한 줄로 늘어져 find가 O(n)이 된다.</li>
+          <li>경로 압축은 find가 지나간 노드를 루트에 바로 붙이고, 크기 기준 합치기는 작은 트리를 큰 트리 밑에 붙인다. 둘을 함께 쓰면 연산 하나가 사실상 상수 시간이다.</li>
+          <li>무방향 그래프에서 간선 양 끝의 루트가 이미 같으면 그 간선은 사이클을 만든다. 29장 크루스칼이 이 판별을 쓴다.</li>
+          <li>트리가 깊어질 수 있으면 반복형 find를 쓰고, 1번부터 오는 입력은 n + 1칸으로 만든다.</li>
+        </ol>
+      </section>
+
+      <nav class="pager" aria-label="이전 장과 다음 장"></nav>
+    </article>
+  </main>
+
+  <aside class="rail" aria-label="이 페이지 목차">
+    <p class="rail-title">이 페이지</p>
+    <nav id="onthispage"></nav>
+  </aside>
+</div>
+<div class="backdrop" id="backdrop"></div>
+
+<script src="assets/book.js"></script>
+<script src="assets/app.js"></script>
+<script src="assets/code.js"></script>
+</body>
+</html>

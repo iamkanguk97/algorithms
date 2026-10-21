@@ -1,0 +1,637 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>27. 비트 조작 — 파이썬 알고리즘 노트</title>
+<script src="assets/theme.js"></script>
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body data-chapter="27">
+<a class="skip-link" href="#content">본문으로 건너뛰기</a>
+<div class="progress" aria-hidden="true"><span></span></div>
+<header class="topbar" id="topbar"></header>
+
+<div class="shell">
+  <aside class="sidebar" id="sidebar" aria-label="책 목차"></aside>
+
+  <main class="main" id="content">
+    <article class="chapter">
+      <header class="chapter-head">
+        <a class="part-pill"></a>
+        <span class="chapter-label"></span>
+        <h1>비트 조작</h1>
+        <p class="lede">정수를 2진수로 적으면 0과 1이 한 줄로 늘어선 칸이 됩니다. 이 장에서는 그 칸을 하나씩 켜고 끄는 비트 연산으로, 작은 집합을 정수 하나에 담아 빠르게 다루는 법을 배웁니다.</p>
+        <div class="chapter-meta">
+          <span class="chip">&amp; | ^</span><span class="chip">시프트</span><span class="chip">비트마스크</span><span class="chip">부분집합</span><span class="chip">비트 DP</span>
+        </div>
+      </header>
+
+      <div class="goals">
+        <p class="goals-title">이 장에서 배울 것</p>
+        <ul>
+          <li>비트 연산자 여섯 가지가 각 자리에서 하는 일을 설명할 수 있다</li>
+          <li>정수 하나로 집합을 표현하고 원소를 넣고, 빼고, 뒤집고, 확인할 수 있다</li>
+          <li><code>x &amp; -x</code>, <code>x &amp; (x - 1)</code> 같은 기법이 왜 동작하는지 안다</li>
+          <li>모든 부분집합과, 특정 집합의 부분집합을 비트마스크로 순회할 수 있다</li>
+          <li>방문한 집합을 상태로 쓰는 비트 DP의 모양과 상태 수를 안다</li>
+        </ul>
+      </div>
+
+      <section id="operators">
+        <h2>비트 연산자</h2>
+        <div class="callout callout-key">
+          <span class="callout-title">핵심</span>
+          <p class="callout-big">비트 조작은 <mark>정수 하나를 켜짐·꺼짐 칸 n개의 집합으로 보는</mark> 기술이다. 집합 연산이 비트 연산 한 번이 되어 빠르고, 집합 자체를 리스트의 인덱스로 쓸 수 있다.</p>
+        </div>
+        <p><strong>비트(bit)</strong>는 2진수의 한 자리, 곧 0 또는 1 하나다. 12는 2진수로 <code>1100</code>이고, 오른쪽 끝부터 0번, 1번, 2번 비트라고 센다. 비트 연산자는 두 수를 2진수로 늘어놓고 <strong>같은 자리끼리</strong> 계산한다. 자리올림이 없어서 자리마다 따로 논다.</p>
+
+<pre data-lang="python" data-title="operators.py"><code>
+a = 0b1100   # 12
+b = 0b1010   # 10
+
+print(bin(a), bin(b))
+print(format(a &amp; b, '04b'))   # 둘 다 1인 자리만 1
+print(format(a | b, '04b'))   # 하나라도 1이면 1
+print(format(a ^ b, '04b'))   # 서로 다를 때만 1
+print(a &lt;&lt; 2, a &gt;&gt; 2)         # 12 × 4, 12 // 4
+print(int('1010', 2))         # 2진수 문자열을 정수로
+</code></pre>
+<pre class="output">
+0b1100 0b1010
+1000
+1110
+0110
+48 3
+10
+</pre>
+
+        <p><code>0b</code>로 시작하는 수는 2진수 표기다. <code>bin(x)</code>는 정수를 <code>'0b…'</code> 문자열로 바꾸고, <code>format(x, '04b')</code>는 앞에 0을 채워 네 자리로 맞춘다. 거꾸로 2진수 문자열을 정수로 바꿀 때는 <code>int(s, 2)</code>를 쓴다.</p>
+
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>연산자</th><th>이름</th><th>자리마다 하는 일</th><th>예 (12, 10)</th></tr></thead>
+            <tbody>
+              <tr><td><code>a &amp; b</code></td><td>AND</td><td>둘 다 1이면 1</td><td><code>1000</code> = 8</td></tr>
+              <tr><td><code>a | b</code></td><td>OR</td><td>하나라도 1이면 1</td><td><code>1110</code> = 14</td></tr>
+              <tr><td><code>a ^ b</code></td><td>XOR</td><td>서로 다르면 1</td><td><code>0110</code> = 6</td></tr>
+              <tr><td><code>~a</code></td><td>NOT</td><td>모든 자리를 뒤집는다</td><td>-13</td></tr>
+              <tr><td><code>a &lt;&lt; k</code></td><td>왼쪽 시프트</td><td>k칸 왼쪽으로 민다 (× 2<sup>k</sup>)</td><td><code>12 &lt;&lt; 2</code> = 48</td></tr>
+              <tr><td><code>a &gt;&gt; k</code></td><td>오른쪽 시프트</td><td>k칸 오른쪽으로 민다 (// 2<sup>k</sup>)</td><td><code>12 &gt;&gt; 2</code> = 3</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <h3>~와 음수</h3>
+        <p><code>~</code>만 결과가 낯설다. C나 Java의 정수는 32비트, 64비트처럼 칸 수가 정해져 있어서 "모든 칸을 뒤집는다"의 뜻이 분명하다. 파이썬의 <code>int</code>는 크기 제한이 없어서(2장) 칸 수가 정해져 있지 않다. 그래서 파이썬은 음수를 <strong>왼쪽으로 1이 끝없이 이어지는 수</strong>로 다룬다. 이 표현을 2의 보수(two's complement)라고 한다. 0이 끝없이 이어지던 왼쪽이 뒤집혀 1이 끝없이 이어지므로, <code>~x</code>는 언제나 <mark><code>-x - 1</code></mark>이다.</p>
+
+<pre data-lang="python" data-title="invert.py"><code>
+x = 5
+print(~x, -x - 1)
+print(bin(~x))                       # 음수는 부호와 절댓값으로 보여 준다
+print(format(~x &amp; 0b1111, '04b'))    # 아래 네 칸만 보면 0101 이 뒤집혀 있다
+print(-7 &gt;&gt; 1, -7 // 2)              # 음수의 오른쪽 시프트는 내림 나눗셈
+</code></pre>
+<pre class="output">
+-6 -6
+-0b110
+1010
+-4 -4
+</pre>
+
+        <p><code>bin(~5)</code>가 <code>-0b110</code>으로 나오는 것은 파이썬이 음수를 "부호 + 절댓값"으로 보여 주기 때문이다. 정해진 칸 수만큼만 보고 싶으면 <code>&amp; 0b1111</code>처럼 그 칸이 모두 켜진 수와 AND 한다. 한 줄로 정리하면, 비트 연산자는 같은 자리끼리 계산하고, 파이썬에서는 <code>~x == -x - 1</code>이다.</p>
+      </section>
+
+      <section id="bitmask-as-set">
+        <h2>비트마스크로 집합 표현</h2>
+        <p>원소가 0부터 n-1까지인 집합을 생각한다. <strong>i번 비트가 1이면 원소 i가 집합에 있다</strong>고 약속하면, 정수 하나가 집합 하나가 된다. 이렇게 집합을 담은 정수를 <strong>비트마스크(bitmask)</strong>라고 한다. 전등 스위치가 한 줄로 늘어선 판에서 켜진 스위치의 번호만 읽는 것과 같다.</p>
+
+        <figure class="fig">
+          <div class="fig-steps">
+            <div class="fig-state">
+              <div class="cells">
+                <div class="cell is-hl" data-i="4">1</div>
+                <div class="cell" data-i="3">0</div>
+                <div class="cell is-hl" data-i="2">1</div>
+                <div class="cell is-hl" data-i="1">1</div>
+                <div class="cell" data-i="0">0</div>
+              </div>
+              <span class="fig-state-label">mask = 0b10110 = 22</span>
+            </div>
+            <div class="fig-arrow">켜진 번호</div>
+            <div class="fig-state">
+              <div class="cells">
+                <div class="cell is-hl">1</div>
+                <div class="cell is-hl">2</div>
+                <div class="cell is-hl">4</div>
+              </div>
+              <span class="fig-state-label">집합 {1, 2, 4}</span>
+            </div>
+          </div>
+          <figcaption><b>그림 27-1</b> 정수 22의 1, 2, 4번 비트가 켜져 있으므로 집합 {1, 2, 4}를 나타낸다. 비트 번호는 오른쪽 끝이 0번이다.</figcaption>
+        </figure>
+
+<pre data-lang="python" data-title="mask_and_set.py"><code>
+def to_mask(items: list[int]) -&gt; int:
+    mask = 0
+    for i in items:
+        mask |= 1 &lt;&lt; i          # i번 비트를 켠다
+    return mask
+
+
+def to_items(mask: int, n: int) -&gt; list[int]:
+    return [i for i in range(n) if mask &gt;&gt; i &amp; 1]
+
+
+mask = to_mask([1, 2, 4])
+print(mask, bin(mask))
+print(to_items(mask, 5))
+print(to_items(0b11111, 5))
+</code></pre>
+<pre class="output">
+22 0b10110
+[1, 2, 4]
+[0, 1, 2, 3, 4]
+</pre>
+
+        <p><code>1 &lt;&lt; i</code>는 i번 비트 하나만 켜진 수다. <code>mask &gt;&gt; i &amp; 1</code>은 i번 비트를 맨 오른쪽으로 끌어내린 뒤 그 한 칸만 남긴다. 결과가 1이면 원소 i가 있다.</p>
+
+        <h3>왜 set 대신 쓰는가</h3>
+        <p>4장의 <code>set</code>으로도 같은 일을 할 수 있다. 그런데도 비트마스크를 쓰는 이유는 세 가지다.</p>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>비교</th><th><code>set</code></th><th>비트마스크</th></tr></thead>
+            <tbody>
+              <tr><td>원소 확인·추가</td><td>해시를 계산해 평균 O(1)</td><td>비트 연산 한 번</td></tr>
+              <tr><td>합집합·교집합</td><td>원소 수에 비례</td><td>n이 작으면 연산 한 번</td></tr>
+              <tr><td>리스트 인덱스로 쓰기</td><td>안 된다</td><td><code>dp[mask]</code>처럼 바로 된다</td></tr>
+              <tr><td>원소 범위</td><td>해시 가능한 값이면 무엇이든</td><td>0 ~ n-1 정수, 보통 n ≤ 20</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <p>가장 큰 장점은 마지막에서 두 번째 줄이다. 집합이 정수라서 <mark>집합을 상태로 하는 표를 리스트로 만들 수 있다.</mark> 대신 가능한 집합이 2<sup>n</sup>개라, 모든 집합을 다루는 문제는 n이 20 안팎일 때만 쓴다. 2장의 시간 제한 표에서 n ≈ 20이 O(2ⁿ)의 한계였던 것과 같은 이야기다. 정리하면, 원소가 적은 집합은 정수 하나로 담는다.</p>
+      </section>
+
+      <section id="set-operations">
+        <h2>켜기·끄기·토글·확인</h2>
+        <p>원소 하나를 다루는 연산은 모두 "i번 비트만 켜진 수" <code>1 &lt;&lt; i</code>와 무엇을 하느냐로 정해진다. 켜기는 OR, 끄기는 뒤집은 수와 AND, 토글(켜져 있으면 끄고 꺼져 있으면 켜기)은 XOR이다.</p>
+
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>하는 일</th><th>집합으로 보면</th><th>코드</th></tr></thead>
+            <tbody>
+              <tr><td>i번 켜기</td><td>원소 i 넣기</td><td><code>mask | (1 &lt;&lt; i)</code></td></tr>
+              <tr><td>i번 끄기</td><td>원소 i 빼기</td><td><code>mask &amp; ~(1 &lt;&lt; i)</code></td></tr>
+              <tr><td>i번 토글</td><td>있으면 빼고 없으면 넣기</td><td><code>mask ^ (1 &lt;&lt; i)</code></td></tr>
+              <tr><td>i번 확인</td><td>원소 i가 있는가</td><td><code>mask &gt;&gt; i &amp; 1</code> 또는 <code>mask &amp; (1 &lt;&lt; i) != 0</code></td></tr>
+              <tr><td>모두 켜기</td><td>전체 집합</td><td><code>(1 &lt;&lt; n) - 1</code></td></tr>
+              <tr><td>모두 끄기</td><td>공집합</td><td><code>0</code></td></tr>
+            </tbody>
+          </table>
+        </div>
+
+<pre data-lang="python" data-title="set_bits.py"><code>
+mask = 0b00110             # {1, 2}
+
+mask |= 1 &lt;&lt; 4             # 원소 4 넣기
+print(format(mask, '05b'))
+mask &amp;= ~(1 &lt;&lt; 1)          # 원소 1 빼기
+print(format(mask, '05b'))
+mask ^= 1 &lt;&lt; 0             # 원소 0 토글
+print(format(mask, '05b'))
+print(mask &gt;&gt; 2 &amp; 1, mask &gt;&gt; 3 &amp; 1)   # 원소 2, 3이 있는가
+</code></pre>
+<pre class="output">
+10110
+10100
+10101
+1 0
+</pre>
+
+        <p>끄기에서 <code>~(1 &lt;&lt; 1)</code>은 1번 칸만 0이고 나머지가 모두 1인 수다. 이것과 AND 하면 1번 칸만 지워지고 다른 칸은 그대로 남는다.</p>
+
+        <h3>집합끼리의 연산</h3>
+        <p>4장의 집합 연산자 <code>|</code>, <code>&amp;</code>, <code>^</code>는 비트 연산자와 기호가 같고 뜻도 같다. 차집합 <code>a - b</code>만 <code>a &amp; ~b</code>("a에 있고 b에 없는")로 바꿔 쓴다.</p>
+
+<pre data-lang="python" data-title="set_algebra.py"><code>
+a = 0b01111   # {0, 1, 2, 3}
+b = 0b11010   # {1, 3, 4}
+
+print(format(a | b, '05b'))    # 합집합
+print(format(a &amp; b, '05b'))    # 교집합
+print(format(a &amp; ~b, '05b'))   # 차집합 a - b
+print(format(a ^ b, '05b'))    # 대칭차집합
+sub = 0b01010                  # {1, 3}
+print((a &amp; sub) == sub, (a &amp; b) == b)   # 부분집합인가
+</code></pre>
+<pre class="output">
+11111
+01010
+00101
+10101
+True False
+</pre>
+
+        <p>마지막 줄처럼 "<code>sub</code>의 원소가 모두 <code>a</code>에 있는가"는 <code>a &amp; sub == sub</code>로 확인한다. 교집합을 해도 <code>sub</code>가 줄지 않았다는 뜻이다. 정리하면, 원소 하나는 <code>1 &lt;&lt; i</code>와 OR·AND·XOR로, 집합끼리는 연산자 하나로 다룬다.</p>
+      </section>
+
+      <section id="tricks">
+        <h2>자주 쓰는 기법</h2>
+        <p>비트마스크 문제에서 반복해서 나오는 짧은 식이 몇 개 있다. 외워 두면 반복문 하나를 식 하나로 줄일 수 있다.</p>
+
+<pre data-lang="python" data-title="tricks.py"><code>
+x = 0b101100   # 44
+
+print(x.bit_count(), bin(x).count('1'))   # 켜진 비트 개수
+print(bin(x &amp; -x))        # 가장 낮은 켜진 비트만 남기기
+print(bin(x &amp; (x - 1)))   # 가장 낮은 켜진 비트 끄기
+print(x.bit_length())     # 2진수 자릿수
+
+for n in [1, 6, 8, 64, 96]:
+    print(n, n &gt; 0 and n &amp; (n - 1) == 0)   # 2의 거듭제곱인가
+</code></pre>
+<pre class="output">
+3 3
+0b100
+0b101000
+6
+1 True
+6 False
+8 True
+64 True
+96 False
+</pre>
+
+        <p><code>int.bit_count()</code>는 켜진 비트 수, 곧 집합의 원소 수를 센다. 파이썬 3.10부터 있고, 그 전 버전에서는 <code>bin(x).count('1')</code>을 쓴다. <code>bit_length()</code>는 맨 앞 0을 뺀 2진수 자릿수다.</p>
+
+        <h3>x &amp; -x 가 가장 낮은 비트를 남기는 이유</h3>
+        <p>앞 절에서 <code>-x = ~x + 1</code>이었다. <code>~x</code>는 모든 칸을 뒤집으므로, x의 가장 낮은 1 아래에 있던 0들은 1이 되고 그 1은 0이 된다. 여기에 1을 더하면 아래쪽 1들이 자리올림으로 모두 0이 되고, 올림이 멈추는 곳이 바로 x의 가장 낮은 1의 자리다. 그 위쪽은 여전히 x와 반대다. 그래서 x와 -x가 함께 1인 칸은 그 한 칸뿐이다.</p>
+
+        <figure class="fig">
+          <div class="fig-steps">
+            <div class="fig-state">
+              <div class="cells">
+                <div class="cell" data-i="5">1</div>
+                <div class="cell" data-i="4">0</div>
+                <div class="cell" data-i="3">1</div>
+                <div class="cell is-hl" data-i="2">1</div>
+                <div class="cell" data-i="1">0</div>
+                <div class="cell" data-i="0">0</div>
+              </div>
+              <span class="fig-state-label">x = 44</span>
+            </div>
+          </div>
+          <div class="fig-steps">
+            <div class="fig-state">
+              <div class="cells">
+                <div class="cell" data-i="5">0</div>
+                <div class="cell" data-i="4">1</div>
+                <div class="cell" data-i="3">0</div>
+                <div class="cell is-hl" data-i="2">1</div>
+                <div class="cell" data-i="1">0</div>
+                <div class="cell" data-i="0">0</div>
+              </div>
+              <span class="fig-state-label">-x = ~x + 1 (아래 여섯 칸)</span>
+            </div>
+          </div>
+          <div class="fig-steps">
+            <div class="fig-state">
+              <div class="cells">
+                <div class="cell is-ghost" data-i="5">0</div>
+                <div class="cell is-ghost" data-i="4">0</div>
+                <div class="cell is-ghost" data-i="3">0</div>
+                <div class="cell is-hl" data-i="2">1</div>
+                <div class="cell is-ghost" data-i="1">0</div>
+                <div class="cell is-ghost" data-i="0">0</div>
+              </div>
+              <span class="fig-state-label">x &amp; -x = 4 = 0b100</span>
+            </div>
+          </div>
+          <figcaption><b>그림 27-2</b> 가장 낮은 1(2번 칸) 위쪽은 x와 -x가 서로 반대라서 AND 하면 그 한 칸만 남는다.</figcaption>
+        </figure>
+
+        <p><code>x &amp; (x - 1)</code>은 반대로 그 칸을 끈다. 1을 빼면 가장 낮은 1이 0이 되고 그 아래 0들이 1이 되므로, x와 AND 하면 그 아래쪽까지 모두 0이 된다. 2의 거듭제곱은 켜진 비트가 하나뿐이라 이것을 끄면 0이 된다. 그래서 <code>n &gt; 0</code>이면서 <code>n &amp; (n - 1) == 0</code>인 수가 2의 거듭제곱이다. 정리하면, <code>x &amp; -x</code>는 가장 낮은 1을 남기고 <code>x &amp; (x - 1)</code>은 지운다.</p>
+      </section>
+
+      <section id="subsets">
+        <h2>부분집합 순회</h2>
+        <p>원소 n개의 부분집합은 2<sup>n</sup>개이고, 각각이 0부터 2<sup>n</sup>-1까지의 정수 하나에 대응한다. 그래서 <mark>모든 부분집합을 보려면 <code>range(1 &lt;&lt; n)</code>을 돌면 끝이다.</mark> 22장에서 재귀로 고르기·안 고르기를 갈라 만들던 부분집합이 반복문 한 줄로 나온다.</p>
+
+<pre data-lang="python" data-title="all_subsets.py"><code>
+items = ['A', 'B', 'C']
+n = len(items)
+
+for mask in range(1 &lt;&lt; n):
+    chosen = [items[i] for i in range(n) if mask &gt;&gt; i &amp; 1]
+    print(format(mask, '03b'), chosen)
+</code></pre>
+<pre class="output">
+000 []
+001 ['A']
+010 ['B']
+011 ['A', 'B']
+100 ['C']
+101 ['A', 'C']
+110 ['B', 'C']
+111 ['A', 'B', 'C']
+</pre>
+
+        <p>마스크마다 n칸을 확인하므로 전체는 O(2ⁿ · n)이다. 22장의 재귀 방식과 비교하면 이렇다.</p>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>비교</th><th>재귀 (22장)</th><th>비트마스크</th></tr></thead>
+            <tbody>
+              <tr><td>코드 모양</td><td>고른다·안 고른다로 두 갈래 호출</td><td><code>for mask in range(1 &lt;&lt; n)</code></td></tr>
+              <tr><td>가지치기</td><td>중간에 가망 없으면 바로 멈춘다</td><td>어렵다. 모든 마스크를 본다</td></tr>
+              <tr><td>집합을 값으로 저장</td><td>리스트를 복사해야 한다</td><td>정수 하나라 그대로 저장한다</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <h3>특정 집합의 부분집합만 돌기</h3>
+        <p>이번에는 집합 <code>mask</code> 안에서 고를 수 있는 부분집합만 보고 싶다. 0부터 다 세며 <code>(sub &amp; mask) == sub</code>를 확인해도 되지만, 바깥 원소가 많으면 낭비가 크다. 다음 식은 <code>mask</code>의 부분집합만 큰 것부터 차례로 밟는다.</p>
+
+<pre data-lang="python" data-title="submasks.py"><code>
+mask = 0b1011   # {0, 1, 3}
+
+sub = mask
+while sub:
+    print(format(sub, '04b'))
+    sub = (sub - 1) &amp; mask
+print(format(sub, '04b'))   # 마지막에 공집합 0
+</code></pre>
+<pre class="output">
+1011
+1010
+1001
+1000
+0011
+0010
+0001
+0000
+</pre>
+
+        <p><code>sub - 1</code>은 <code>sub</code>보다 하나 작은 수다. 여기에 <code>&amp; mask</code>를 하면 <code>mask</code> 밖의 칸이 지워져, "<code>sub</code>보다 작은 <code>mask</code>의 부분집합 중 가장 큰 것"이 된다. 그래서 하나도 건너뛰지 않고 2<sup>3</sup> = 8개를 모두 밟는다. 모든 <code>mask</code>에 대해 이렇게 돌면 전체 횟수는 2ⁿ × 2ⁿ이 아니라 3ⁿ이다. 원소마다 "mask에 없음 / mask에만 있음 / sub에도 있음" 세 경우뿐이기 때문이다. 정리하면, 전체 부분집합은 <code>range(1 &lt;&lt; n)</code>, 특정 집합의 부분집합은 <code>(sub - 1) &amp; mask</code>로 돈다.</p>
+      </section>
+
+      <section id="bit-dp">
+        <h2>비트 DP 맛보기</h2>
+        <p>비트마스크가 가장 빛나는 곳은 26장의 다이나믹 프로그래밍(DP)과 만날 때다. "지금까지 어떤 것들을 썼는가"가 상태에 들어가야 하는 문제에서, 그 집합을 마스크로 만들어 표의 인덱스로 쓴다. 이것을 <strong>비트 DP</strong>라고 한다.</p>
+        <p>대표 예가 <strong>외판원 문제(TSP, Traveling Salesman Problem)</strong>다. 도시 n개를 모두 한 번씩 들르고 출발점으로 돌아오는 가장 싼 경로를 찾는다. 순서를 모두 따지면 (n-1)!가지라 n이 조금만 커져도 못 본다. 그런데 다음 도시를 고를 때 필요한 정보는 "이미 들른 도시의 집합"과 "지금 있는 도시" 둘뿐이다. 들른 순서는 상관없다. 그래서 상태를 <code>dp[mask][i]</code> = "<code>mask</code>의 도시를 모두 들르고 지금 <code>i</code>에 있을 때의 최소 비용"으로 잡는다.</p>
+
+<pre data-lang="python" data-title="tsp_bit_dp.py"><code>
+INF = 10**9
+cost = [
+    [0, 10, 15, 20],
+    [10, 0, 35, 25],
+    [15, 35, 0, 30],
+    [20, 25, 30, 0],
+]
+n = len(cost)
+full = (1 &lt;&lt; n) - 1
+
+dp = [[INF] * n for _ in range(1 &lt;&lt; n)]
+dp[1][0] = 0                      # 0번 도시에서 출발: {0}, 위치 0
+
+for mask in range(1 &lt;&lt; n):
+    for last in range(n):
+        if dp[mask][last] == INF:
+            continue
+        for nxt in range(n):
+            if mask &gt;&gt; nxt &amp; 1:   # 이미 들른 도시
+                continue
+            new_mask = mask | (1 &lt;&lt; nxt)
+            new_cost = dp[mask][last] + cost[last][nxt]
+            dp[new_mask][nxt] = min(dp[new_mask][nxt], new_cost)
+
+print(min(dp[full][i] + cost[i][0] for i in range(1, n)))
+print(len(dp) * n)                # 상태 수 2^n × n
+</code></pre>
+<pre class="output">
+80
+64
+</pre>
+
+        <p><code>mask | (1 &lt;&lt; nxt)</code>는 항상 <code>mask</code>보다 크므로, 마스크를 작은 수부터 돌면 필요한 칸이 늘 먼저 채워진다. 계산 순서를 따로 고민하지 않아도 되는 것도 마스크의 장점이다. 상태가 2ⁿ · n개이고 상태마다 다음 도시 n개를 보므로 시간은 O(2ⁿ · n²)이다.</p>
+
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>도시 수 n</th><th>모든 순서 (n-1)!</th><th>비트 DP 2ⁿ · n²</th></tr></thead>
+            <tbody>
+              <tr><td>10</td><td>362,880</td><td>102,400</td></tr>
+              <tr><td>16</td><td>약 1.3 × 10<sup>12</sup></td><td>약 1,678만</td></tr>
+              <tr><td>20</td><td>약 1.2 × 10<sup>17</sup></td><td>약 4.2억</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <p>n = 16이면 2장의 어림값으로 1~2초가 걸리는 빠듯한 크기다. 지수 시간인 것은 같지만, 팩토리얼보다는 훨씬 큰 n까지 버틴다. 정리하면, 쓴 것들의 집합이 상태에 들어가는 DP는 마스크를 인덱스로 쓰고, 상태 수 2ⁿ · n으로 크기를 가늠한다.</p>
+      </section>
+
+      <section id="pitfalls">
+        <h2>자주 하는 실수</h2>
+        <div class="callout callout-warn">
+          <span class="callout-title">연산자 우선순위</span>
+          <p>파이썬에서 <code>+</code>, <code>-</code>는 <code>&lt;&lt;</code>, <code>&amp;</code>보다 먼저 계산된다. 그래서 전체 집합을 <code>1 &lt;&lt; n - 1</code>로 쓰면 <code>1 &lt;&lt; (n - 1)</code>이 되어 엉뚱한 값이 나온다. 반대로 <code>==</code>는 <code>&amp;</code>보다 나중이라 <code>x &amp; 1 == 0</code>은 <code>(x &amp; 1) == 0</code>으로 계산된다. C와 Java는 이 순서가 거꾸로라 같은 식이 다르게 동작한다. 헷갈리지 않게 비트 연산에는 괄호를 친다.</p>
+        </div>
+
+<pre data-lang="python" data-title="precedence.py"><code>
+n = 3
+print(1 &lt;&lt; n - 1)       # 1 &lt;&lt; (n - 1) 로 계산된다
+print((1 &lt;&lt; n) - 1)     # 의도한 전체 집합 0b111
+x = 6
+print(x &amp; 1 == 0)       # 파이썬에서는 (x &amp; 1) == 0
+try:
+    print(1 &lt;&lt; -1)
+except ValueError as e:
+    print(f'{type(e).__name__}: {e}')
+</code></pre>
+<pre class="output">
+4
+7
+True
+ValueError: negative shift count
+</pre>
+
+        <div class="callout callout-warn">
+          <span class="callout-title">음수만큼 시프트하기</span>
+          <p>위 코드의 마지막처럼 시프트 횟수가 음수면 <code>ValueError</code>가 난다. <code>1 &lt;&lt; (x - 1)</code>에서 x가 0으로 들어오는 경우처럼 인덱스 계산이 어긋났을 때 터진다. 음수를 오른쪽으로 미는 것(<code>-7 &gt;&gt; 1</code>)은 에러가 아니라 내림 나눗셈이다.</p>
+        </div>
+        <div class="callout callout-warn">
+          <span class="callout-title">1 &lt;&lt; n 에서 n의 범위</span>
+          <p>파이썬 정수는 크기 제한이 없어서 <code>1 &lt;&lt; 100</code>도 에러 없이 만들어진다. 마스크 하나로는 문제가 없지만, <code>[0] * (1 &lt;&lt; n)</code>처럼 모든 집합의 표를 만들면 n = 20에서 약 105만 칸, n = 25에서 약 3,355만 칸이 된다. 표를 만들기 전에 n이 20 안팎인지 확인한다.</p>
+        </div>
+        <div class="callout callout-warn">
+          <span class="callout-title">비트 번호는 0부터</span>
+          <p>원소가 1번부터 n번까지인데 <code>1 &lt;&lt; x</code>를 그대로 쓰면 0번 칸은 비고 n번 칸까지 필요해, 전체 집합 <code>(1 &lt;&lt; n) - 1</code>과 한 칸 어긋난다. 입력이 1부터 시작하면 <code>1 &lt;&lt; (x - 1)</code>로 한 칸 당겨 쓴다.</p>
+        </div>
+        <div class="callout callout-warn">
+          <span class="callout-title">~mask 로 여집합 구하기</span>
+          <p><code>~mask</code>는 음수라서 그대로 출력하거나 개수를 세면 엉뚱하다. 전체 n칸 안의 여집합은 <code>full ^ mask</code>나 <code>~mask &amp; full</code>로 구한다.</p>
+        </div>
+      </section>
+
+      <section id="problem">
+        <h2>대표 문제</h2>
+        <div class="problem">
+          <div class="problem-head">
+            <div class="problem-kicker"><b>Problem</b><span class="chip">쉬움</span><span class="chip">비트마스크</span></div>
+            <h3>집합 명령 처리</h3>
+          </div>
+          <div class="problem-body">
+            <p>처음에 비어 있는 집합 S가 있다. S에 들어갈 수 있는 수는 1부터 20까지다. 첫 줄에 명령 수 M(1 ≤ M ≤ 1,000,000)이 주어지고, 다음 M줄에 명령이 하나씩 주어진다. 명령은 여섯 가지다.</p>
+            <ul>
+              <li><code>add x</code> — S에 x를 넣는다. 이미 있으면 그대로 둔다.</li>
+              <li><code>remove x</code> — S에서 x를 뺀다. 없으면 그대로 둔다.</li>
+              <li><code>check x</code> — S에 x가 있으면 <code>1</code>, 없으면 <code>0</code>을 출력한다.</li>
+              <li><code>toggle x</code> — x가 있으면 빼고, 없으면 넣는다.</li>
+              <li><code>all</code> — S를 {1, 2, …, 20}으로 바꾼다.</li>
+              <li><code>empty</code> — S를 공집합으로 바꾼다.</li>
+            </ul>
+            <p><code>check</code> 명령의 결과를 한 줄에 하나씩 출력하라.</p>
+            <div class="table-wrap">
+              <table>
+                <thead><tr><th>입력</th><th>출력</th><th>설명</th></tr></thead>
+                <tbody>
+                  <tr><td><code>3</code><br><code>add 5</code><br><code>check 5</code><br><code>check 6</code></td><td><code>1</code><br><code>0</code></td><td>5만 들어 있다</td></tr>
+                  <tr><td><code>3</code><br><code>toggle 2</code><br><code>toggle 2</code><br><code>check 2</code></td><td><code>0</code></td><td>두 번 뒤집으면 원래대로 빠진다</td></tr>
+                  <tr><td><code>3</code><br><code>all</code><br><code>remove 1</code><br><code>check 1</code></td><td><code>0</code></td><td>전부 넣은 뒤 1만 뺐다</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <details class="reveal">
+            <summary>접근 방법<span class="reveal-hint">먼저 생각해 보고 펼치세요</span></summary>
+            <div class="reveal-body">
+              <p>원소가 20개뿐이므로 <mark>S 전체를 정수 하나의 20칸으로 담으면 모든 명령이 비트 연산 한 번</mark>이 된다.</p>
+              <ol>
+                <li>수 x는 <code>x - 1</code>번 비트에 둔다. 해당 칸만 켜진 수는 <code>1 &lt;&lt; (x - 1)</code>이다.</li>
+                <li><code>add</code>는 OR, <code>remove</code>는 그 칸을 뒤집은 수와 AND, <code>toggle</code>은 XOR, <code>check</code>는 AND 결과가 0인지 본다.</li>
+                <li><code>all</code>은 20칸이 모두 켜진 <code>(1 &lt;&lt; 20) - 1</code>, <code>empty</code>는 0으로 바꾼다.</li>
+                <li>명령이 많으므로 입력은 <code>sys.stdin.readline</code>으로 읽고, 출력은 모아서 한 번에 낸다(1장).</li>
+              </ol>
+            </div>
+          </details>
+
+          <details class="reveal">
+            <summary>풀이 코드</summary>
+            <div class="reveal-body">
+<pre data-lang="python" data-title="set_commands.py"><code>
+import sys
+
+input = sys.stdin.readline
+
+FULL = (1 &lt;&lt; 20) - 1          # 1~20이 모두 켜진 상태
+
+m = int(input())
+mask = 0
+out = []
+
+for _ in range(m):
+    parts = input().split()
+    command = parts[0]
+    if command == 'all':
+        mask = FULL
+    elif command == 'empty':
+        mask = 0
+    else:
+        bit = 1 &lt;&lt; (int(parts[1]) - 1)   # 수 x 는 x-1번 비트
+        if command == 'add':
+            mask |= bit
+        elif command == 'remove':
+            mask &amp;= ~bit
+        elif command == 'toggle':
+            mask ^= bit
+        else:                            # check
+            out.append('1' if mask &amp; bit else '0')
+
+print('\n'.join(out))
+</code></pre>
+<pre class="stdin">
+11
+add 3
+add 7
+check 3
+check 5
+toggle 3
+check 3
+all
+remove 20
+check 19
+empty
+check 7
+</pre>
+<pre class="output">
+1
+0
+0
+1
+0
+</pre>
+              <p><code>set</code>으로 풀어도 답은 같지만, 정수 하나를 바꾸는 쪽이 해시 계산이 없어 가볍다. <code>all</code>을 <code>set(range(1, 21))</code>로 처리하면 매번 원소 20개짜리 집합을 새로 만들어야 하는데, 마스크는 수 하나를 대입하면 끝난다.</p>
+            </div>
+          </details>
+
+          <details class="reveal">
+            <summary>복잡도</summary>
+            <div class="reveal-body">
+              <dl class="cx">
+                <dt>시간</dt><dd><span class="bigo b-linear">O(M)</span> 명령마다 비트 연산을 한 번만 한다.</dd>
+                <dt>공간</dt><dd><span class="bigo b-const">O(1)</span> 집합은 정수 하나다. 출력을 모으는 리스트는 <code>check</code> 수만큼 따로 든다.</dd>
+              </dl>
+            </div>
+          </details>
+        </div>
+      </section>
+
+      <section id="recall">
+        <h2>스스로 확인</h2>
+        <div class="recall">
+          <details>
+            <summary>파이썬에서 <code>~12</code>의 값은 무엇이고, 왜 그런가?</summary>
+            <div class="answer"><p>-13이다. 파이썬 정수는 칸 수가 정해져 있지 않아, 음수를 왼쪽으로 1이 끝없이 이어지는 2의 보수로 다룬다. 모든 칸을 뒤집으면 언제나 <code>-x - 1</code>이 된다.</p></div>
+          </details>
+          <details>
+            <summary><code>mask = 0b10110</code>에서 원소 2를 빼는 코드와 그 결과는?</summary>
+            <div class="answer"><p><code>mask &amp; ~(1 &lt;&lt; 2)</code>이고 결과는 <code>0b10010</code>이다. 2번 칸만 0인 수와 AND 하므로 그 칸만 지워진다. <code>mask ^ (1 &lt;&lt; 2)</code>도 지금은 같은 결과지만, 원소 2가 없을 때는 오히려 넣어 버린다.</p></div>
+          </details>
+          <details>
+            <summary><code>sub = (sub - 1) &amp; mask</code>가 <code>mask</code>의 부분집합을 하나도 빠뜨리지 않는 이유는?</summary>
+            <div class="answer"><p><code>sub - 1</code>은 <code>sub</code> 바로 아래 수이고, <code>&amp; mask</code>는 <code>mask</code> 밖의 칸을 지운다. 그 결과는 <code>sub</code>보다 작은 <code>mask</code>의 부분집합 중 가장 큰 것이다. 그래서 부분집합을 큰 것부터 한 단계씩 차례로 밟는다.</p></div>
+          </details>
+          <details>
+            <summary>도시가 15개인 외판원 문제를 비트 DP로 풀 때 상태 수는 몇 개인가?</summary>
+            <div class="answer"><p>2<sup>15</sup> × 15 = 491,520개다. 상태마다 다음 도시 15개를 보므로 계산은 약 737만 번으로, 14! ≈ 872억 가지 순서를 모두 보는 것보다 훨씬 적다.</p></div>
+          </details>
+        </div>
+      </section>
+
+      <section id="summary">
+        <h2>정리</h2>
+        <ol class="summary-list">
+          <li>비트 연산자는 같은 자리끼리 계산한다. <code>&amp;</code>는 둘 다, <code>|</code>는 하나라도, <code>^</code>는 다를 때 1이고, <code>&lt;&lt;</code>·<code>&gt;&gt;</code>는 2<sup>k</sup>를 곱하고 나눈다.</li>
+          <li>파이썬 정수는 크기 제한이 없어서 <code>~x == -x - 1</code>이다. 정해진 칸만 보려면 <code>&amp; full</code>을 한다.</li>
+          <li>i번 비트를 원소 i로 보면 정수 하나가 집합이다. 넣기 <code>|</code>, 빼기 <code>&amp; ~</code>, 토글 <code>^</code>, 확인 <code>&gt;&gt; i &amp; 1</code>이다.</li>
+          <li><code>bit_count()</code>는 원소 수, <code>x &amp; -x</code>는 가장 낮은 1, <code>x &amp; (x - 1)</code>은 가장 낮은 1을 지운 수다.</li>
+          <li>모든 부분집합은 <code>range(1 &lt;&lt; n)</code>, 특정 집합의 부분집합은 <code>sub = (sub - 1) &amp; mask</code>로 돈다.</li>
+          <li>쓴 것들의 집합이 상태인 DP는 마스크를 인덱스로 쓴다. 상태 수 2ⁿ · n이라 n이 20 안팎일 때 쓴다.</li>
+          <li><code>+</code>, <code>-</code>가 <code>&lt;&lt;</code>보다 먼저 계산되므로 비트 연산에는 괄호를 친다.</li>
+        </ol>
+      </section>
+
+      <nav class="pager" aria-label="이전 장과 다음 장"></nav>
+    </article>
+  </main>
+
+  <aside class="rail" aria-label="이 페이지 목차">
+    <p class="rail-title">이 페이지</p>
+    <nav id="onthispage"></nav>
+  </aside>
+</div>
+<div class="backdrop" id="backdrop"></div>
+
+<script src="assets/book.js"></script>
+<script src="assets/app.js"></script>
+<script src="assets/code.js"></script>
+</body>
+</html>

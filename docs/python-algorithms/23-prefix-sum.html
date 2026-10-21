@@ -1,0 +1,625 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>23. 누적합 — 파이썬 알고리즘 노트</title>
+<script src="assets/theme.js"></script>
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body data-chapter="23">
+<a class="skip-link" href="#content">본문으로 건너뛰기</a>
+<div class="progress" aria-hidden="true"><span></span></div>
+<header class="topbar" id="topbar"></header>
+
+<div class="shell">
+  <aside class="sidebar" id="sidebar" aria-label="책 목차"></aside>
+
+  <main class="main" id="content">
+    <article class="chapter">
+      <header class="chapter-head">
+        <a class="part-pill"></a>
+        <span class="chapter-label"></span>
+        <h1>누적합</h1>
+        <p class="lede">같은 배열에 구간을 묻는 질문이 수만 번 들어오면, 매번 다시 더하는 대신 한 번 미리 더해 두는 편이 훨씬 빠릅니다. 이 장에서는 구간 합을 빼기 한 번으로 구하는 누적합과, 그 거울인 차분 배열을 함께 다룹니다.</p>
+        <div class="chapter-meta">
+          <span class="chip">구간 합</span><span class="chip">2차원 누적합</span><span class="chip">차분 배열</span><span class="chip">포함-배제</span><span class="chip">O(1) 질의</span>
+        </div>
+      </header>
+
+      <div class="goals">
+        <p class="goals-title">이 장에서 배울 것</p>
+        <ul>
+          <li>질의를 점과 구간, get과 update로 나눠 어떤 도구가 맞는지 고를 수 있다</li>
+          <li>길이 n+1의 누적합 배열을 만들고 구간 합을 O(1)에 구할 수 있다</li>
+          <li>합 말고 어떤 연산이 누적합으로 되고 어떤 연산이 안 되는지 안다</li>
+          <li>2차원 누적합을 포함-배제로 만들고 직사각형의 합을 구할 수 있다</li>
+          <li>차분 배열로 구간 더하기를 모아 처리하고, 누적합과의 대칭을 설명할 수 있다</li>
+        </ul>
+      </div>
+
+      <section id="terms">
+        <h2>점과 구간, get과 update</h2>
+        <div class="callout callout-key">
+          <span class="callout-title">핵심</span>
+          <p class="callout-big">누적합은 <mark>구간 get을 점 get 두 번으로</mark>, 차분 배열은 <mark>구간 update를 점 update 두 번으로</mark> 바꾸는 기술이다.</p>
+        </div>
+        <p>이 장은 네 단어로 설명된다. <strong>get</strong>은 값을 읽기만 하는 질의이고, <strong>update</strong>는 값을 고치는 질의다. <strong>점</strong>은 칸 하나, <strong>구간</strong>은 이어진 여러 칸이다. 보통 리스트에서 점 작업은 빠르고 구간 작업은 느리다.</p>
+
+<pre data-lang="python" data-title="four_operations.py"><code>
+a = [4, 7, 2, 9, 5]
+
+print(a[2])              # 점 get: 칸 하나 읽기
+print(sum(a[1:4]))       # 구간 get: 1~3번 칸을 모두 더한다
+
+a[2] += 10               # 점 update: 칸 하나 고치기
+print(a)
+
+for i in range(1, 4):    # 구간 update: 1~3번 칸에 3씩 더한다
+    a[i] += 3
+print(a)
+</code></pre>
+<pre class="output">
+2
+18
+[4, 7, 12, 9, 5]
+[4, 10, 15, 12, 5]
+</pre>
+
+        <p>구간 작업은 구간 길이만큼 칸을 건드리므로 한 번에 O(n)이다. 질의가 m번이면 O(nm)이 되어, n과 m이 모두 10만이면 100억 번을 넘는다(2장). 문제는 대개 둘 중 한 모양으로 나온다.</p>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>상황</th><th>예</th><th>도구</th></tr></thead>
+            <tbody>
+              <tr><td>배열은 그대로, 구간 get이 많다</td><td>기간별 매출 합을 10만 번 묻는다</td><td>누적합</td></tr>
+              <tr><td>구간 update가 많고, 다 끝난 뒤 한 번 읽는다</td><td>예약 구간마다 좌석 수를 늘린 뒤 날짜별 결과를 낸다</td><td>차분 배열</td></tr>
+              <tr><td>update와 get이 번갈아 섞인다</td><td>값을 고치고 묻기를 반복한다</td><td>펜윅 트리·세그먼트 트리 (이 책의 범위 밖)</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <p>정리하면, 구간 질의는 배열을 한 번 다른 모양으로 바꿔 저장하면 빨라진다.</p>
+      </section>
+
+      <section id="one-d">
+        <h2>1차원 누적합</h2>
+        <p>가계부의 잔액 칸을 떠올리면 쉽다. 잔액 두 개의 차이가 그 사이 기간의 지출이다. 누적합도 같다. <code>prefix[i]</code>를 <mark>앞 i개 원소의 합</mark>으로 정하고, 길이를 n+1로 잡아 <code>prefix[0] = 0</code>(앞 0개의 합)을 둔다.</p>
+        <p>그러면 구간 [l, r]의 합은 "앞 r+1개의 합"에서 "앞 l개의 합"을 뺀 값, 즉 <code>prefix[r + 1] - prefix[l]</code>이다.</p>
+
+<pre data-lang="python" data-title="prefix_sum.py"><code>
+def build_prefix(nums: list[int]) -&gt; list[int]:
+    prefix = [0] * (len(nums) + 1)     # 앞 0개의 합 자리를 하나 더 둔다
+    for i, x in enumerate(nums):
+        prefix[i + 1] = prefix[i] + x
+    return prefix
+
+
+def range_sum(prefix: list[int], l: int, r: int) -&gt; int:
+    return prefix[r + 1] - prefix[l]   # [l, r] 양 끝 포함
+
+
+nums = [5, 2, 8, 1, 6, 3]
+prefix = build_prefix(nums)
+print(prefix)
+print(range_sum(prefix, 1, 4), sum(nums[1:5]))
+print(range_sum(prefix, 0, 5), sum(nums))    # l = 0 도 같은 식
+print(range_sum(prefix, 3, 3), nums[3])      # 칸 하나짜리 구간
+</code></pre>
+<pre class="output">
+[0, 5, 7, 15, 16, 22, 25]
+17 17
+25 25
+1 1
+</pre>
+
+        <figure class="fig">
+          <div class="fig-steps">
+            <div class="fig-state">
+              <div class="cells">
+                <div class="cell" data-i="0">5</div>
+                <div class="cell is-hl" data-i="1">2</div>
+                <div class="cell is-hl" data-i="2">8</div>
+                <div class="cell is-hl" data-i="3">1</div>
+                <div class="cell is-hl" data-i="4">6</div>
+                <div class="cell" data-i="5">3</div>
+              </div>
+              <span class="fig-state-label">nums의 구간 [1, 4]</span>
+            </div>
+          </div>
+          <div class="fig-steps">
+            <div class="fig-arrow">미리 더해 두기</div>
+            <div class="fig-state">
+              <div class="cells">
+                <div class="cell is-ghost" data-i="0">0</div>
+                <div class="cell is-hl" data-i="1" data-ptr="l">5</div>
+                <div class="cell" data-i="2">7</div>
+                <div class="cell" data-i="3">15</div>
+                <div class="cell" data-i="4">16</div>
+                <div class="cell is-hl" data-i="5" data-ptr="r+1">22</div>
+                <div class="cell" data-i="6">25</div>
+              </div>
+              <span class="fig-state-label">prefix</span>
+            </div>
+          </div>
+          <figcaption><b>그림 23-1</b> 구간 [1, 4]의 합 17은 <code>prefix[5] - prefix[1] = 22 - 5</code>로, 칸 두 개만 읽어 구한다.</figcaption>
+        </figure>
+
+        <p><code>prefix[0]</code>을 비워 두는 이유는 경계 때문이다. 길이를 n으로 잡고 <code>prefix[i]</code>를 "0~i번의 합"으로 두면, l이 0일 때 <code>prefix[l - 1]</code>이 <code>prefix[-1]</code>(마지막 칸)이 되어 버린다. 0 한 칸을 앞에 두면 모든 구간이 같은 식 하나로 풀린다. 7장의 <code>accumulate(nums, initial=0)</code>도 같은 배열을 만든다.</p>
+        <p>만드는 데 O(n), 질의마다 O(1)이다. 매번 <code>sum()</code>을 부르는 방법과 읽는 칸 수를 세어 비교하면 차이가 분명하다.</p>
+
+<pre data-lang="python" data-title="query_cost.py"><code>
+def naive_cost(queries: list[tuple[int, int]]) -&gt; int:
+    return sum(r - l + 1 for l, r in queries)    # sum() 이 읽는 칸 수
+
+
+def prefix_cost(n: int, queries: list[tuple[int, int]]) -&gt; int:
+    return n + 2 * len(queries)                  # 만들기 n번 + 질의마다 두 칸
+
+
+n = 100_000
+queries = [(0, n - 1)] * 100_000     # 가장 나쁜 경우: 매번 전체 구간
+print(f'{naive_cost(queries):,}')
+print(f'{prefix_cost(n, queries):,}')
+</code></pre>
+<pre class="output">
+10,000,000,000
+300,000
+</pre>
+
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>방법</th><th>준비</th><th>질의 하나</th><th>질의 m개 전체</th></tr></thead>
+            <tbody>
+              <tr><td>매번 <code>sum(a[l:r+1])</code></td><td>없음</td><td><span class="bigo b-linear">O(n)</span></td><td><span class="bigo b-quad">O(nm)</span></td></tr>
+              <tr><td>누적합</td><td><span class="bigo b-linear">O(n)</span></td><td><span class="bigo b-const">O(1)</span></td><td><span class="bigo b-linear">O(n + m)</span></td></tr>
+            </tbody>
+          </table>
+        </div>
+        <p>한 줄로 줄이면, 구간 합은 큰 앞부분에서 작은 앞부분을 빼서 구한다.</p>
+      </section>
+
+      <section id="fixed-window">
+        <h2>길이 k 구간의 최대 합</h2>
+        <p>"연속한 k개의 합 중 가장 큰 값"은 누적합의 대표 응용이다. 시작 위치가 n-k+1가지이고, 각 구간의 합이 빼기 한 번이므로 전체 O(n)이다. 같은 문제를 21장의 고정 길이 창으로도 풀 수 있다. 창을 한 칸 밀 때 새로 들어온 값을 더하고 빠진 값을 뺀다.</p>
+
+<pre data-lang="python" data-title="max_window.py"><code>
+def max_window_prefix(nums: list[int], k: int) -&gt; int:
+    prefix = [0] * (len(nums) + 1)
+    for i, x in enumerate(nums):
+        prefix[i + 1] = prefix[i] + x
+    return max(prefix[i + k] - prefix[i] for i in range(len(nums) - k + 1))
+
+
+def max_window_sliding(nums: list[int], k: int) -&gt; int:
+    window = sum(nums[:k])
+    best = window
+    for i in range(k, len(nums)):
+        window += nums[i] - nums[i - k]    # 들어온 값 더하고 빠진 값 빼기
+        best = max(best, window)
+    return best
+
+
+temps = [3, -1, 4, 6, -2, 5, 1, -3]
+print(max_window_prefix(temps, 3), max_window_sliding(temps, 3))
+print(max_window_prefix(temps, 5), max_window_sliding(temps, 5))
+</code></pre>
+<pre class="output">
+9 9
+14 14
+</pre>
+
+        <p>둘 다 O(n)이다. 차이는 쓰임새에 있다. 창은 메모리 O(1)로 한 방향으로 훑을 때 좋고, 누적합은 O(n)을 더 쓰는 대신 아무 구간이나 순서 없이 물어도 된다. 길이가 제각각인 질의가 섞여 들어오면 누적합이 맞다.</p>
+      </section>
+
+      <section id="not-only-sum">
+        <h2>"합"만이 아니다</h2>
+        <p>누적합이라는 이름에는 함정이 있다. 꼭 <strong>합</strong>일 필요도, 꼭 <strong>앞에서부터</strong>일 필요도 없다. 뒤에서부터 쌓으면 접미사 누적(suffix)이 되고, 더하기 대신 다른 연산을 쌓을 수도 있다. 예를 들어 "구간 안에 짝수가 몇 개인가"는 조건을 만족하면 1, 아니면 0을 쌓으면 된다. <code>True</code>가 1처럼 더해지기 때문이다(2장).</p>
+
+<pre data-lang="python" data-title="count_prefix.py"><code>
+nums = [7, 4, 10, 3, 8, 6, 1]
+even_prefix = [0]
+for x in nums:
+    even_prefix.append(even_prefix[-1] + (x % 2 == 0))
+print(even_prefix)
+
+l, r = 1, 4                                  # [4, 10, 3, 8]
+print(even_prefix[r + 1] - even_prefix[l])
+</code></pre>
+<pre class="output">
+[0, 0, 1, 2, 2, 3, 4, 4]
+3
+</pre>
+
+        <p>XOR(배타적 논리합, 27장)도 된다. 같은 값을 두 번 XOR하면 지워지므로, 빼기 자리에 XOR을 한 번 더 쓰면 앞부분이 사라진다.</p>
+
+<pre data-lang="python" data-title="xor_prefix.py"><code>
+codes = [5, 3, 6, 2, 7]
+xor_prefix = [0]
+for x in codes:
+    xor_prefix.append(xor_prefix[-1] ^ x)
+
+l, r = 1, 3
+print(xor_prefix[r + 1] ^ xor_prefix[l])    # 앞부분을 XOR 로 지운다
+print(3 ^ 6 ^ 2)                             # 직접 계산과 비교
+</code></pre>
+<pre class="output">
+7
+7
+</pre>
+
+        <p>그런데 누적 최댓값으로는 아무 구간의 최댓값을 구할 수 없다. <mark>앞부분을 지우려면 연산을 되돌리는 역연산이 있어야 한다.</mark> 합에는 빼기가, XOR에는 XOR가 있지만 max에는 없다.</p>
+
+<pre data-lang="python" data-title="prefix_max.py"><code>
+from itertools import accumulate
+
+nums = [2, 9, 4, 1, 5]
+prefix_max = list(accumulate(nums, max))
+print(prefix_max)
+print(max(nums[2:5]))     # 구간 [2, 4] 의 최댓값은 5 지만
+                          # prefix_max 에는 9 뿐이라 5 를 되살릴 수 없다
+</code></pre>
+<pre class="output">
+[2, 9, 9, 9, 9]
+5
+</pre>
+
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>쌓는 연산</th><th>아무 구간 [l, r]</th><th>이유</th></tr></thead>
+            <tbody>
+              <tr><td>합, 개수</td><td>된다</td><td>빼기로 앞부분을 지운다</td></tr>
+              <tr><td>XOR</td><td>된다</td><td>XOR 자신이 역연산이다</td></tr>
+              <tr><td>곱</td><td>0이 없을 때만</td><td>나누기로 지우는데 0으로는 나눌 수 없다</td></tr>
+              <tr><td>max, min, gcd</td><td>안 된다 (앞부분·뒷부분만)</td><td>역연산이 없다</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <p>정리하면, 되돌릴 수 있는 연산이라면 무엇이든 누적해 둘 수 있다.</p>
+      </section>
+
+      <section id="two-d">
+        <h2>2차원 누적합</h2>
+        <p>격자에서는 <code>prefix[r][c]</code>를 "왼쪽 위 모서리부터 r행 c열 직전까지의 직사각형 합"으로 정한다. 1차원처럼 0번 행과 0번 열을 0으로 비워 둔다. 만들 때는 위쪽 직사각형과 왼쪽 직사각형을 더하고, 두 번 더해진 왼쪽 위 겹침을 한 번 뺀 뒤 자기 칸을 더한다. 겹친 부분을 빼고 더해 맞추는 이 방식을 <strong>포함-배제</strong>라고 한다.</p>
+
+<pre data-lang="python" data-title="prefix_2d.py"><code>
+grid = [
+    [3, 1, 4, 2],
+    [2, 5, 1, 3],
+    [6, 2, 3, 1],
+]
+rows, cols = len(grid), len(grid[0])
+prefix = [[0] * (cols + 1) for _ in range(rows + 1)]
+for r in range(rows):
+    for c in range(cols):
+        prefix[r + 1][c + 1] = (prefix[r][c + 1] + prefix[r + 1][c]
+                                - prefix[r][c] + grid[r][c])
+
+
+def rect_sum(r1: int, c1: int, r2: int, c2: int) -&gt; int:
+    return (prefix[r2 + 1][c2 + 1] - prefix[r1][c2 + 1]
+            - prefix[r2 + 1][c1] + prefix[r1][c1])
+
+
+for row in prefix:
+    print(row)
+print(rect_sum(1, 1, 2, 2))    # 5 1 / 2 3
+print(rect_sum(0, 0, 2, 3))    # 격자 전체
+</code></pre>
+<pre class="output">
+[0, 0, 0, 0, 0]
+[0, 3, 4, 8, 10]
+[0, 5, 11, 16, 21]
+[0, 11, 19, 27, 33]
+11
+33
+</pre>
+
+        <figure class="fig">
+          <div class="fig-steps">
+            <div class="fig-state">
+              <div>
+                <div class="cells"><div class="cell">3</div><div class="cell">1</div><div class="cell">4</div><div class="cell">2</div></div>
+                <div class="cells"><div class="cell">2</div><div class="cell is-hl">5</div><div class="cell is-hl">1</div><div class="cell">3</div></div>
+                <div class="cells"><div class="cell">6</div><div class="cell is-hl">2</div><div class="cell is-hl">3</div><div class="cell">1</div></div>
+              </div>
+              <span class="fig-state-label">grid의 (1,1)~(2,2)</span>
+            </div>
+            <div class="fig-arrow">네 칸 읽기</div>
+            <div class="fig-state">
+              <div>
+                <div class="cells"><div class="cell is-ghost">0</div><div class="cell is-ghost">0</div><div class="cell is-ghost">0</div><div class="cell is-ghost">0</div><div class="cell is-ghost">0</div></div>
+                <div class="cells"><div class="cell is-ghost">0</div><div class="cell is-hl">+3</div><div class="cell">4</div><div class="cell is-hl">−8</div><div class="cell">10</div></div>
+                <div class="cells"><div class="cell is-ghost">0</div><div class="cell">5</div><div class="cell">11</div><div class="cell">16</div><div class="cell">21</div></div>
+                <div class="cells"><div class="cell is-ghost">0</div><div class="cell is-hl">−11</div><div class="cell">19</div><div class="cell is-hl">+27</div><div class="cell">33</div></div>
+              </div>
+              <span class="fig-state-label">prefix</span>
+            </div>
+          </div>
+          <figcaption><b>그림 23-2</b> 직사각형 합 11 = 27 − 8 − 11 + 3. 위쪽과 왼쪽을 빼면 왼쪽 위 3이 두 번 빠지므로 한 번 되돌려 더한다.</figcaption>
+        </figure>
+
+        <p>격자가 R×C면 만드는 데 O(RC), 직사각형 질의는 칸 네 개만 읽으므로 O(1)이다. 행과 열이 하나씩 늘었을 뿐, 1차원과 생각은 같다.</p>
+      </section>
+
+      <section id="difference-array">
+        <h2>차분 배열</h2>
+        <p>이번에는 반대 상황이다. "[l, r]에 v를 더하라"가 수만 번 들어오고, 결과는 마지막에 한 번만 본다. 구간을 매번 다 고치는 대신, <strong>시작점</strong>에 "여기서부터 +v"를, <strong>끝 다음 칸</strong>에 "여기서부터 다시 −v"를 적어 둔다. 이렇게 이웃한 칸의 차이를 담은 배열을 <strong>차분 배열</strong>이라고 한다. 기록이 끝나면 누적합을 한 번 돌려 실제 값을 되살린다.</p>
+
+<pre data-lang="python" data-title="difference_array.py"><code>
+def apply_updates(n: int, updates: list[tuple[int, int, int]]) -&gt; tuple[list[int], list[int]]:
+    diff = [0] * (n + 1)          # r + 1 이 n 이 될 수 있어 한 칸 더
+    for l, r, v in updates:
+        diff[l] += v              # 여기서부터 v 만큼 올라간다
+        diff[r + 1] -= v          # 여기서부터 원래대로
+    result = []
+    running = 0
+    for i in range(n):            # 누적합으로 복원
+        running += diff[i]
+        result.append(running)
+    return diff, result
+
+
+updates = [(0, 2, 5), (2, 5, 1), (4, 4, 10)]
+diff, result = apply_updates(6, updates)
+print(diff)
+print(result)
+</code></pre>
+<pre class="output">
+[5, 0, 1, -5, 10, -10, -1]
+[5, 5, 6, 1, 11, 1]
+</pre>
+
+        <figure class="fig">
+          <div class="fig-steps">
+            <div class="fig-state">
+              <div class="cells">
+                <div class="cell is-hl" data-i="0">5</div>
+                <div class="cell" data-i="1">0</div>
+                <div class="cell is-hl" data-i="2">1</div>
+                <div class="cell is-hl" data-i="3">−5</div>
+                <div class="cell is-hl" data-i="4">10</div>
+                <div class="cell is-hl" data-i="5">−10</div>
+                <div class="cell is-ghost" data-i="6">−1</div>
+              </div>
+              <span class="fig-state-label">diff (기록한 칸만 강조)</span>
+            </div>
+          </div>
+          <div class="fig-steps">
+            <div class="fig-arrow">누적합</div>
+            <div class="fig-state">
+              <div class="cells">
+                <div class="cell" data-i="0">5</div>
+                <div class="cell" data-i="1">5</div>
+                <div class="cell" data-i="2">6</div>
+                <div class="cell" data-i="3">1</div>
+                <div class="cell" data-i="4">11</div>
+                <div class="cell" data-i="5">1</div>
+              </div>
+              <span class="fig-state-label">복원한 배열</span>
+            </div>
+          </div>
+          <figcaption><b>그림 23-3</b> 수정 하나당 두 칸만 적는다. 6번 칸은 배열 밖이라 복원에 쓰이지 않는다.</figcaption>
+        </figure>
+
+        <p>수정 하나가 O(1)이고 복원은 O(n)이라, 수정 m개를 처리하는 데 O(n + m)이다. 이름이 왜 "차분"인지는 거꾸로 해 보면 보인다. 배열에서 이웃한 값의 차이를 뽑아 누적하면 원래 배열로 돌아온다.</p>
+
+<pre data-lang="python" data-title="inverse.py"><code>
+from itertools import accumulate
+
+nums = [4, 4, 7, 2, 2]
+diff = [nums[0]] + [nums[i] - nums[i - 1] for i in range(1, len(nums))]
+print(diff)                       # 이웃한 값의 차이
+print(list(accumulate(diff)))     # 누적하면 제자리로
+</code></pre>
+<pre class="output">
+[4, 0, 3, -5, 0]
+[4, 4, 7, 2, 2]
+</pre>
+
+        <p>즉 차분과 누적합은 서로를 되돌리는 연산이다. 정리하면, 구간 더하기는 양 끝 두 점에 적고 마지막에 누적합으로 펼친다.</p>
+      </section>
+
+      <section id="symmetry">
+        <h2>두 기술의 대칭</h2>
+        <p>두 기술은 공짜가 아니다. 한쪽이 빨라지면 반대쪽이 느려진다. 누적합을 만든 뒤 원소 하나를 고치면, 그 뒤의 누적합이 모두 바뀐다. 원래 배열의 점 update가 누적합에서는 구간 update가 되는 것이다.</p>
+
+<pre data-lang="python" data-title="prefix_update_cost.py"><code>
+from itertools import accumulate
+
+nums = [5, 2, 8, 1, 6, 3]
+before = list(accumulate(nums, initial=0))
+nums[2] += 4                                   # 점 update 한 번
+after = list(accumulate(nums, initial=0))
+print(before)
+print(after)
+print([i for i in range(len(before)) if before[i] != after[i]])
+</code></pre>
+<pre class="output">
+[0, 5, 7, 15, 16, 22, 25]
+[0, 5, 7, 19, 20, 26, 29]
+[3, 4, 5, 6]
+</pre>
+
+        <p>차분 배열은 반대다. 값 하나를 읽으려면 <code>diff[0]</code>부터 그 칸까지 더해야 하니, 점 get이 구간 get이 된다. 그래서 수정 도중에는 읽지 않고, 모두 모은 뒤 한 번에 복원한다.</p>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th></th><th>누적합</th><th>차분 배열</th></tr></thead>
+            <tbody>
+              <tr><td>빨라지는 것</td><td>구간 get → 점 get 두 번</td><td>구간 update → 점 update 두 번</td></tr>
+              <tr><td>느려지는 것</td><td>점 update → 구간 update</td><td>점 get → 구간 get</td></tr>
+              <tr><td>맞는 상황</td><td>수정 없이 조회가 많다</td><td>수정을 다 모은 뒤 조회한다</td></tr>
+              <tr><td>서로의 관계</td><td colspan="2">차분 배열을 누적하면 원래 배열, 원래 배열의 차분이 차분 배열이다</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <p>문제를 읽을 때 "무엇이 구간이고 무엇이 점인가, 수정과 조회가 섞이는가"를 먼저 따지면 둘 중 무엇을 쓸지 바로 정해진다.</p>
+      </section>
+
+      <section id="pitfalls">
+        <h2>자주 하는 실수</h2>
+        <div class="callout callout-warn">
+          <span class="callout-title">prefix 길이를 n으로 잡기</span>
+          <p>길이를 n으로 잡으면 마지막 원소가 어떤 누적합에도 들어가지 못하거나, l이 0일 때 <code>prefix[-1]</code>을 읽게 된다. 에러 없이 틀린 답이 나와 찾기 어렵다.</p>
+        </div>
+
+<pre data-lang="python" data-title="off_by_one.py"><code>
+nums = [5, 2, 8]
+prefix = [0] * len(nums)               # 한 칸 모자라다
+for i in range(1, len(nums)):
+    prefix[i] = prefix[i - 1] + nums[i - 1]
+print(prefix)                          # 마지막 원소 8 이 어디에도 없다
+print(prefix[2] - prefix[0])           # 전체 합 15 를 기대했다
+</code></pre>
+<pre class="output">
+[0, 5, 7]
+7
+</pre>
+        <p>길이를 <code>len(nums) + 1</code>로 잡고 <code>prefix[r + 1] - prefix[l]</code>을 쓰면 해결된다. 차분 배열도 <code>diff[r + 1]</code>에 쓰므로 한 칸 여유가 필요하다.</p>
+
+        <div class="callout callout-warn">
+          <span class="callout-title">2차원에서 겹친 부분을 되돌리지 않기</span>
+          <p>위쪽과 왼쪽을 빼고 끝내면 왼쪽 위 모서리 영역이 두 번 빠진다. 직사각형 합에서는 <code>+ prefix[r1][c1]</code>을, 만들 때는 <code>- prefix[r][c]</code>를 빠뜨리지 않았는지 확인한다.</p>
+        </div>
+        <div class="callout callout-warn">
+          <span class="callout-title">질의마다 sum(a[l:r+1])</span>
+          <p>코드는 짧지만 슬라이스가 구간을 복사하고(3장) <code>sum</code>이 다시 훑어서 질의 하나가 O(n)이다. 예제는 통과하고 큰 입력에서 시간 초과가 난다.</p>
+        </div>
+        <div class="callout callout-warn">
+          <span class="callout-title">차분 배열을 복원하지 않고 읽기</span>
+          <p><code>diff[i]</code>는 i번 칸의 값이 아니라 "i번에서 값이 얼마나 바뀌는가"다. 결과를 내기 전에 반드시 누적합으로 펼친다.</p>
+        </div>
+      </section>
+
+      <section id="problem">
+        <h2>대표 문제</h2>
+        <div class="problem">
+          <div class="problem-head">
+            <div class="problem-kicker"><b>Problem</b><span class="chip">쉬움</span><span class="chip">누적합</span></div>
+            <h3>구간 합 질의</h3>
+          </div>
+          <div class="problem-body">
+            <p>어느 전시관의 N일 동안 일별 방문자 수가 주어진다. 질의 M개가 들어오는데, 질의 <code>l r</code>은 l일부터 r일까지(양 끝 포함) 방문자 수의 합을 묻는다. 각 질의의 답을 한 줄에 하나씩 출력하라.</p>
+            <p>첫 줄에 N과 M(1 ≤ N, M ≤ 100,000), 둘째 줄에 방문자 수 N개(각각 0 이상 1,000 이하)가 주어진다. 다음 M줄에 l과 r(1 ≤ l ≤ r ≤ N)이 주어진다. 날짜는 1일부터 센다.</p>
+            <div class="table-wrap">
+              <table>
+                <thead><tr><th>입력</th><th>출력</th><th>설명</th></tr></thead>
+                <tbody>
+                  <tr><td><code>6 4</code><br><code>12 7 30 5 18 9</code><br><code>1 3</code><br><code>2 5</code><br><code>4 4</code><br><code>1 6</code></td><td><code>49</code><br><code>60</code><br><code>5</code><br><code>81</code></td><td>12+7+30, 7+30+5+18, 5, 전체 합</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <details class="reveal">
+            <summary>접근 방법<span class="reveal-hint">먼저 생각해 보고 펼치세요</span></summary>
+            <div class="reveal-body">
+              <p>매번 더하면 최악에 100억 번이다. 배열이 바뀌지 않고 구간 get만 많으니 <mark>누적합을 한 번 만들어 두고 질의마다 빼기 한 번으로 답한다.</mark></p>
+              <ol>
+                <li>길이 N+1의 <code>prefix</code>를 만든다. <code>prefix[i]</code>는 1일부터 i일까지의 합이다.</li>
+                <li>날짜가 1부터 시작하므로 l~r일의 합은 <code>prefix[r] - prefix[l - 1]</code>이다. 0번 칸 덕분에 l이 1이어도 같은 식이 통한다.</li>
+                <li>답을 리스트에 모아 마지막에 한 번에 출력한다(1장).</li>
+              </ol>
+            </div>
+          </details>
+
+          <details class="reveal">
+            <summary>풀이 코드</summary>
+            <div class="reveal-body">
+<pre data-lang="python" data-title="range_sum_queries.py"><code>
+import sys
+
+input = sys.stdin.readline
+
+n, m = map(int, input().split())
+visitors = list(map(int, input().split()))
+
+prefix = [0] * (n + 1)              # prefix[i] = 1일부터 i일까지의 합
+for i in range(n):
+    prefix[i + 1] = prefix[i] + visitors[i]
+
+answers = []
+for _ in range(m):
+    l, r = map(int, input().split())
+    answers.append(prefix[r] - prefix[l - 1])
+print('\n'.join(map(str, answers)))
+</code></pre>
+<pre class="stdin">
+6 4
+12 7 30 5 18 9
+1 3
+2 5
+4 4
+1 6
+</pre>
+<pre class="output">
+49
+60
+5
+81
+</pre>
+              <p>입력이 1부터 세는 번호라서 <code>prefix[r] - prefix[l - 1]</code>로 바로 맞아떨어진다. 0부터 세는 번호였다면 본문처럼 <code>prefix[r + 1] - prefix[l]</code>을 쓴다.</p>
+            </div>
+          </details>
+
+          <details class="reveal">
+            <summary>복잡도</summary>
+            <div class="reveal-body">
+              <dl class="cx">
+                <dt>시간</dt><dd><span class="bigo b-linear">O(N + M)</span> 누적합을 만드는 데 N번, 질의마다 빼기 한 번이다.</dd>
+                <dt>공간</dt><dd><span class="bigo b-linear">O(N + M)</span> 누적합 배열 N+1칸과 모아 둔 답 M개다.</dd>
+              </dl>
+            </div>
+          </details>
+        </div>
+      </section>
+
+      <section id="recall">
+        <h2>스스로 확인</h2>
+        <div class="recall">
+          <details>
+            <summary>누적합 배열의 길이를 n이 아니라 n+1로 잡는 이유는?</summary>
+            <div class="answer"><p><code>prefix[0] = 0</code>을 "앞 0개의 합"으로 두기 위해서다. 그러면 l이 0인 구간도 <code>prefix[r + 1] - prefix[l]</code> 하나로 풀리고, 마지막 원소까지 포함한 합 <code>prefix[n]</code>도 들어갈 자리가 생긴다.</p></div>
+          </details>
+          <details>
+            <summary>XOR 누적으로는 아무 구간이나 되는데, 누적 최댓값으로는 왜 안 되는가?</summary>
+            <div class="answer"><p>구간 값을 얻으려면 앞부분을 지워야 하고, 그러려면 역연산이 필요하다. XOR는 같은 값을 다시 XOR하면 지워지지만, max는 한 번 큰 값에 덮이면 그 앞의 정보를 되살릴 수 없다. 누적 최댓값은 맨 앞부터의 구간에만 답한다.</p></div>
+          </details>
+          <details>
+            <summary>2차원 직사각형 합 공식에서 <code>prefix[r1][c1]</code>을 마지막에 더하는 이유는?</summary>
+            <div class="answer"><p>위쪽 직사각형 <code>prefix[r1][c2 + 1]</code>과 왼쪽 직사각형 <code>prefix[r2 + 1][c1]</code>에 왼쪽 위 영역이 모두 들어 있어서 두 번 빠진다. 한 번만 빠져야 하므로 한 번 되돌려 더한다.</p></div>
+          </details>
+          <details>
+            <summary>"구간에 v 더하기"와 "한 칸 값 읽기"가 번갈아 수만 번 들어온다. 누적합과 차분 배열이 모두 느린 이유는?</summary>
+            <div class="answer"><p>누적합을 쓰면 구간 더하기가 뒤쪽 누적합 전체를 고치는 일이 되어 O(n)이다. 차분 배열을 쓰면 더하기는 O(1)이지만 한 칸을 읽을 때마다 앞부터 더해야 해서 O(n)이다. 둘 다 한쪽이 O(n)으로 남는다. 이런 경우는 펜윅 트리나 세그먼트 트리처럼 양쪽을 모두 O(log n)에 하는 자료구조가 필요하다.</p></div>
+          </details>
+        </div>
+      </section>
+
+      <section id="summary">
+        <h2>정리</h2>
+        <ol class="summary-list">
+          <li>구간 질의 문제는 먼저 점/구간, get/update를 가르고, 수정과 조회가 섞이는지 본다.</li>
+          <li>누적합은 길이 n+1로 만들고, 구간 [l, r]의 합은 <code>prefix[r + 1] - prefix[l]</code>이다. 만들기 O(n), 질의 O(1)이다.</li>
+          <li>길이 k 구간의 최대 합은 누적합과 21장의 고정 창 모두 O(n)에 풀린다.</li>
+          <li>합 말고도 개수, XOR처럼 역연산이 있는 연산은 누적할 수 있다. max, min, gcd는 앞부분 구간에만 쓴다.</li>
+          <li>2차원 누적합은 포함-배제로 만들고, 직사각형 합은 칸 네 개로 구한다.</li>
+          <li>차분 배열은 구간 더하기를 <code>diff[l] += v</code>, <code>diff[r + 1] -= v</code>로 적고, 마지막에 누적합으로 복원한다.</li>
+          <li>두 기술은 서로 대칭이다. 한쪽 작업을 빠르게 하는 대신 반대쪽 작업이 느려진다.</li>
+        </ol>
+      </section>
+
+      <nav class="pager" aria-label="이전 장과 다음 장"></nav>
+    </article>
+  </main>
+
+  <aside class="rail" aria-label="이 페이지 목차">
+    <p class="rail-title">이 페이지</p>
+    <nav id="onthispage"></nav>
+  </aside>
+</div>
+<div class="backdrop" id="backdrop"></div>
+
+<script src="assets/book.js"></script>
+<script src="assets/app.js"></script>
+<script src="assets/code.js"></script>
+</body>
+</html>

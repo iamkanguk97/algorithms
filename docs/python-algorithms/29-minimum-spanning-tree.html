@@ -1,0 +1,639 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>29. 최소 신장 트리 — 파이썬 알고리즘 노트</title>
+<script src="assets/theme.js"></script>
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body data-chapter="29">
+<a class="skip-link" href="#content">본문으로 건너뛰기</a>
+<div class="progress" aria-hidden="true"><span></span></div>
+<header class="topbar" id="topbar"></header>
+
+<div class="shell">
+  <aside class="sidebar" id="sidebar" aria-label="책 목차"></aside>
+
+  <main class="main" id="content">
+    <article class="chapter">
+      <header class="chapter-head">
+        <a class="part-pill"></a>
+        <span class="chapter-label"></span>
+        <h1>최소 신장 트리</h1>
+        <p class="lede">여러 도시를 도로로 모두 잇되 공사비를 가장 적게 쓰는 방법을 찾는 문제입니다. 가장 싼 간선부터 고르는 단순한 규칙이 왜 정답이 되는지 이해하면, 크루스칼과 프림은 그 규칙을 구현하는 두 가지 방법일 뿐입니다.</p>
+        <div class="chapter-meta">
+          <span class="chip">신장 트리</span><span class="chip">크루스칼</span><span class="chip">프림</span><span class="chip">컷 속성</span><span class="chip">O(E log E)</span>
+        </div>
+      </header>
+
+      <div class="goals">
+        <p class="goals-title">이 장에서 배울 것</p>
+        <ul>
+          <li>신장 트리의 세 조건(모든 정점 연결, 사이클 없음, 간선 n-1개)을 설명할 수 있다</li>
+          <li>컷 속성으로 가장 싼 간선을 골라도 되는 이유를 설명할 수 있다</li>
+          <li>크루스칼을 정렬과 유니온 파인드로, 프림을 힙으로 구현할 수 있다</li>
+          <li>두 알고리즘을 고르는 기준과, 프림과 다익스트라의 차이를 안다</li>
+          <li>이미 놓인 간선, 최대 신장 트리, 연결 불가 판정 같은 변형을 처리할 수 있다</li>
+        </ul>
+      </div>
+
+      <section id="idea">
+        <h2>신장 트리와 최소 신장 트리</h2>
+        <div class="callout callout-key">
+          <span class="callout-title">핵심</span>
+          <p class="callout-big">최소 신장 트리는 <mark>모든 정점을 잇는 간선 n-1개를, 비용 합이 가장 작게 고른 것</mark>이다.</p>
+        </div>
+        <p>그래프(13장)에서 간선 일부만 남겨도 모든 정점이 여전히 이어져 있을 수 있다. 모든 정점을 포함하고, 서로 이어져 있고, 사이클이 없는 부분 그래프를 <strong>신장 트리</strong>(spanning tree)라고 한다. 그래프 전체에 걸쳐 펼쳐진 트리라는 뜻이다.</p>
+        <ul>
+          <li><strong>연결</strong> — 어느 두 정점 사이에도 길이 있다</li>
+          <li><strong>사이클 없음</strong> — 어느 두 정점 사이의 길은 하나뿐이다</li>
+          <li><strong>간선 n-1개</strong> — 정점이 n개면 간선은 정확히 n-1개다</li>
+        </ul>
+        <p>간선 수가 n-1인 이유는 그룹 수로 보면 쉽다. 처음에 정점 n개가 모두 떨어져 있으면 그룹이 n개다. 사이클을 만들지 않는 간선은 서로 다른 두 그룹을 하나로 합치므로 그룹 수를 1씩 줄인다. 하나가 되려면 n-1개가 필요하다. 하나를 더 넣으면 이미 같은 그룹 안을 잇게 되어 사이클이 생긴다.</p>
+        <p>간선마다 <strong>비용</strong>(가중치)이 붙어 있으면 신장 트리마다 비용 합이 다르다. 그중 합이 가장 작은 것이 <strong>최소 신장 트리</strong>(MST, Minimum Spanning Tree)다. 통신망, 전력망, 도로처럼 "모든 지점을 가장 싸게 잇는" 문제가 이 모양이다.</p>
+
+        <figure class="fig">
+          <div class="fig-steps">
+            <div class="fig-state">
+              <div class="cells">
+                <div class="cell" data-i="4">1-2</div>
+                <div class="cell" data-i="1">1-3</div>
+                <div class="cell" data-i="2">2-3</div>
+                <div class="cell" data-i="5">2-4</div>
+                <div class="cell" data-i="8">3-4</div>
+                <div class="cell" data-i="3">3-5</div>
+                <div class="cell" data-i="6">4-5</div>
+              </div>
+              <span class="fig-state-label">간선 (아래 숫자는 비용)</span>
+            </div>
+          </div>
+          <figcaption><b>그림 29-1</b> 이 장 내내 쓰는 예제 그래프. 정점 1~5, 무방향 간선 7개다.</figcaption>
+        </figure>
+
+        <p>먼저 정의대로 모든 신장 트리를 만들어 보자. 간선 7개 중 4개를 고르는 조합을 모두 만들고(7장의 <code>combinations</code>), 그중 이어져 있는 것만 남긴다. 간선이 n-1개이면서 연결돼 있으면 사이클이 있을 수 없으므로, 남은 것이 곧 신장 트리다.</p>
+
+<pre data-lang="python" data-title="all_spanning_trees.py"><code>
+from itertools import combinations
+
+n = 5
+edges = [(1, 2, 4), (1, 3, 1), (2, 3, 2), (2, 4, 5),
+         (3, 4, 8), (3, 5, 3), (4, 5, 6)]      # (정점, 정점, 비용)
+
+
+def is_connected(chosen: tuple) -&gt; bool:
+    graph = {v: [] for v in range(1, n + 1)}
+    for a, b, _ in chosen:
+        graph[a].append(b)
+        graph[b].append(a)
+    visited = {1}
+    stack = [1]
+    while stack:                       # 13장의 DFS
+        v = stack.pop()
+        for nxt in graph[v]:
+            if nxt not in visited:
+                visited.add(nxt)
+                stack.append(nxt)
+    return len(visited) == n
+
+
+trees = [c for c in combinations(edges, n - 1) if is_connected(c)]
+costs = [sum(w for _, _, w in t) for t in trees]
+print(len(trees))
+print(min(costs), max(costs))
+print(trees[costs.index(min(costs))])
+</code></pre>
+<pre class="output">
+21
+11 23
+((1, 3, 1), (2, 3, 2), (2, 4, 5), (3, 5, 3))
+</pre>
+
+        <p>35가지 조합 중 신장 트리는 21개이고, 비용은 11부터 23까지 퍼져 있다. 최소는 11이다. 하지만 간선이 수십 개만 돼도 조합 수가 폭발하므로(22장) 이렇게 셀 수는 없다. 다음 절의 성질 하나가 이 문제를 정렬 한 번 수준으로 줄여 준다.</p>
+      </section>
+
+      <section id="cut-property">
+        <h2>왜 가장 싼 간선을 골라도 되는가</h2>
+        <p>정점을 두 무리로 나누는 것을 <strong>컷</strong>(cut)이라고 한다. 두 끝이 서로 다른 무리에 있는 간선을 "컷을 건너는 간선"이라고 부른다. 최소 신장 트리 알고리즘은 모두 다음 성질 하나에 기대고 있다.</p>
+        <p><strong>컷 속성</strong>: <mark>어떤 컷이든, 그 컷을 건너는 간선 중 가장 싼 것은 최소 신장 트리에 넣어도 된다.</mark></p>
+
+<pre data-lang="python" data-title="cut_property.py"><code>
+edges = [(1, 2, 4), (1, 3, 1), (2, 3, 2), (2, 4, 5),
+         (3, 4, 8), (3, 5, 3), (4, 5, 6)]
+group = {1, 3}                         # 한쪽 무리. 나머지는 {2, 4, 5}
+
+crossing = [e for e in edges if (e[0] in group) != (e[1] in group)]
+print(crossing)
+print(min(crossing, key=lambda e: e[2]))
+</code></pre>
+<pre class="output">
+[(1, 2, 4), (2, 3, 2), (3, 4, 8), (3, 5, 3)]
+(2, 3, 2)
+</pre>
+
+        <figure class="fig">
+          <div class="fig-steps">
+            <div class="fig-state">
+              <div class="cells">
+                <div class="cell is-hl">1</div>
+                <div class="cell is-hl">3</div>
+              </div>
+              <span class="fig-state-label">무리 A</span>
+            </div>
+            <div class="fig-arrow">2-3 (2)</div>
+            <div class="fig-state">
+              <div class="cells">
+                <div class="cell">2</div>
+                <div class="cell">4</div>
+                <div class="cell">5</div>
+              </div>
+              <span class="fig-state-label">무리 B</span>
+            </div>
+          </div>
+          <figcaption><b>그림 29-2</b> 컷 {1, 3} | {2, 4, 5}. 건너는 간선 4개 중 가장 싼 2-3은 최소 신장 트리에 넣어도 된다.</figcaption>
+        </figure>
+
+        <p>이유는 바꿔치기, 즉 24장의 교환 논증으로 보인다. 가장 싼 건너는 간선 e를 쓰지 않은 최소 신장 트리 T가 있다고 하자. e의 두 끝은 서로 다른 무리에 있으므로, T 안에서 두 끝을 잇는 길도 어딘가에서 컷을 건넌다. 그 자리의 간선을 f라 하자. T에서 f를 빼고 e를 넣으면 두 무리가 e로 다시 이어지므로 여전히 신장 트리다. e는 f보다 비싸지 않으므로 비용 합은 늘지 않는다. 따라서 e를 포함한 최소 신장 트리가 언제나 있다.</p>
+        <p>크루스칼과 프림은 이 성질을 서로 다른 컷에 적용할 뿐이다. 크루스칼은 "지금 보는 간선의 한쪽 끝이 속한 그룹 대 나머지", 프림은 "지금까지 트리에 넣은 정점 대 나머지"로 자른다.</p>
+        <div class="callout callout-tip">
+          <span class="callout-title">답이 여러 개일 때</span>
+          <p>비용이 같은 간선이 있으면 최소 신장 트리가 여러 개일 수 있다. 고른 간선은 달라도 비용 합은 모두 같으므로, 문제가 보통 합만 묻는다.</p>
+        </div>
+      </section>
+
+      <section id="kruskal">
+        <h2>크루스칼: 싼 간선부터</h2>
+        <p><strong>크루스칼</strong>(Kruskal) 알고리즘은 간선을 비용 순으로 정렬하고, 싼 것부터 보면서 사이클을 만들지 않는 간선만 넣는다. 사이클 판별은 28장의 유니온 파인드가 맡는다. 두 끝의 루트가 같으면 이미 이어져 있으므로, 넣으면 사이클이다.</p>
+        <p>왜 맞는지도 컷 속성으로 바로 보인다. 간선 a-b를 넣는 순간 "a가 속한 그룹 대 나머지"로 자르면, 더 싼 간선은 이미 다 봤고 넣었거나 같은 그룹 안이라 건너뛰었다. 그러니 a-b는 이 컷을 건너는 가장 싼 간선이다.</p>
+
+<pre data-lang="python" data-title="kruskal.py"><code>
+def find(parent: list[int], x: int) -&gt; int:
+    if parent[x] != x:
+        parent[x] = find(parent, parent[x])   # 경로 압축(28장)
+    return parent[x]
+
+
+def union(parent: list[int], a: int, b: int) -&gt; bool:
+    ra, rb = find(parent, a), find(parent, b)
+    if ra == rb:
+        return False                         # 이미 같은 그룹: 사이클
+    parent[rb] = ra
+    return True
+
+
+def kruskal(n: int, edges: list[tuple[int, int, int]]) -&gt; tuple[int, list]:
+    parent = list(range(n + 1))
+    total = 0
+    chosen = []
+    for a, b, w in sorted(edges, key=lambda e: e[2]):   # 싼 간선부터
+        if union(parent, a, b):
+            total += w
+            chosen.append((a, b, w))
+            if len(chosen) == n - 1:         # n-1개를 채우면 끝
+                break
+    return total, chosen
+
+
+edges = [(1, 2, 4), (1, 3, 1), (2, 3, 2), (2, 4, 5),
+         (3, 4, 8), (3, 5, 3), (4, 5, 6)]
+total, chosen = kruskal(5, edges)
+print(total)
+print(chosen)
+</code></pre>
+<pre class="output">
+11
+[(1, 3, 1), (2, 3, 2), (3, 5, 3), (2, 4, 5)]
+</pre>
+
+        <figure class="fig">
+          <div class="fig-steps">
+            <div class="fig-state">
+              <div class="cells">
+                <div class="cell is-hl" data-i="1">1-3</div>
+                <div class="cell is-hl" data-i="2">2-3</div>
+                <div class="cell is-hl" data-i="3">3-5</div>
+                <div class="cell is-ghost" data-i="4">1-2</div>
+                <div class="cell is-hl" data-i="5">2-4</div>
+                <div class="cell is-ghost" data-i="6">4-5</div>
+                <div class="cell is-ghost" data-i="8">3-4</div>
+              </div>
+              <span class="fig-state-label">비용 순으로 정렬한 간선</span>
+            </div>
+          </div>
+          <figcaption><b>그림 29-3</b> 강조한 칸이 고른 간선이다. 1-2는 1과 2가 이미 3을 거쳐 이어져 있어 건너뛰고, 2-4로 4개를 채운 뒤 4-5와 3-4는 보지 않는다.</figcaption>
+        </figure>
+
+        <p>입력을 받을 때부터 비용을 맨 앞에 두면 <code>key</code> 없이 정렬할 수 있다. 튜플은 첫 원소부터 비교하기 때문이다(3장). 대표 문제의 풀이가 이 방식을 쓴다.</p>
+
+<pre data-lang="python" data-title="cost_first.py"><code>
+roads = [(4, 1, 2), (1, 1, 3), (2, 2, 3)]   # (비용, 정점, 정점)
+roads.sort()                               # 비용 순으로 정렬된다
+</code></pre>
+
+        <p>시간은 정렬이 <span class="bigo b-nlogn">O(E log E)</span>로 대부분을 차지한다. E는 간선 수, V는 정점 수다. 경로 압축을 한 find와 union은 거의 상수 시간이다(28장). 간선은 많아야 V²개라 log E ≤ 2 log V이므로 O(E log V)라고 써도 같은 말이다.</p>
+      </section>
+
+      <section id="prim">
+        <h2>프림: 한 정점에서 키워 가기</h2>
+        <p><strong>프림</strong>(Prim) 알고리즘은 정점 하나에서 시작해 트리를 한 정점씩 키운다. 매번 "이미 트리에 들어온 정점 대 아직 안 들어온 정점" 컷을 건너는 간선 중 가장 싼 것을 고른다. 가장 싼 것을 빠르게 꺼내려고 힙(7장의 <code>heapq</code>, 17장)을 쓴다.</p>
+        <ol>
+          <li>시작 정점을 <code>(0, 시작)</code>으로 힙에 넣는다.</li>
+          <li>힙에서 가장 싼 <code>(비용, 정점)</code>을 꺼낸다. 이미 방문한 정점이면 버린다.</li>
+          <li>처음 보는 정점이면 방문 표시를 하고 비용을 더한 뒤, 그 정점에서 아직 방문하지 않은 정점으로 가는 간선을 모두 힙에 넣는다.</li>
+        </ol>
+
+<pre data-lang="python" data-title="prim.py"><code>
+import heapq
+
+
+def prim(n: int, edges: list[tuple[int, int, int]], start: int = 1) -&gt; int:
+    graph = [[] for _ in range(n + 1)]       # 인접 리스트(13장)
+    for a, b, w in edges:
+        graph[a].append((w, b))
+        graph[b].append((w, a))              # 무방향: 양쪽에 넣는다
+
+    visited = [False] * (n + 1)
+    heap = [(0, start)]                      # (간선 비용, 정점)
+    total = 0
+    while heap:
+        w, v = heapq.heappop(heap)
+        if visited[v]:                       # 더 싼 간선으로 이미 들어왔다
+            print(f'  ({w}, {v}) 버림')
+            continue
+        visited[v] = True
+        total += w
+        print(f'({w}, {v}) 꺼냄 → 정점 {v} 추가, 합 {total}')
+        for nw, nxt in graph[v]:
+            if not visited[nxt]:
+                heapq.heappush(heap, (nw, nxt))
+    return total
+
+
+edges = [(1, 2, 4), (1, 3, 1), (2, 3, 2), (2, 4, 5),
+         (3, 4, 8), (3, 5, 3), (4, 5, 6)]
+print(prim(5, edges))
+</code></pre>
+<pre class="output">
+(0, 1) 꺼냄 → 정점 1 추가, 합 0
+(1, 3) 꺼냄 → 정점 3 추가, 합 1
+(2, 2) 꺼냄 → 정점 2 추가, 합 3
+(3, 5) 꺼냄 → 정점 5 추가, 합 6
+  (4, 2) 버림
+(5, 4) 꺼냄 → 정점 4 추가, 합 11
+  (6, 4) 버림
+  (8, 4) 버림
+11
+</pre>
+
+        <figure class="fig">
+          <div class="fig-steps">
+            <div class="fig-state">
+              <div class="cells"><div class="cell is-hl">1</div></div>
+              <span class="fig-state-label">합 0</span>
+            </div>
+            <div class="fig-arrow">1</div>
+            <div class="fig-state">
+              <div class="cells"><div class="cell">1</div><div class="cell is-hl">3</div></div>
+              <span class="fig-state-label">합 1</span>
+            </div>
+            <div class="fig-arrow">2</div>
+            <div class="fig-state">
+              <div class="cells"><div class="cell">1</div><div class="cell">3</div><div class="cell is-hl">2</div></div>
+              <span class="fig-state-label">합 3</span>
+            </div>
+          </div>
+          <div class="fig-steps">
+            <div class="fig-arrow">3</div>
+            <div class="fig-state">
+              <div class="cells"><div class="cell">1</div><div class="cell">3</div><div class="cell">2</div><div class="cell is-hl">5</div></div>
+              <span class="fig-state-label">합 6</span>
+            </div>
+            <div class="fig-arrow">5</div>
+            <div class="fig-state">
+              <div class="cells"><div class="cell">1</div><div class="cell">3</div><div class="cell">2</div><div class="cell">5</div><div class="cell is-hl">4</div></div>
+              <span class="fig-state-label">합 11</span>
+            </div>
+          </div>
+          <figcaption><b>그림 29-4</b> 프림이 트리를 키우는 순서. 화살표 위 숫자는 새로 넣은 간선의 비용이다.</figcaption>
+        </figure>
+
+        <p>같은 정점이 여러 비용으로 힙에 여러 번 들어간다는 점을 보자. 정점 2는 1에서 <code>(4, 2)</code>로, 3에서 <code>(2, 2)</code>로 들어갔다. 더 싼 <code>(2, 2)</code>가 먼저 나와 2를 트리에 넣고, 나중에 나온 <code>(4, 2)</code>는 버린다. 힙 안의 값을 고치는 대신 <mark>낡은 항목은 꺼낼 때 버린다.</mark> 그래서 꺼낸 뒤의 방문 확인이 빠지면 안 된다.</p>
+        <p>항목은 간선마다 많아야 두 번 들어가고 나오므로 시간은 <span class="bigo b-nlogn">O(E log V)</span>다. 크루스칼과 같은 이유로 O(E log E)와 같다.</p>
+      </section>
+
+      <section id="compare">
+        <h2>둘 중 무엇을 쓸까</h2>
+        <p>두 알고리즘은 같은 답을 내지만 바라보는 대상이 다르다. 크루스칼은 간선을, 프림은 정점을 중심으로 움직인다.</p>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>기준</th><th>크루스칼</th><th>프림</th></tr></thead>
+            <tbody>
+              <tr><td>중심</td><td>간선: 싼 간선부터 고른다</td><td>정점: 트리를 한 정점씩 키운다</td></tr>
+              <tr><td>필요한 자료구조</td><td>정렬 + 유니온 파인드</td><td>인접 리스트 + 힙</td></tr>
+              <tr><td>시간</td><td><span class="bigo b-nlogn">O(E log E)</span></td><td><span class="bigo b-nlogn">O(E log V)</span>, 배열로 최솟값을 찾으면 <span class="bigo b-quad">O(V²)</span></td></tr>
+              <tr><td>잘 맞는 그래프</td><td>간선이 적은 희소 그래프</td><td>간선이 V²에 가까운 밀집 그래프</td></tr>
+              <tr><td>구현</td><td>간선 목록을 그대로 정렬해 짧다</td><td>다익스트라와 모양이 거의 같다</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <p>코딩 테스트에서는 크루스칼이 대개 편하다. 입력이 간선 목록으로 주어지고, 28장 코드를 그대로 쓰면 된다. 모든 정점 쌍 사이에 간선이 있는 밀집 그래프라면 힙 없이 배열에서 최솟값을 찾는 O(V²) 프림이 정렬보다 빠르다.</p>
+
+        <h3>프림과 다익스트라</h3>
+        <p>프림은 다익스트라(14장)와 코드가 거의 같다. 둘 다 힙에서 가장 작은 것을 꺼내고 방문을 확인한다. 다른 것은 <strong>힙에 넣는 값</strong> 하나다. 프림은 간선 하나의 비용 <code>w</code>를, 다익스트라는 시작점부터의 누적 거리 <code>거리 + w</code>를 넣는다.</p>
+
+<pre data-lang="python" data-title="prim_vs_dijkstra.py"><code>
+import heapq
+
+edges = [(1, 2, 2), (2, 3, 2), (1, 3, 3)]      # 삼각형
+graph = [[] for _ in range(4)]
+for a, b, w in edges:
+    graph[a].append((w, b))
+    graph[b].append((w, a))
+
+
+def tree_from(start: int, use_total_distance: bool) -&gt; list[tuple[int, int]]:
+    visited = [False] * 4
+    heap = [(0, start, 0)]                     # (기준값, 정점, 어디서 왔나)
+    chosen = []
+    while heap:
+        key, v, prev = heapq.heappop(heap)
+        if visited[v]:
+            continue
+        visited[v] = True
+        if prev:
+            chosen.append((prev, v))
+        for w, nxt in graph[v]:
+            if visited[nxt]:
+                continue
+            if use_total_distance:
+                heapq.heappush(heap, (key + w, nxt, v))   # 다익스트라: 누적 거리
+            else:
+                heapq.heappush(heap, (w, nxt, v))         # 프림: 간선 하나의 비용
+    return chosen
+
+
+print('프림      ', tree_from(1, False))
+print('다익스트라', tree_from(1, True))
+</code></pre>
+<pre class="output">
+프림       [(1, 2), (2, 3)]
+다익스트라 [(1, 2), (1, 3)]
+</pre>
+
+        <p>다익스트라는 1에서 3까지 가장 가까운 길(거리 3)을 원하므로 1-3을 쓰고, 간선 합은 5가 된다. 프림은 모두 이어지기만 하면 되므로 2-3을 써서 합 4를 만든다. 최단 경로 트리는 최소 신장 트리가 아니다.</p>
+      </section>
+
+      <section id="variations">
+        <h2>문제의 모양</h2>
+        <p>최소 신장 트리 문제는 "모든 지점을 잇는 최소 비용"을 묻는 기본형에 조건이 하나씩 붙는 경우가 많다. 크루스칼 하나로 모두 처리할 수 있다.</p>
+        <ul>
+          <li><strong>이미 놓인 간선이 있다</strong> — 비용 0인 간선으로 보고 정렬된 간선보다 먼저 union한다.</li>
+          <li><strong>최대 신장 트리</strong> — 비용 합을 가장 크게 하려면 비용의 부호를 뒤집어 최소를 구하고, 답의 부호를 다시 뒤집는다. 내림차순으로 정렬해도 된다.</li>
+          <li><strong>연결이 안 될 수도 있다</strong> — 간선을 다 봤는데 고른 간선이 n-1개가 안 되면 그래프가 여러 조각으로 떨어져 있다는 뜻이다.</li>
+        </ul>
+
+<pre data-lang="python" data-title="variations.py"><code>
+def find(parent: list[int], x: int) -&gt; int:
+    while parent[x] != x:                    # 반복형 find(28장)
+        parent[x] = parent[parent[x]]
+        x = parent[x]
+    return x
+
+
+def mst_cost(n: int, edges: list[tuple[int, int, int]], already=()) -&gt; int:
+    parent = list(range(n + 1))
+    free = [(a, b, 0) for a, b in already]   # 이미 놓인 간선은 비용 0, 먼저 본다
+    total = used = 0
+    for a, b, w in free + sorted(edges, key=lambda e: e[2]):
+        ra, rb = find(parent, a), find(parent, b)
+        if ra != rb:
+            parent[rb] = ra
+            total += w
+            used += 1
+    return total if used == n - 1 else -1    # n-1개를 못 채우면 연결 불가
+
+
+edges = [(1, 2, 4), (1, 3, 1), (2, 3, 2), (2, 4, 5),
+         (3, 4, 8), (3, 5, 3), (4, 5, 6)]
+print(mst_cost(5, edges))                      # 기본형
+print(mst_cost(5, edges, already=[(3, 4)]))    # 3-4가 이미 있다
+negated = [(a, b, -w) for a, b, w in edges]
+print(-mst_cost(5, negated))                   # 최대 신장 트리
+print(mst_cost(5, edges[:3]))                  # 4·5에 닿는 간선이 없다
+</code></pre>
+<pre class="output">
+11
+6
+23
+-1
+</pre>
+
+        <p>3-4가 이미 있으면 1-3, 2-3, 3-5만 더 지으면 되어 6이다. 최대 신장 트리 23은 1절에서 센 신장 트리 비용의 최댓값과 같다. 기본값을 <code>already=()</code>처럼 튜플로 둔 것은 6장의 가변 기본값 함정을 피하려는 것이다.</p>
+      </section>
+
+      <section id="pitfalls">
+        <h2>자주 하는 실수</h2>
+        <div class="callout callout-warn">
+          <span class="callout-title">다익스트라와 섞기</span>
+          <p>"모든 도시를 잇는 최소 비용"과 "한 도시에서 다른 도시로 가는 최소 비용"은 다른 문제다. 앞은 최소 신장 트리, 뒤는 최단 경로(14장)다. 프림 코드에서 힙에 누적 거리를 넣으면 다익스트라가 되어 답이 틀린다.</p>
+        </div>
+        <div class="callout callout-warn">
+          <span class="callout-title">방향 그래프에 적용하기</span>
+          <p>크루스칼과 프림은 무방향 그래프를 전제로 한다. 방향 그래프의 최소 신장 트리(한 정점에서 모든 정점으로 가는 최소 비용 간선 집합)는 전혀 다른 알고리즘이 필요하다. 반대로 무방향 그래프를 프림으로 풀 때 인접 리스트에 한쪽 방향만 넣으면 방향 그래프처럼 동작해 일부 정점에 닿지 못한다.</p>
+        </div>
+
+<pre data-lang="python" data-title="undirected.py"><code>
+for a, b, w in edges:
+    graph[a].append((w, b))
+    graph[b].append((w, a))   # 이 줄이 빠지면 방향 그래프가 된다
+</code></pre>
+
+        <div class="callout callout-warn">
+          <span class="callout-title">프림에서 꺼낸 뒤 방문 확인을 빼기</span>
+          <p>넣을 때만 방문을 확인하면 충분해 보이지만, 같은 정점이 아직 방문 전일 때 여러 번 힙에 들어간다. 꺼낼 때 확인하지 않으면 그 낡은 항목의 비용이 모두 더해진다.</p>
+        </div>
+
+<pre data-lang="python" data-title="prim_no_check.py"><code>
+import heapq
+
+edges = [(1, 2, 4), (1, 3, 1), (2, 3, 2), (2, 4, 5),
+         (3, 4, 8), (3, 5, 3), (4, 5, 6)]
+graph = [[] for _ in range(6)]
+for a, b, w in edges:
+    graph[a].append((w, b))
+    graph[b].append((w, a))
+
+visited = [False] * 6
+heap = [(0, 1)]
+total = 0
+while heap:
+    w, v = heapq.heappop(heap)           # 꺼낸 뒤 확인이 없다
+    visited[v] = True
+    total += w
+    for nw, nxt in graph[v]:
+        if not visited[nxt]:             # 넣을 때만 확인한다
+            heapq.heappush(heap, (nw, nxt))
+print(total)                             # 11 이어야 한다
+</code></pre>
+<pre class="output">
+34
+</pre>
+
+        <div class="callout callout-warn">
+          <span class="callout-title">간선이 n-1개가 안 됐는데 합을 출력하기</span>
+          <p>그래프가 떨어져 있으면 크루스칼은 에러 없이 끝나고, 몇 조각의 비용 합을 그대로 돌려준다. 프림도 시작 정점이 속한 조각만 돌고 끝난다. 크루스칼은 고른 간선 수를, 프림은 방문한 정점 수를 세어 n-1개, n개인지 확인한다.</p>
+        </div>
+      </section>
+
+      <section id="problem">
+        <h2>대표 문제</h2>
+        <div class="problem">
+          <div class="problem-head">
+            <div class="problem-kicker"><b>Problem</b><span class="chip">보통</span><span class="chip">최소 신장 트리</span></div>
+            <h3>도시 잇기</h3>
+          </div>
+          <div class="problem-body">
+            <p>도시 <code>N</code>개(1번부터 <code>N</code>번)가 있고, 지을 수 있는 양방향 도로 <code>M</code>개의 후보가 있다. 첫 줄에 <code>N M</code>이, 다음 <code>M</code>줄에 도로 후보 <code>a b c</code>(도시 a와 b를 잇는 비용 c)가 주어진다. 모든 도시가 서로 오갈 수 있도록 도로를 지을 때 드는 최소 비용을 출력하라. 어떻게 지어도 모두 이을 수 없으면 <code>-1</code>을 출력하라. <code>1 ≤ N ≤ 10,000</code>, <code>0 ≤ M ≤ 100,000</code>, <code>1 ≤ c ≤ 1,000</code>이다.</p>
+            <div class="table-wrap">
+              <table>
+                <thead><tr><th>입력</th><th>출력</th><th>설명</th></tr></thead>
+                <tbody>
+                  <tr><td><code>3 3</code><br><code>1 2 5</code><br><code>2 3 4</code><br><code>1 3 9</code></td><td><code>9</code></td><td>4와 5를 짓는다. 9를 더하면 사이클이다</td></tr>
+                  <tr><td><code>4 2</code><br><code>1 2 1</code><br><code>3 4 1</code></td><td><code>-1</code></td><td>{1, 2}와 {3, 4}를 잇는 후보가 없다</td></tr>
+                  <tr><td><code>1 0</code></td><td><code>0</code></td><td>도시가 하나면 지을 도로가 없다</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <details class="reveal">
+            <summary>접근 방법<span class="reveal-hint">먼저 생각해 보고 펼치세요</span></summary>
+            <div class="reveal-body">
+              <p><mark>모든 도시를 가장 싸게 잇는 비용은 최소 신장 트리의 비용 합이고, 모두 이을 수 없다는 것은 간선 N-1개를 채우지 못했다는 뜻이다.</mark> 입력이 간선 목록이므로 크루스칼이 잘 맞는다.</p>
+              <ol>
+                <li>도로를 <code>(비용, a, b)</code>로 받아 정렬한다.</li>
+                <li>싼 도로부터 보면서 두 도시의 루트가 다를 때만 합치고 비용을 더한다.</li>
+                <li>고른 도로가 N-1개가 되면 바로 멈춘다.</li>
+                <li>끝난 뒤 고른 도로가 N-1개면 합을, 아니면 -1을 출력한다.</li>
+              </ol>
+            </div>
+          </details>
+
+          <details class="reveal">
+            <summary>풀이 코드</summary>
+            <div class="reveal-body">
+<pre data-lang="python" data-title="connect_cities.py"><code>
+import sys
+
+input = sys.stdin.readline
+
+
+def find(parent: list[int], x: int) -&gt; int:
+    while parent[x] != x:                # 반복형 find: 재귀 한도 걱정이 없다
+        parent[x] = parent[parent[x]]
+        x = parent[x]
+    return x
+
+
+n, m = map(int, input().split())
+roads = []
+for _ in range(m):
+    a, b, cost = map(int, input().split())
+    roads.append((cost, a, b))
+roads.sort()                             # 비용이 첫 원소라 그대로 정렬된다
+
+parent = list(range(n + 1))
+total = 0
+used = 0
+for cost, a, b in roads:
+    if used == n - 1:
+        break
+    ra, rb = find(parent, a), find(parent, b)
+    if ra == rb:
+        continue
+    parent[rb] = ra
+    total += cost
+    used += 1
+
+print(total if used == n - 1 else -1)
+</code></pre>
+<pre class="stdin">
+6 8
+1 2 7
+1 3 9
+2 3 3
+2 4 6
+3 5 2
+4 5 4
+4 6 8
+5 6 5
+</pre>
+<pre class="output">
+21
+</pre>
+              <p>3-5(2), 2-3(3), 4-5(4), 5-6(5)을 고른 뒤 2-4(6)는 이미 이어져 있어 건너뛰고, 1-2(7)로 다섯 번째 도로를 채운다. 합은 21이다. <code>N = 1</code>이면 <code>used == 0 == N - 1</code>이라 0이 나온다.</p>
+            </div>
+          </details>
+
+          <details class="reveal">
+            <summary>복잡도</summary>
+            <div class="reveal-body">
+              <dl class="cx">
+                <dt>시간</dt><dd><span class="bigo b-nlogn">O(M log M)</span> 도로 정렬이 대부분이다. find는 경로 압축으로 거의 상수 시간이다.</dd>
+                <dt>공간</dt><dd><span class="bigo b-linear">O(N + M)</span> 도로 목록과 <code>parent</code> 배열이다.</dd>
+              </dl>
+            </div>
+          </details>
+        </div>
+      </section>
+
+      <section id="recall">
+        <h2>스스로 확인</h2>
+        <div class="recall">
+          <details>
+            <summary>정점이 n개인 그래프의 신장 트리는 왜 간선이 정확히 n-1개인가?</summary>
+            <div class="answer"><p>정점 n개가 따로 있으면 그룹이 n개다. 사이클을 만들지 않는 간선은 두 그룹을 합쳐 그룹 수를 1 줄이므로, 하나로 만들려면 n-1개가 필요하다. 그 이상 넣으면 같은 그룹 안을 잇게 되어 사이클이 생긴다.</p></div>
+          </details>
+          <details>
+            <summary>크루스칼이 간선을 건너뛰는 조건은 무엇이고, 그 간선을 넣으면 왜 사이클이 되는가?</summary>
+            <div class="answer"><p>두 끝의 루트(<code>find</code> 결과)가 같으면 건너뛴다. 루트가 같다는 것은 이미 고른 간선들로 두 끝이 이어져 있다는 뜻이므로, 간선을 하나 더 넣으면 두 끝 사이의 길이 둘이 되어 사이클이 생긴다.</p></div>
+          </details>
+          <details>
+            <summary>간선 1-2(2), 2-3(2), 1-3(3)인 삼각형에서 1을 시작점으로 한 다익스트라의 최단 경로 트리는 왜 최소 신장 트리가 아닌가?</summary>
+            <div class="answer"><p>다익스트라는 3까지의 거리를 최소로 하려고 1-3(거리 3)을 쓰므로 합이 2 + 3 = 5다. 최소 신장 트리는 1-2, 2-3으로 합 4다. 다익스트라는 누적 거리를, 최소 신장 트리는 간선 비용의 합을 줄인다.</p></div>
+          </details>
+          <details>
+            <summary>프림에서 꺼낸 뒤 방문 확인을 빼면 예제 그래프의 답이 11이 아니라 34가 되는 이유는?</summary>
+            <div class="answer"><p>같은 정점이 방문 전에 여러 비용으로 힙에 들어간다. 정점 2는 (4, 2), (2, 2)로, 정점 4는 (8, 4), (5, 4), (6, 4), (5, 4)로 들어갔다. 꺼낼 때 확인하지 않으면 이 낡은 항목의 비용이 모두 합에 더해진다.</p></div>
+          </details>
+        </div>
+      </section>
+
+      <section id="summary">
+        <h2>정리</h2>
+        <ol class="summary-list">
+          <li>신장 트리는 모든 정점을 잇고 사이클이 없는 부분 그래프로, 간선이 정확히 n-1개다. 비용 합이 가장 작은 것이 최소 신장 트리다.</li>
+          <li>컷 속성: 어떤 컷이든 건너는 간선 중 가장 싼 것은 최소 신장 트리에 넣어도 된다. 교환 논증으로 보인다.</li>
+          <li>크루스칼은 간선을 비용 순으로 정렬하고, 유니온 파인드로 사이클이 안 생기는 간선만 넣는다. O(E log E).</li>
+          <li>프림은 한 정점에서 시작해 힙으로 가장 싼 건너는 간선을 꺼낸다. 낡은 항목은 꺼낸 뒤 방문 확인으로 버린다. O(E log V).</li>
+          <li>입력이 간선 목록이면 크루스칼, 밀집 그래프면 프림이 편하다. 프림은 힙에 간선 비용을, 다익스트라는 누적 거리를 넣는다.</li>
+          <li>이미 놓인 간선은 먼저 union하고, 최대 신장 트리는 부호를 뒤집고, 고른 간선이 n-1개 미만이면 연결 불가로 처리한다.</li>
+        </ol>
+      </section>
+
+      <nav class="pager" aria-label="이전 장과 다음 장"></nav>
+    </article>
+  </main>
+
+  <aside class="rail" aria-label="이 페이지 목차">
+    <p class="rail-title">이 페이지</p>
+    <nav id="onthispage"></nav>
+  </aside>
+</div>
+<div class="backdrop" id="backdrop"></div>
+
+<script src="assets/book.js"></script>
+<script src="assets/app.js"></script>
+<script src="assets/code.js"></script>
+</body>
+</html>

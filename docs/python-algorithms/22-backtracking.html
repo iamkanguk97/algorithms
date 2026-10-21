@@ -1,0 +1,631 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>22. 완전 탐색과 백트래킹 — 파이썬 알고리즘 노트</title>
+<script src="assets/theme.js"></script>
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body data-chapter="22">
+<a class="skip-link" href="#content">본문으로 건너뛰기</a>
+<div class="progress" aria-hidden="true"><span></span></div>
+<header class="topbar" id="topbar"></header>
+
+<div class="shell">
+  <aside class="sidebar" id="sidebar" aria-label="책 목차"></aside>
+
+  <main class="main" id="content">
+    <article class="chapter">
+      <header class="chapter-head">
+        <a class="part-pill"></a>
+        <span class="chapter-label"></span>
+        <h1>완전 탐색과 백트래킹</h1>
+        <p class="lede">가능한 경우를 하나도 빠짐없이 만들어 보고 답을 고르는 방법은 가장 단순하면서도 가장 확실합니다. 이 장에서는 경우의 수를 먼저 세는 습관부터, 재귀로 경우를 만들고 가망 없는 가지를 일찍 잘라 내는 백트래킹까지 다룹니다.</p>
+        <div class="chapter-meta">
+          <span class="chip">완전 탐색</span><span class="chip">순열 · 조합</span><span class="chip">재귀</span><span class="chip">상태 되돌리기</span><span class="chip">가지치기</span>
+        </div>
+      </header>
+
+      <div class="goals">
+        <p class="goals-title">이 장에서 배울 것</p>
+        <ul>
+          <li>입력 범위를 보고 경우의 수를 세어 완전 탐색이 시간 안에 되는지 판단할 수 있다</li>
+          <li>반복문과 <code>itertools</code>로 순열, 조합, 부분집합을 만들 수 있다</li>
+          <li><code>visited</code>와 <code>path</code>를 써서 재귀로 순열과 조합을 직접 만들 수 있다</li>
+          <li>재귀에서 돌아올 때 상태를 되돌려야 하는 이유를 설명할 수 있다</li>
+          <li>가지치기로 호출 횟수를 줄이고, 그 효과를 직접 세어 확인할 수 있다</li>
+        </ul>
+      </div>
+
+      <section id="brute-force">
+        <h2>완전 탐색이란</h2>
+        <div class="callout callout-key">
+          <span class="callout-title">핵심</span>
+          <p class="callout-big"><mark>경우의 수를 먼저 센다.</mark> 셀 수 있을 만큼 작으면 전부 본다. 크면 가망 없는 가지를 일찍 자른다.</p>
+        </div>
+        <p><strong>완전 탐색</strong>(brute force)은 답이 될 수 있는 후보를 모두 만들어 하나씩 확인하는 방법이다. 빠뜨리는 경우가 없으니 답이 틀릴 일이 없다. 문제는 시간이다. 후보가 몇 개인지 모르고 시작하면, 맞는 코드가 시간 초과로 끝난다.</p>
+        <p>그래서 코드를 쓰기 전에 후보의 개수부터 센다. 경우를 만드는 방식은 대부분 아래 네 가지 중 하나다. 2장의 어림값인 "1초에 대략 1천만 번"을 기준으로 n의 한계를 함께 적었다.</p>
+
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>경우</th><th>뜻</th><th>개수</th><th>1초 안에 되는 대략의 n</th></tr></thead>
+            <tbody>
+              <tr><td>순열</td><td>n개를 모두 줄 세우기</td><td>n!</td><td>n ≤ 10 (약 363만)</td></tr>
+              <tr><td>조합</td><td>n개 중 r개 고르기, 순서 무시</td><td>C(n, r)</td><td>r이 작으면 n이 커도 된다. C(100, 3) = 161,700</td></tr>
+              <tr><td>부분집합</td><td>각 원소를 넣거나 빼기</td><td>2ⁿ</td><td>n ≤ 20 (약 105만)</td></tr>
+              <tr><td>중복 순열</td><td>n가지 중 하나를 r번 고르기</td><td>nʳ</td><td>nʳ ≤ 1천만 정도. 10⁷이면 n = 10, r = 7</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+<pre data-lang="python" data-title="count_cases.py"><code>
+from math import comb, perm
+
+n = 10
+print(perm(n), comb(n, 3), 2 ** n, n ** 3)
+
+LIMIT = 10_000_000              # 1초에 대략 1천만 번(2장)
+print(perm(10) &lt;= LIMIT, perm(11) &lt;= LIMIT)
+print(2 ** 20 &lt;= LIMIT, 2 ** 24 &lt;= LIMIT)
+</code></pre>
+<pre class="output">
+3628800 120 1024 1000
+True False
+True False
+</pre>
+
+        <p>후보 하나를 만들고 확인하는 데에도 몇 번의 연산이 드니, 실제로는 이 한계보다 넉넉히 잡는다. 반대로 문제의 입력 범위가 n ≤ 10이나 n ≤ 20처럼 유난히 작다면, 그 자체가 "전부 봐도 된다"는 신호다.</p>
+      </section>
+
+      <section id="nested-loops">
+        <h2>반복문으로 고르기</h2>
+        <p>고를 개수가 2개나 3개로 정해져 있으면 반복문을 그만큼 겹치면 된다. 합이 9가 되는 두 수와 세 수를 찾아보자.</p>
+
+<pre data-lang="python" data-title="nested_loops.py"><code>
+nums = [3, 8, 1, 6, 5, 2]
+target = 9
+n = len(nums)
+
+pairs = []
+for i in range(n):
+    for j in range(i + 1, n):            # j 는 항상 i 뒤에서 시작한다
+        if nums[i] + nums[j] == target:
+            pairs.append((nums[i], nums[j]))
+print(pairs)
+
+triples = 0
+for i in range(n):
+    for j in range(i + 1, n):
+        for k in range(j + 1, n):
+            if nums[i] + nums[j] + nums[k] == target:
+                triples += 1
+print(triples)
+</code></pre>
+<pre class="output">
+[(3, 6), (8, 1)]
+2
+</pre>
+
+        <figure class="fig">
+          <div class="cells">
+            <div class="cell" data-i="0">3</div>
+            <div class="cell" data-i="1" data-ptr="i">8</div>
+            <div class="cell is-hl" data-i="2" data-ptr="j">1</div>
+            <div class="cell is-hl" data-i="3">6</div>
+            <div class="cell is-hl" data-i="4">5</div>
+            <div class="cell is-hl" data-i="5">2</div>
+          </div>
+          <figcaption><b>그림 22-1</b> <code>i</code>가 1일 때 <code>j</code>는 2부터 끝까지만 돈다. 앞쪽 짝은 이미 확인했으니 다시 보지 않는다.</figcaption>
+        </figure>
+
+        <p><code>j</code>를 <code>i + 1</code>부터 시작하는 것이 요점이다. <code>(3, 6)</code>과 <code>(6, 3)</code>을 두 번 세지 않고, 자기 자신과 짝짓지도 않는다. 두 수 고르기는 C(n, 2)로 O(n²), 세 수는 O(n³)이다.</p>
+        <p>이 방식은 고를 개수가 코드에 박혀 있다는 한계가 있다. "몇 개를 고를지"가 입력으로 바뀌면 반복문을 몇 겹 쓸지 정할 수 없다. 이럴 때 쓰는 도구가 다음 절의 <code>itertools</code>와 그다음 절의 재귀다. 각 원소를 넣을지 말지를 정수의 비트로 표현하는 방법은 27장 비트마스크에서 다룬다.</p>
+      </section>
+
+      <section id="itertools">
+        <h2>itertools로 경우 만들기</h2>
+        <p>7장에서 본 <code>itertools</code>는 순열과 조합을 대신 만들어 준다. 앞 절의 두 수, 세 수 고르기가 한 줄씩으로 줄어든다.</p>
+
+<pre data-lang="python" data-title="itertools_cases.py"><code>
+from itertools import combinations, permutations, product
+
+nums = [3, 8, 1, 6, 5, 2]
+target = 9
+
+print([pair for pair in combinations(nums, 2) if sum(pair) == target])
+print(sum(1 for triple in combinations(nums, 3) if sum(triple) == target))
+
+digits = [2, 7, 4]
+print(max(permutations(digits)))           # 세 자리를 가장 크게 늘어놓기
+print(len(list(product('01', repeat=4))))  # 0/1 네 자리: 2⁴ 가지
+</code></pre>
+<pre class="output">
+[(3, 6), (8, 1)]
+2
+(7, 4, 2)
+16
+</pre>
+
+        <p><code>permutations</code>는 순열, <code>combinations</code>는 조합, <code>product</code>는 중복 순열을 만든다. <code>product([0, 1], repeat=n)</code>은 각 원소를 넣을지(1) 뺄지(0)의 모든 조합이라 부분집합을 만드는 데에도 쓴다. 모두 C로 구현돼 있어 직접 짠 재귀보다 빠르다.</p>
+        <div class="callout callout-tip">
+          <span class="callout-title">팁</span>
+          <p>"전부 만들어 본 뒤 조건을 확인"하면 되는 문제는 <code>itertools</code>가 가장 짧고 빠르다. 만드는 도중에 조건을 보고 멈춰야 한다면 재귀로 직접 만든다.</p>
+        </div>
+      </section>
+
+      <section id="recursive">
+        <h2>재귀로 직접 만들기</h2>
+        <p><code>itertools</code>는 경우를 끝까지 다 만든 다음에야 건네준다. 세 번째 자리에서 이미 틀렸다는 것을 알아도 나머지 자리까지 채운다. 경우를 만드는 과정에 끼어들려면 직접 만들어야 한다.</p>
+        <p>순열을 만드는 과정은 "자리를 하나씩 채우는 일"로 볼 수 있다. 첫 자리에 무엇을 놓을지 고르고, 남은 것으로 둘째 자리를 고르고, 이것을 자리가 다 찰 때까지 반복한다. 매 자리에서 하는 일이 같으니 재귀(6장)로 짠다. 필요한 상태는 둘이다.</p>
+        <ul>
+          <li><strong><code>path</code></strong> — 지금까지 고른 원소의 리스트</li>
+          <li><strong><code>visited</code></strong> — <code>visited[i]</code>가 참이면 i번 원소는 이미 <code>path</code>에 있다</li>
+        </ul>
+
+<pre data-lang="python" data-title="permutations_recursive.py"><code>
+def permutations(nums: list[int]) -&gt; list[list[int]]:
+    result = []
+    visited = [False] * len(nums)     # i번 원소를 이미 썼는가
+    path = []                         # 지금까지 고른 원소
+
+    def choose() -&gt; None:
+        if len(path) == len(nums):    # 다 골랐다: 순열 하나 완성
+            result.append(path[:])    # 복사본을 넣는다
+            return
+        for i in range(len(nums)):
+            if visited[i]:
+                continue
+            visited[i] = True
+            path.append(nums[i])
+            choose()                  # 다음 자리를 고른다
+            path.pop()                # 고른 것을 되돌린다
+            visited[i] = False
+
+    choose()
+    return result
+
+
+for p in permutations([1, 2, 3]):
+    print(p)
+</code></pre>
+<pre class="output">
+[1, 2, 3]
+[1, 3, 2]
+[2, 1, 3]
+[2, 3, 1]
+[3, 1, 2]
+[3, 2, 1]
+</pre>
+
+        <p>조합은 순서를 따지지 않으므로 <code>visited</code> 대신 "어디부터 고를 수 있는가"를 넘긴다. <code>i</code>번을 골랐다면 다음은 <code>i + 1</code>번부터 고른다. 앞 절 반복문의 <code>range(i + 1, n)</code>과 같은 생각이다.</p>
+
+<pre data-lang="python" data-title="combinations_recursive.py"><code>
+def combinations(nums: list[int], r: int) -&gt; list[list[int]]:
+    result = []
+    path = []
+
+    def choose(start: int) -&gt; None:
+        if len(path) == r:
+            result.append(path[:])
+            return
+        for i in range(start, len(nums)):   # start 앞으로는 돌아가지 않는다
+            path.append(nums[i])
+            choose(i + 1)
+            path.pop()
+
+    choose(0)
+    return result
+
+
+print(combinations([1, 2, 3, 4], 2))
+print(len(combinations([1, 2, 3, 4], 2)))
+</code></pre>
+<pre class="output">
+[[1, 2], [1, 3], [1, 4], [2, 3], [2, 4], [3, 4]]
+6
+</pre>
+        <p>고를 개수 <code>r</code>이 인자라서 반복문을 몇 겹 쓸지 고민할 필요가 없다. 재귀 깊이가 곧 반복문의 겹 수가 된다.</p>
+      </section>
+
+      <section id="backtracking">
+        <h2>상태 되돌리기</h2>
+        <p>앞의 두 코드에는 <code>append</code> 뒤에 반드시 <code>pop</code>이 짝으로 붙어 있다. 이렇게 한 가지를 골라 끝까지 가 본 뒤, 고른 것을 취소하고 바로 전 갈림길로 돌아가 다른 것을 고르는 탐색을 <strong>백트래킹</strong>(backtracking)이라고 한다. 미로에서 막다른 길을 만나면 마지막 갈림길까지 되돌아가는 것과 같다.</p>
+        <p><code>[1, 2]</code>의 순열을 만들 때 <code>path</code>가 어떻게 바뀌는지 찍어 보자.</p>
+
+<pre data-lang="python" data-title="trace_backtracking.py"><code>
+nums = [1, 2]
+path = []
+visited = [False] * len(nums)
+
+
+def choose(depth: int) -&gt; None:
+    for i in range(len(nums)):
+        if visited[i]:
+            continue
+        visited[i] = True
+        path.append(nums[i])
+        done = ' 완성' if len(path) == len(nums) else ''
+        print('  ' * depth + f'append -&gt; {path}{done}')
+        choose(depth + 1)
+        path.pop()
+        visited[i] = False
+        print('  ' * depth + f'pop    -&gt; {path}')
+
+
+choose(0)
+</code></pre>
+<pre class="output">
+append -&gt; [1]
+  append -&gt; [1, 2] 완성
+  pop    -&gt; [1]
+pop    -&gt; []
+append -&gt; [2]
+  append -&gt; [2, 1] 완성
+  pop    -&gt; [2]
+pop    -&gt; []
+</pre>
+
+        <figure class="fig">
+          <div class="fig-steps">
+            <div class="fig-state">
+              <div class="cells vertical">
+                <div class="cell" data-ptr="path">1</div>
+              </div>
+              <span class="fig-state-label">1 고름</span>
+            </div>
+            <div class="fig-arrow">append</div>
+            <div class="fig-state">
+              <div class="cells vertical">
+                <div class="cell">1</div>
+                <div class="cell is-hl" data-ptr="완성">2</div>
+              </div>
+              <span class="fig-state-label">[1, 2]</span>
+            </div>
+            <div class="fig-arrow">pop × 2</div>
+            <div class="fig-state">
+              <div class="cells vertical">
+                <div class="cell is-ghost">1</div>
+                <div class="cell is-ghost">2</div>
+              </div>
+              <span class="fig-state-label">빈 path</span>
+            </div>
+          </div>
+          <div class="fig-steps">
+            <div class="fig-state">
+              <div class="cells vertical">
+                <div class="cell is-ghost">1</div>
+                <div class="cell is-ghost">2</div>
+              </div>
+              <span class="fig-state-label">빈 path</span>
+            </div>
+            <div class="fig-arrow">append × 2</div>
+            <div class="fig-state">
+              <div class="cells vertical">
+                <div class="cell">2</div>
+                <div class="cell is-hl" data-ptr="완성">1</div>
+              </div>
+              <span class="fig-state-label">[2, 1]</span>
+            </div>
+          </div>
+          <figcaption><b>그림 22-2</b> <code>path</code>는 스택처럼 쌓였다 빠진다. 다 비운 뒤에야 첫 자리에 2를 놓는 새 가지로 들어간다.</figcaption>
+        </figure>
+
+        <p>되돌려야 하는 이유는 <mark><code>path</code>와 <code>visited</code>가 모든 호출이 함께 쓰는 리스트 하나</mark>이기 때문이다. 호출마다 복사본을 만들면 되돌릴 필요가 없지만, 매번 O(n)의 복사가 든다. 하나를 공유하고 고친 만큼만 되돌리면 복사 없이 탐색할 수 있다. 그 대가로 "고친 것은 돌아올 때 반드시 원래대로"라는 규칙을 지켜야 한다. 되돌리지 않으면 다음 가지가 앞 가지의 흔적을 안고 시작한다.</p>
+        <p>모든 백트래킹은 같은 틀을 따른다.</p>
+
+<pre data-lang="python" data-title="backtracking_template.py"><code>
+def backtrack(state):
+    if is_complete(state):          # 끝까지 왔다
+        record(state)
+        return
+    for choice in candidates(state):
+        if not is_promising(state, choice):
+            continue                # 가지치기 (다음 절)
+        apply(state, choice)        # 고른다
+        backtrack(state)
+        undo(state, choice)         # 되돌린다
+</code></pre>
+      </section>
+
+      <section id="pruning">
+        <h2>가지치기</h2>
+        <p>탐색 과정을 나무로 그리면, 갈림길마다 가지가 갈라지고 맨 끝 잎 하나하나가 후보 하나다. 어떤 갈림길에서 "여기서부터는 무엇을 골라도 답이 될 수 없다"는 것을 안다면, 그 아래 가지 전체를 보지 않아도 된다. 이것을 <strong>가지치기</strong>(pruning)라고 한다. 재귀로 직접 만드는 이유가 바로 여기에 있다.</p>
+        <p>양의 정수 중에서 합이 10이 되는 부분집합을 세어 보자. 원소가 모두 양수이니, 지금까지의 합이 이미 10 이상이면 더 넣어 봐야 커지기만 한다. 가지치기 전후로 호출 횟수를 센다.</p>
+
+<pre data-lang="python" data-title="subset_sum_pruning.py"><code>
+nums = [5, 3, 8, 2, 7, 4, 6, 1]
+target = 10
+
+
+def count_subsets(prune: bool) -&gt; tuple[int, int]:
+    """합이 target 인 부분집합의 수와 choose 호출 횟수를 돌려준다."""
+    found = 0
+    calls = 0
+
+    def choose(start: int, total: int) -&gt; None:
+        nonlocal found, calls
+        calls += 1
+        if total == target:
+            found += 1
+        if prune and total &gt;= target:       # 더 더해도 작아지지 않는다
+            return
+        for i in range(start, len(nums)):
+            choose(i + 1, total + nums[i])
+
+    choose(0, 0)
+    return found, calls
+
+
+print(count_subsets(prune=False))
+print(count_subsets(prune=True))
+</code></pre>
+<pre class="output">
+(8, 256)
+(8, 64)
+</pre>
+
+        <p>답은 8개로 같고, 호출은 256번에서 64번으로 줄었다. 가지치기 없이는 부분집합 2⁸ = 256개를 하나도 빼지 않고 만든다. 이 차이는 n이 커질수록 벌어진다.</p>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>가지치기 조건이 지켜야 할 것</th><th>이 예제에서</th></tr></thead>
+            <tbody>
+              <tr><td>답이 될 가능성이 있는 가지는 자르지 않는다</td><td>양수만 있어서 합이 줄어들 수 없다. 음수가 섞이면 이 조건은 틀린다</td></tr>
+              <tr><td>판단이 싸야 한다</td><td>비교 한 번이다. 판단에 O(n)이 들면 아낀 만큼 다시 쓴다</td></tr>
+              <tr><td>되도록 위에서 자른다</td><td>얕은 곳에서 자를수록 그 아래 가지가 많이 사라진다</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <p>가지치기는 최악의 경우 복잡도를 바꾸지 못할 때가 많다. 그래도 실제로 도는 호출 수를 크게 줄여서, 완전 탐색으로는 시간이 모자라던 문제를 통과하게 만든다. 원소를 미리 정렬해 두면 "이 원소를 넣어 넘친다면 뒤의 더 큰 원소도 넘친다"가 성립해 반복문을 <code>break</code>로 끊을 수도 있다.</p>
+      </section>
+
+      <section id="pitfalls">
+        <h2>자주 하는 실수</h2>
+        <div class="callout callout-warn">
+          <span class="callout-title">결과에 path를 그대로 넣기</span>
+          <p><code>result.append(path)</code>는 리스트의 복사본이 아니라 같은 리스트를 가리키는 이름을 넣는다. 탐색이 끝나면 <code>path</code>는 다 비워지므로, 결과가 모두 같은 빈 리스트가 된다.</p>
+        </div>
+
+<pre data-lang="python" data-title="path_alias.py"><code>
+def subsets(nums: list[int]) -&gt; list[list[int]]:
+    result = []
+    path = []
+
+    def choose(start: int) -&gt; None:
+        result.append(path)            # path 자체를 넣었다
+        for i in range(start, len(nums)):
+            path.append(nums[i])
+            choose(i + 1)
+            path.pop()
+
+    choose(0)
+    return result
+
+
+print(subsets([1, 2]))     # [[], [1], [1, 2], [2]] 를 기대했다
+</code></pre>
+<pre class="output">
+[[], [], [], []]
+</pre>
+        <p><code>result.append(path[:])</code>나 <code>list(path)</code>로 그 순간의 복사본을 넣는다(복사는 3장).</p>
+
+        <div class="callout callout-warn">
+          <span class="callout-title">visited 복구 누락</span>
+          <p><code>path.pop()</code>만 하고 <code>visited[i] = False</code>를 빠뜨리면, 한 번 쓴 원소를 다른 가지에서 다시 쓰지 못한다. 순열 6개 중 첫 번째만 나오고 끝난다. 고친 상태가 몇 개든 돌아올 때 모두 되돌린다.</p>
+        </div>
+
+        <div class="callout callout-warn">
+          <span class="callout-title">같은 값이 있는데 중복을 거르지 않기</span>
+          <p>원소에 같은 값이 있으면 위치는 달라도 값이 같은 순열이 여러 번 나온다.</p>
+        </div>
+
+<pre data-lang="python" data-title="duplicate_permutations.py"><code>
+from itertools import permutations
+
+nums = [1, 1, 2]
+print(list(permutations(nums)))         # 같은 순열이 두 번씩 나온다
+print(len(set(permutations(nums))))     # 집합으로 거르면 3개
+</code></pre>
+<pre class="output">
+[(1, 1, 2), (1, 2, 1), (1, 1, 2), (1, 2, 1), (2, 1, 1), (2, 1, 1)]
+3
+</pre>
+        <p>집합으로 거르면 답은 맞지만 중복까지 다 만든 뒤라 느리다. 처음부터 만들지 않으려면 정렬한 뒤, 같은 값은 앞의 것을 먼저 쓴 경우에만 뒤의 것을 쓰게 한다.</p>
+
+<pre data-lang="python" data-title="unique_permutations.py"><code>
+def unique_permutations(nums: list[int]) -&gt; list[list[int]]:
+    nums = sorted(nums)               # 같은 값을 이웃하게 둔다
+    result = []
+    path = []
+    visited = [False] * len(nums)
+
+    def choose() -&gt; None:
+        if len(path) == len(nums):
+            result.append(path[:])
+            return
+        for i in range(len(nums)):
+            if visited[i]:
+                continue
+            if i &gt; 0 and nums[i] == nums[i - 1] and not visited[i - 1]:
+                continue              # 같은 값은 앞의 것부터 쓴다
+            visited[i] = True
+            path.append(nums[i])
+            choose()
+            path.pop()
+            visited[i] = False
+
+    choose()
+    return result
+
+
+print(unique_permutations([1, 1, 2]))
+</code></pre>
+<pre class="output">
+[[1, 1, 2], [1, 2, 1], [2, 1, 1]]
+</pre>
+
+        <div class="callout callout-warn">
+          <span class="callout-title">재귀 깊이</span>
+          <p>재귀 깊이는 "몇 번 골랐는가"와 같다. 순열이나 조합은 n이 작아 문제가 없지만, 격자를 한 칸씩 따라가는 백트래킹은 깊이가 칸 수만큼 될 수 있다. 깊이가 1000에 가까우면 <code>sys.setrecursionlimit</code>으로 한도를 올린다(6장).</p>
+        </div>
+      </section>
+
+      <section id="problem">
+        <h2>대표 문제</h2>
+        <div class="problem">
+          <div class="problem-head">
+            <div class="problem-kicker"><b>Problem</b><span class="chip">보통</span><span class="chip">백트래킹</span></div>
+            <h3>N-Queen</h3>
+          </div>
+          <div class="problem-body">
+            <p>체스의 퀸은 같은 가로줄, 같은 세로줄, 같은 대각선에 있는 말을 공격할 수 있다. N×N 판에 퀸 N개를 어떤 두 퀸도 서로 공격하지 못하게 놓으려 한다. 첫 줄에 정수 <code>N</code>이 주어진다(1 ≤ N ≤ 10). 가능한 배치의 수를 출력하라.</p>
+            <div class="table-wrap">
+              <table>
+                <thead><tr><th>입력</th><th>출력</th><th>설명</th></tr></thead>
+                <tbody>
+                  <tr><td><code>4</code></td><td><code>2</code></td><td>그림 22-3의 배치와, 그것을 좌우로 뒤집은 배치</td></tr>
+                  <tr><td><code>3</code></td><td><code>0</code></td><td>어떻게 놓아도 두 퀸이 서로 공격한다</td></tr>
+                  <tr><td><code>1</code></td><td><code>1</code></td><td>한 칸에 하나를 놓는다</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <details class="reveal">
+            <summary>접근 방법<span class="reveal-hint">먼저 생각해 보고 펼치세요</span></summary>
+            <div class="reveal-body">
+              <p>퀸이 N개이고 가로줄도 N개인데, 한 줄에 둘이 있으면 서로 공격한다. 그러니 <mark>각 가로줄에 정확히 하나씩</mark> 놓인다. 칸 N²개 중 N개를 고르는 문제가 "줄마다 몇 번째 열에 놓을까"로 줄어든다.</p>
+              <ol>
+                <li>0번 줄부터 차례로, 그 줄의 각 열에 퀸을 놓아 본다.</li>
+                <li>그 칸의 세로줄이나 두 대각선에 이미 퀸이 있으면 그 가지는 자른다.</li>
+                <li>놓을 수 있으면 표시하고 다음 줄로 재귀한다. 돌아오면 표시를 지운다.</li>
+                <li>N번 줄까지 내려왔다면 N개를 다 놓은 것이니 하나를 센다.</li>
+              </ol>
+              <p>공격 확인을 O(1)로 하려면 칸이 어느 대각선에 있는지 번호로 바로 알아야 한다. ↙ 방향 대각선 위의 칸은 <code>row + col</code>이 모두 같고, ↘ 방향은 <code>row - col</code>이 모두 같다. 세 종류의 줄을 불리언 리스트 세 개로 기록한다.</p>
+              <figure class="fig">
+                <div class="fig-steps">
+                  <div class="fig-state">
+                    <div class="cells">
+                      <div class="cell">·</div><div class="cell is-hl">Q</div><div class="cell">·</div><div class="cell">·</div>
+                    </div>
+                    <div class="cells">
+                      <div class="cell">·</div><div class="cell">·</div><div class="cell">·</div><div class="cell is-hl">Q</div>
+                    </div>
+                    <div class="cells">
+                      <div class="cell is-hl">Q</div><div class="cell">·</div><div class="cell">·</div><div class="cell">·</div>
+                    </div>
+                    <div class="cells">
+                      <div class="cell">·</div><div class="cell">·</div><div class="cell is-hl">Q</div><div class="cell">·</div>
+                    </div>
+                    <span class="fig-state-label">열 = [1, 3, 0, 2]</span>
+                  </div>
+                </div>
+                <figcaption><b>그림 22-3</b> N = 4의 배치 하나. 줄마다 하나씩, 어떤 두 퀸도 같은 열이나 대각선에 있지 않다.</figcaption>
+              </figure>
+            </div>
+          </details>
+
+          <details class="reveal">
+            <summary>풀이 코드</summary>
+            <div class="reveal-body">
+<pre data-lang="python" data-title="n_queen.py"><code>
+import sys
+
+input = sys.stdin.readline
+
+n = int(input())
+cols = [False] * n               # 그 열에 퀸이 있는가
+diag1 = [False] * (2 * n - 1)    # row + col 이 같은 대각선(↙)
+diag2 = [False] * (2 * n - 1)    # row - col 이 같은 대각선(↘), n-1 을 더해 0부터
+count = 0
+
+
+def place(row: int) -&gt; None:
+    global count
+    if row == n:                 # 모든 줄에 하나씩 놓았다
+        count += 1
+        return
+    for col in range(n):
+        d1, d2 = row + col, row - col + n - 1
+        if cols[col] or diag1[d1] or diag2[d2]:
+            continue             # 공격받는 칸: 이 가지는 자른다
+        cols[col] = diag1[d1] = diag2[d2] = True
+        place(row + 1)
+        cols[col] = diag1[d1] = diag2[d2] = False   # 되돌린다
+
+
+place(0)
+print(count)
+</code></pre>
+<pre class="stdin">
+8
+</pre>
+<pre class="output">
+92
+</pre>
+              <p><code>row - col</code>은 -(n-1)부터 n-1까지라 음수가 나온다. <code>n - 1</code>을 더해 0부터 시작하는 인덱스로 옮겼다. 줄마다 하나씩 놓기 때문에 가로줄 검사는 따로 필요 없다.</p>
+            </div>
+          </details>
+
+          <details class="reveal">
+            <summary>복잡도</summary>
+            <div class="reveal-body">
+              <dl class="cx">
+                <dt>시간</dt><dd><span class="bigo b-quad">O(N!)</span> 줄마다 앞에서 쓴 열을 빼고 고르므로 최악이라도 N × (N-1) × … 이다. 실제로는 대각선 가지치기 덕분에 훨씬 적어서, N = 10에서 <code>place</code> 호출은 35,539번이다. 칸마다 놓아 보는 Nᴺ = 100억과 비교된다.</dd>
+                <dt>공간</dt><dd><span class="bigo b-linear">O(N)</span> 표시용 리스트 세 개와, 깊이 N + 1의 호출 스택만 쓴다.</dd>
+              </dl>
+            </div>
+          </details>
+        </div>
+      </section>
+
+      <section id="recall">
+        <h2>스스로 확인</h2>
+        <div class="recall">
+          <details>
+            <summary>n = 12인 수열의 순열을 모두 만들어 확인하는 풀이는 1초 안에 끝날까?</summary>
+            <div class="answer"><p>어렵다. 12!은 약 4억 8천만이고, 1초에 대략 1천만 번이라는 어림값으로 수십 초가 걸린다. 표에서 본 대로 순열 전체는 n ≤ 10 정도까지만 통한다. 이보다 크면 가지치기나 다른 방법을 찾는다.</p></div>
+          </details>
+          <details>
+            <summary>백트래킹에서 <code>result.append(path)</code>로 저장하면 결과가 모두 빈 리스트가 되는 이유는?</summary>
+            <div class="answer"><p>결과에 들어간 것이 모두 같은 리스트 <code>path</code>이기 때문이다. 탐색이 끝나면 <code>pop</code>으로 <code>path</code>가 다 비워지고, 결과의 모든 항목이 그 빈 리스트를 가리킨다. <code>path[:]</code>로 복사해 넣는다.</p></div>
+          </details>
+          <details>
+            <summary>재귀로 조합을 만들 때 <code>visited</code> 대신 <code>start</code>를 넘기는 이유는?</summary>
+            <div class="answer"><p>조합은 순서를 따지지 않아서 <code>[1, 2]</code>와 <code>[2, 1]</code>을 같은 것으로 본다. 다음 원소를 항상 지금 고른 원소의 뒤에서만 고르면 원소가 오름차순 위치로만 뽑혀, 같은 조합이 한 번만 나온다. 이미 쓴 원소를 다시 고를 일도 없으니 <code>visited</code>가 필요 없다.</p></div>
+          </details>
+          <details>
+            <summary>N-Queen에서 두 칸이 같은 대각선에 있는지 <code>row + col</code>과 <code>row - col</code>로 판단할 수 있는 이유는?</summary>
+            <div class="answer"><p>↙ 방향으로 한 칸 가면 행은 1 늘고 열은 1 줄어서 <code>row + col</code>이 그대로다. ↘ 방향으로 한 칸 가면 행과 열이 함께 1씩 늘어 <code>row - col</code>이 그대로다. 그래서 이 두 값이 대각선의 번호가 된다.</p></div>
+          </details>
+        </div>
+      </section>
+
+      <section id="summary">
+        <h2>정리</h2>
+        <ol class="summary-list">
+          <li>완전 탐색은 모든 후보를 확인하므로 확실하다. 코드를 쓰기 전에 후보의 개수부터 세어 시간 안에 되는지 본다.</li>
+          <li>순열 n!은 n ≤ 10, 부분집합 2ⁿ은 n ≤ 20 정도가 1초 안의 대략적인 한계다. 입력 범위가 유난히 작으면 완전 탐색을 의심한다.</li>
+          <li>고를 개수가 정해져 있으면 반복문, 다 만든 뒤 확인하면 되면 <code>itertools</code>, 만드는 도중에 멈춰야 하면 재귀로 직접 만든다.</li>
+          <li>재귀로 순열은 <code>visited</code>와 <code>path</code>로, 조합은 <code>start</code>와 <code>path</code>로 만든다. 결과에는 <code>path[:]</code>를 넣는다.</li>
+          <li>백트래킹은 공유하는 상태를 고르고, 재귀하고, 되돌린다. <code>append</code>와 <code>pop</code>, <code>True</code>와 <code>False</code>는 늘 짝을 이룬다.</li>
+          <li>가지치기는 답이 될 수 없는 가지만 일찍 자른다. 조건이 정말 안전한지(음수가 섞이지 않는지 등) 확인하고, 호출 수를 세어 효과를 본다.</li>
+        </ol>
+      </section>
+
+      <nav class="pager" aria-label="이전 장과 다음 장"></nav>
+    </article>
+  </main>
+
+  <aside class="rail" aria-label="이 페이지 목차">
+    <p class="rail-title">이 페이지</p>
+    <nav id="onthispage"></nav>
+  </aside>
+</div>
+<div class="backdrop" id="backdrop"></div>
+
+<script src="assets/book.js"></script>
+<script src="assets/app.js"></script>
+<script src="assets/code.js"></script>
+</body>
+</html>
