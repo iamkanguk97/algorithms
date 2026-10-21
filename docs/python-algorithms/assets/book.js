@@ -54,10 +54,13 @@ window.BOOK = {
         { no: '20', slug: '20-binary-search', title: '이진 탐색', desc: '절반씩 줄여 찾기, 파라메트릭 서치', isWritten: false },
         { no: '21', slug: '21-two-pointers', title: '투 포인터와 슬라이딩 윈도우', desc: '두 위치를 움직여 구간을 한 번에 훑기', isWritten: false },
         { no: '22', slug: '22-backtracking', title: '완전 탐색과 백트래킹', desc: '모든 경우를 보되, 가망 없는 가지는 일찍 자르기', isWritten: false },
-        { no: '23', slug: '23-greedy', title: '그리디', desc: '매 순간의 최선이 전체의 최선이 되는 조건', isWritten: false },
-        { no: '24', slug: '24-divide-and-conquer', title: '분할 정복', desc: '문제를 쪼개서 풀고 다시 합치기', isWritten: false },
-        { no: '25', slug: '25-dynamic-programming', title: '다이나믹 프로그래밍', desc: '겹치는 부분 문제의 답을 저장해 다시 쓰기', isWritten: false },
-        { no: '26', slug: '26-bit-manipulation', title: '비트 조작', desc: '비트 연산자와 자주 쓰는 비트 기법', isWritten: false }
+        { no: '23', slug: '23-prefix-sum', title: '누적합', desc: '구간 합을 미리 더해 두고 O(1)에 꺼내기, 차분 배열', isWritten: false },
+        { no: '24', slug: '24-greedy', title: '그리디', desc: '매 순간의 최선이 전체의 최선이 되는 조건', isWritten: false },
+        { no: '25', slug: '25-divide-and-conquer', title: '분할 정복', desc: '문제를 쪼개서 풀고 다시 합치기', isWritten: false },
+        { no: '26', slug: '26-dynamic-programming', title: '다이나믹 프로그래밍', desc: '겹치는 부분 문제의 답을 저장해 다시 쓰기', isWritten: false },
+        { no: '27', slug: '27-bit-manipulation', title: '비트 조작', desc: '비트 연산자와 자주 쓰는 비트 기법', isWritten: false },
+        { no: '28', slug: '28-union-find', title: '유니온 파인드', desc: '서로소 집합을 합치고 찾기, 사이클 판별', isWritten: false },
+        { no: '29', slug: '29-minimum-spanning-tree', title: '최소 신장 트리', desc: '크루스칼과 프림으로 모든 정점을 가장 싸게 잇기', isWritten: false }
       ]
     }
   ]
