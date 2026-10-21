@@ -1,0 +1,645 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>12. 해시 테이블 — 파이썬 알고리즘 노트</title>
+<script src="assets/theme.js"></script>
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body data-chapter="12">
+<a class="skip-link" href="#content">본문으로 건너뛰기</a>
+<div class="progress" aria-hidden="true"><span></span></div>
+<header class="topbar" id="topbar"></header>
+
+<div class="shell">
+  <aside class="sidebar" id="sidebar" aria-label="책 목차"></aside>
+
+  <main class="main" id="content">
+    <article class="chapter">
+      <header class="chapter-head">
+        <a class="part-pill"></a>
+        <span class="chapter-label"></span>
+        <h1>해시 테이블</h1>
+        <p class="lede">4장에서 딕셔너리와 집합은 해시 덕분에 거의 한 번에 찾는다고 했습니다. 이 장은 그 "거의"의 속을 들여다봅니다. 키가 칸 번호가 되는 과정, 두 키가 같은 칸을 원할 때의 처리, 표가 찼을 때 파이썬이 하는 일을 작은 해시 테이블을 직접 만들며 확인합니다.</p>
+        <div class="chapter-meta">
+          <span class="chip">hash()</span><span class="chip">버킷</span><span class="chip">충돌</span><span class="chip">적재율</span><span class="chip">체이닝</span>
+        </div>
+      </header>
+
+      <div class="goals">
+        <p class="goals-title">이 장에서 배울 것</p>
+        <ul>
+          <li>키가 해시 함수를 거쳐 칸 번호가 되는 과정을 설명할 수 있다</li>
+          <li>충돌이 왜 피할 수 없는지, 체이닝과 개방 주소법이 충돌을 어떻게 다루는지 안다</li>
+          <li>적재율이 높아지면 왜 느려지고, 표를 늘리면 왜 평균 O(1)이 지켜지는지 안다</li>
+          <li>체이닝 해시 테이블을 직접 만들어 넣기·찾기·지우기를 할 수 있다</li>
+          <li><code>__hash__</code>와 <code>__eq__</code>의 약속을 알고, <code>1</code>·<code>1.0</code>·<code>True</code>가 한 키인 이유를 설명할 수 있다</li>
+        </ul>
+      </div>
+
+      <section id="what-is-hash-table">
+        <h2>해시 테이블이란</h2>
+        <div class="callout callout-key">
+          <span class="callout-title">핵심</span>
+          <p class="callout-big">해시 테이블은 <mark>키를 해시 함수에 넣어 칸 번호를 얻고, 그 칸에 값을 둔다</mark>. 찾을 때도 같은 계산을 하므로 어느 칸을 볼지 바로 안다.</p>
+        </div>
+        <p>딕셔너리와 집합(4장)의 바닥에 있는 구조가 <strong>해시 테이블(hash table)</strong>이다. 이 장은 4장이 미뤄 둔 두 질문, "평균"이라는 말이 왜 붙는지와 파이썬이 표를 늘려 충돌을 줄이는 방식을 다룬다.</p>
+        <p>해시 테이블은 세 조각으로 이루어진다.</p>
+        <ul>
+          <li><strong>칸(bucket, 버킷)</strong>이 줄지어 있는 배열. 칸 수를 m이라고 하자.</li>
+          <li>키를 정수로 바꾸는 <strong>해시 함수</strong> <code>hash()</code>.</li>
+          <li>그 정수를 0 이상 m 미만의 칸 번호로 접는 규칙. 가장 단순한 규칙이 <code>hash(key) % m</code>이다.</li>
+        </ul>
+        <p>칸 번호만 알면 배열이니 "시작 위치 + 칸 크기 × 번호"로 한 번에 간다(8장). 키가 백만 개여도 계산은 한 번이다. 그래서 찾기가 O(1)이다.</p>
+
+        <figure class="fig">
+          <div class="fig-steps">
+            <div class="fig-state">
+              <div class="cells">
+                <div class="cell">17</div>
+                <div class="cell">12</div>
+                <div class="cell">5</div>
+              </div>
+              <span class="fig-state-label">키</span>
+            </div>
+            <div class="fig-arrow">hash(key) % 8</div>
+            <div class="fig-state">
+              <div class="buckets">
+                <div class="bucket" data-i="0"></div>
+                <div class="bucket" data-i="1"><div class="cell is-hl">17</div></div>
+                <div class="bucket" data-i="2"></div>
+                <div class="bucket" data-i="3"></div>
+                <div class="bucket" data-i="4"><div class="cell is-hl">12</div></div>
+                <div class="bucket" data-i="5"><div class="cell is-hl">5</div></div>
+                <div class="bucket" data-i="6"></div>
+                <div class="bucket" data-i="7"></div>
+              </div>
+              <span class="fig-state-label">칸 8개짜리 표</span>
+            </div>
+          </div>
+          <figcaption><b>그림 12-1</b> 정수의 해시 값은 자기 자신이므로 17은 17 % 8 = 1번, 12는 4번, 5는 5번 칸에 들어간다.</figcaption>
+        </figure>
+
+<pre data-lang="python" data-title="bucket_index.py"><code>
+SIZE = 8                                   # 칸이 8개인 작은 표
+
+for key in (17, 12, 5, 8, 33):
+    print(f'{key:&gt;2} -&gt; hash {hash(key):&gt;2} -&gt; {hash(key) % SIZE}번 칸')
+</code></pre>
+<pre class="output">
+17 -&gt; hash 17 -&gt; 1번 칸
+12 -&gt; hash 12 -&gt; 4번 칸
+ 5 -&gt; hash  5 -&gt; 5번 칸
+ 8 -&gt; hash  8 -&gt; 0번 칸
+33 -&gt; hash 33 -&gt; 1번 칸
+</pre>
+
+        <p>17과 33이 같은 1번 칸을 원한다. 이 <strong>충돌</strong>은 해시 함수를 먼저 본 뒤에 다룬다.</p>
+      </section>
+
+      <section id="hash-function">
+        <h2>해시 함수</h2>
+        <p>해시 함수는 어떤 값이든 받아 정수 하나를 돌려주는 함수다(4장). 해시 테이블의 재료로 쓰려면 세 가지를 갖춰야 한다.</p>
+        <ul>
+          <li><strong>같은 값에는 언제나 같은 해시 값</strong>을 준다. 아니면 넣은 칸과 찾는 칸이 어긋난다.</li>
+          <li><strong>빠르다.</strong> 찾을 때마다 부르기 때문이다.</li>
+          <li><strong>고르게 퍼뜨린다.</strong> 키들이 몇 칸에 몰리면 충돌이 늘어난다.</li>
+        </ul>
+
+        <h3>정수의 해시</h3>
+        <p>파이썬에서 정수의 해시 값은 거의 자기 자신이다. 정확히는 2<sup>61</sup> − 1로 나눈 나머지이고 부호는 그대로 둔다. 하나뿐인 예외가 −1이다.</p>
+
+<pre data-lang="python" data-title="hash_int.py"><code>
+print(hash(42), hash(0), hash(-7))         # 작은 정수는 해시 값이 자기 자신
+print(hash(-1))                            # 예외: -1 은 오류 신호로 쓰여서 -2
+print(hash(2**61 - 1), hash(2**61))        # 큰 정수는 2^61 - 1 로 나눈 나머지
+print(hash(-7) % 8)                        # 음수 해시도 % 는 0~7 사이를 준다
+</code></pre>
+<pre class="output">
+42 0 -7
+-2
+0 1
+1
+</pre>
+
+        <p>−1이 −2가 되는 것은 파이썬의 C 구현이 "해시 계산 실패"를 −1로 알리기 때문이다. 오류와 헷갈리지 않게 −1의 해시만 −2로 바꿨다. 큰 정수를 접는 것은 해시 값이 64비트 정수 한 칸에 들어가야 해서다. 음수 해시라도 파이썬의 <code>%</code>는 0 이상의 나머지를 주므로 칸 번호는 늘 범위 안이다.</p>
+
+        <h3>문자열의 해시는 실행마다 다르다</h3>
+        <p>문자열과 바이트열, 그리고 그것을 담은 튜플의 해시 값은 프로그램을 시작할 때 뽑은 무작위 <strong>시드(seed, 해시 계산에 섞는 비밀 숫자)</strong>에 따라 달라진다. 한 번 실행되는 동안은 같으니 찾기에는 문제가 없지만, 다음 실행에서는 다른 값이 나온다(환경 변수 <code>PYTHONHASHSEED</code>로 고정할 수는 있다). 일부러 이렇게 만든 것은 공격을 막기 위해서다. 규칙이 고정돼 있으면 누군가 같은 칸에 몰리는 문자열을 수만 개 만들어 보내, 서버의 딕셔너리를 최악인 O(n)으로 떨어뜨릴 수 있다. 시드를 숨기면 그런 문자열을 미리 만들 수 없다. 이 책이 문자열의 해시 값을 출력하지 않는 이유다.</p>
+      </section>
+
+      <section id="collision">
+        <h2>충돌과 처리법</h2>
+        <p>서로 다른 키가 같은 칸 번호를 받는 것이 <strong>충돌(collision)</strong>이다. 충돌은 피할 수 없다. 비둘기 9마리를 집 8개에 넣으면 어느 집엔가는 두 마리가 들어가듯(비둘기집 원리), 칸은 유한하고 키는 끝이 없으니 어떤 두 키는 반드시 같은 칸을 원한다. 좋은 해시 함수도 충돌을 드물게 만들 뿐이라서 충돌을 처리하는 규칙이 따로 있어야 한다. 방법은 크게 둘이다.</p>
+
+        <h3>체이닝: 한 칸에 줄을 세운다</h3>
+        <p><strong>체이닝(chaining)</strong>은 칸마다 리스트를 두고, 같은 칸에 온 키를 그 리스트에 이어 붙인다. 찾을 때는 칸 번호를 계산한 뒤 그 리스트만 앞에서부터 비교한다. 리스트가 짧으면 거의 한 번에 끝나고, 길면 그만큼 느려진다.</p>
+
+        <figure class="fig">
+          <div class="fig-steps">
+            <div class="fig-state">
+              <div class="buckets">
+                <div class="bucket" data-i="0"></div>
+                <div class="bucket" data-i="1"><div class="cell">17</div></div>
+                <div class="bucket" data-i="2"></div>
+                <div class="bucket" data-i="3"></div>
+                <div class="bucket" data-i="4"><div class="cell">12</div></div>
+                <div class="bucket" data-i="5"></div>
+                <div class="bucket" data-i="6"></div>
+                <div class="bucket" data-i="7"></div>
+              </div>
+              <span class="fig-state-label">처음</span>
+            </div>
+            <div class="fig-arrow">put(33)</div>
+            <div class="fig-state">
+              <div class="buckets">
+                <div class="bucket" data-i="0"></div>
+                <div class="bucket" data-i="1"><div class="cell">17</div><div class="cell is-hl">33</div></div>
+                <div class="bucket" data-i="2"></div>
+                <div class="bucket" data-i="3"></div>
+                <div class="bucket" data-i="4"><div class="cell">12</div></div>
+                <div class="bucket" data-i="5"></div>
+                <div class="bucket" data-i="6"></div>
+                <div class="bucket" data-i="7"></div>
+              </div>
+              <span class="fig-state-label">33을 넣은 뒤</span>
+            </div>
+          </div>
+          <figcaption><b>그림 12-2</b> 33 % 8 = 1이라 17이 있는 칸에 온다. 체이닝은 그 칸의 줄 끝에 33을 이어 붙인다.</figcaption>
+        </figure>
+
+        <h3>개방 주소법: 빈 칸을 찾아 옮긴다</h3>
+        <p><strong>개방 주소법(open addressing)</strong>은 한 칸에 키 하나만 둔다. 원하는 칸이 차 있으면 정해진 순서로 다른 칸을 살펴 빈 칸을 찾는다. 이 살피기를 <strong>탐사(probing)</strong>라고 한다. 가장 단순한 규칙은 바로 옆 칸으로 가는 선형 탐사다.</p>
+
+<pre data-lang="python" data-title="linear_probing.py"><code>
+table = [None] * 8                        # 한 칸에 키 하나만 둔다
+
+
+def put(key):
+    start = hash(key) % 8
+    i = start
+    while table[i] is not None:           # 차 있으면 다음 칸을 본다
+        i = (i + 1) % 8
+    table[i] = key
+    print(f'{key}: {start}번 칸을 원했고 {i}번 칸에 넣었다')
+
+
+for key in (17, 12, 33, 25):
+    put(key)
+print(table)
+</code></pre>
+<pre class="output">
+17: 1번 칸을 원했고 1번 칸에 넣었다
+12: 4번 칸을 원했고 4번 칸에 넣었다
+33: 1번 칸을 원했고 2번 칸에 넣었다
+25: 1번 칸을 원했고 3번 칸에 넣었다
+[None, 17, 33, 25, 12, None, None, None]
+</pre>
+
+        <p>33은 1번 칸이 차 있어서 2번으로, 25는 1번과 2번이 차 있어서 3번으로 밀렸다. 찾을 때도 같은 길을 따라가며 키를 비교하고, 빈 칸을 만나면 "없다"로 끝낸다. 그래서 지우기가 까다롭다. 17을 그냥 빈 칸으로 만들면 33을 찾을 때 1번 칸에서 빈 칸을 만나 길이 끊긴다. 개방 주소법은 지운 자리에 "지워졌음" 표시를 남겨 탐사가 그 칸을 건너뛰게 한다.</p>
+        <p>파이썬의 <code>dict</code>와 <code>set</code>은 <strong>개방 주소법</strong>을 쓴다. 체인용 리스트를 따로 만들지 않아 메모리가 적게 들고, 칸이 연속 메모리라 빠르기 때문이다. 다만 바로 옆 칸만 보면 찬 칸이 한 덩어리로 뭉치므로, 파이썬은 해시 값의 윗자리 비트를 섞어 다음 칸을 띄엄띄엄 고른다. 빈 칸을 찾을 때까지 다른 칸을 본다는 뼈대는 같다.</p>
+
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th></th><th>체이닝</th><th>개방 주소법</th></tr></thead>
+            <tbody>
+              <tr><td>한 칸에</td><td>키 여러 개(리스트)</td><td>키 하나</td></tr>
+              <tr><td>충돌하면</td><td>줄 끝에 붙인다</td><td>빈 칸을 찾아 옮긴다</td></tr>
+              <tr><td>지우기</td><td>줄에서 빼면 끝</td><td>"지워졌음" 표시를 남겨야 한다</td></tr>
+              <tr><td>적재율</td><td>1을 넘어도 동작한다</td><td>1을 넘을 수 없고, 가까워지면 급격히 느려진다</td></tr>
+              <tr><td>쓰는 곳</td><td>자바 <code>HashMap</code> 등</td><td>파이썬 <code>dict</code>, <code>set</code></td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section id="load-factor">
+        <h2>적재율과 리사이즈</h2>
+        <p>어느 방법이든 충돌이 잦아지면 느려진다. 표가 얼마나 찼는지를 나타내는 수가 <strong>적재율(load factor)</strong>, 곧 항목 수 ÷ 칸 수다. 체이닝에서 적재율이 α면 줄의 평균 길이가 α이므로, 없는 키를 찾을 때 평균 α번쯤 비교한다. 개방 주소법은 적재율이 1에 가까워질수록 빈 칸이 드물어 탐사가 급격히 길어지고, 1을 넘으면 넣을 곳 자체가 없다.</p>
+        <p>해결책은 단순하다. 표가 어느 정도 차면 더 큰 표를 만들고 모든 키를 새 칸 번호로 옮겨 담는다. 이것이 <strong>리사이즈(resize)</strong>다. 파이썬 <code>dict</code>는 칸 8개로 시작하고, 쓸 수 있는 칸(칸 수의 2/3)을 다 쓰면 더 큰 2의 거듭제곱 크기로 옮긴다. <code>sys.getsizeof</code>로 그 순간을 볼 수 있다.</p>
+
+<pre data-lang="python" data-title="dict_resize.py"><code>
+import sys
+
+d = {}
+last = sys.getsizeof(d)
+print(f'빈 딕셔너리: {last}바이트')
+
+for n in range(1, 30):
+    d[n] = n
+    now = sys.getsizeof(d)
+    if now != last:                       # 크기가 바뀐 순간만 찍는다
+        print(f'{n}번째 키를 넣자 {last} -&gt; {now}바이트')
+        last = now
+</code></pre>
+<pre class="output">
+빈 딕셔너리: 64바이트
+1번째 키를 넣자 64 -&gt; 224바이트
+6번째 키를 넣자 224 -&gt; 352바이트
+11번째 키를 넣자 352 -&gt; 632바이트
+22번째 키를 넣자 632 -&gt; 1168바이트
+</pre>
+
+        <p>8칸짜리 표는 쓸 수 있는 칸이 5개라 6번째 키에서 16칸으로, 16칸은 11번째 키에서 32칸으로 늘어난다. 바이트 수는 환경(파이썬 버전과 운영체제)에 따라 다를 수 있다.</p>
+
+        <h3>그래서 "평균" O(1)이다</h3>
+        <p>이제 4장의 "평균"을 설명할 수 있다. 한 번의 찾기는 칸 번호 계산 한 번에 충돌한 만큼의 비교가 더해진다. <mark>리사이즈가 적재율을 늘 2/3 아래로 눌러 두므로 충돌은 드물고, 비교 횟수는 데이터 크기와 상관없이 작은 상수에 머문다.</mark> 이것이 평균 O(1)이다. 그래도 키가 한 칸에 몰리면 n개를 비교하는 최악 O(n)이 된다. 앞 절의 해시 시드가 이 최악을 막는 장치다.</p>
+        <p>리사이즈 자체는 키 n개를 모두 옮기므로 O(n)이다. 그런데도 넣기를 O(1)이라 부르는 것은 8장의 <code>append</code>와 같은 논리다. 표를 두 배로 키우면 다음 리사이즈까지 그만큼 많은 넣기가 공짜로 들어가므로, 여러 번을 평균 내면 넣기 한 번에 O(1)이다(분할 상환, 8장).</p>
+
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>연산</th><th>코드</th><th>평균</th><th>최악</th><th>이유</th></tr></thead>
+            <tbody>
+              <tr><td>찾기</td><td><code>k in d</code>, <code>d[k]</code></td><td><span class="bigo b-const">O(1)</span></td><td><span class="bigo b-linear">O(n)</span></td><td>칸 번호 계산 한 번 + 충돌한 만큼 비교</td></tr>
+              <tr><td>넣기</td><td><code>d[k] = v</code></td><td><span class="bigo b-const">O(1)*</span></td><td><span class="bigo b-linear">O(n)</span></td><td>가끔 리사이즈로 전부 옮긴다</td></tr>
+              <tr><td>지우기</td><td><code>del d[k]</code></td><td><span class="bigo b-const">O(1)</span></td><td><span class="bigo b-linear">O(n)</span></td><td>찾은 뒤 표시만 남긴다</td></tr>
+              <tr><td>순회</td><td><code>for k in d</code></td><td><span class="bigo b-linear">O(n)</span></td><td><span class="bigo b-linear">O(n)</span></td><td>항목을 넣은 순서대로 읽는다</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <p>* 리사이즈가 일어나는 한 번은 O(n)이지만 여러 번에 걸쳐 나눠 보면 평균 O(1)이다(분할 상환).</p>
+      </section>
+
+      <section id="build-your-own">
+        <h2>직접 만들어 보기</h2>
+        <p>작은 체이닝 해시 테이블을 만들어 보자. 칸마다 <code>(키, 값)</code> 튜플의 리스트를 두고 넣기·찾기·지우기와 리사이즈를 갖춘다. 출력이 실행마다 같도록 키는 정수만 쓴다. 이 클래스는 <code>hash_table.py</code>에 한 번 정의하고 뒤의 코드가 가져다 쓴다.</p>
+
+<pre data-lang="python" data-title="hash_table.py"><code>
+class HashTable:
+    def __init__(self, capacity=8):
+        self.buckets = [[] for _ in range(capacity)]
+        self.size = 0
+
+    def _index(self, key):
+        return hash(key) % len(self.buckets)        # 해시 값 -&gt; 칸 번호
+
+    def put(self, key, value):
+        bucket = self.buckets[self._index(key)]
+        for i, (k, _) in enumerate(bucket):
+            if k == key:                            # 이미 있는 키면 값만 바꾼다
+                bucket[i] = (key, value)
+                return
+        bucket.append((key, value))
+        self.size += 1
+        if self.size &gt; len(self.buckets) * 2 // 3:  # 적재율이 2/3 를 넘으면
+            self._resize(len(self.buckets) * 2)     # 칸을 두 배로 늘린다
+
+    def get(self, key, default=None):
+        for k, v in self.buckets[self._index(key)]:   # 그 칸의 체인만 훑는다
+            if k == key:
+                return v
+        return default
+
+    def remove(self, key):
+        bucket = self.buckets[self._index(key)]
+        for i, (k, _) in enumerate(bucket):
+            if k == key:
+                del bucket[i]
+                self.size -= 1
+                return True
+        return False
+
+    def _resize(self, capacity):
+        old = [pair for bucket in self.buckets for pair in bucket]
+        self.buckets = [[] for _ in range(capacity)]
+        self.size = 0
+        for key, value in old:                      # 새 칸 번호로 다시 넣는다
+            self.put(key, value)
+
+    def show(self):
+        for i, bucket in enumerate(self.buckets):
+            chain = ' -&gt; '.join(f'{k}:{v}' for k, v in bucket)
+            print(f'{i}: {chain or "비어 있음"}')
+</code></pre>
+<pre class="output">
+</pre>
+
+        <p><code>put</code>은 먼저 체인에 같은 키가 있는지 보고, 있으면 값만 바꾼다. 없으면 체인 끝에 붙이고 개수를 센 뒤, 적재율이 2/3를 넘는 순간 칸을 두 배로 늘린다. <code>_resize</code>는 모든 쌍을 꺼내 새 표에 <code>put</code>으로 다시 넣는다. 칸 수가 달라졌으니 <code>_index</code>가 새 번호를 준다. 일부러 작은 표에 넣어 충돌을 눈으로 보자.</p>
+
+<pre data-lang="python" data-title="chain_demo.py"><code>
+from hash_table import HashTable
+
+t = HashTable(capacity=8)
+for key, value in [(17, 'a'), (12, 'b'), (33, 'c'), (25, 'd')]:
+    t.put(key, value)
+t.show()
+
+print(t.get(33))                  # 1번 칸의 체인을 훑어 33 을 찾는다
+print(t.get(41, '없음'))           # 1번 칸 체인에 없으니 기본값
+t.put(33, 'C')                    # 있는 키는 값만 바뀐다
+print(t.get(33), t.size)
+print(t.remove(17), t.remove(99)) # 있는 키는 True, 없는 키는 False
+print(t.get(33), t.size)          # 앞 쌍을 지워도 체인의 나머지는 그대로
+</code></pre>
+<pre class="output">
+0: 비어 있음
+1: 17:a -&gt; 33:c -&gt; 25:d
+2: 비어 있음
+3: 비어 있음
+4: 12:b
+5: 비어 있음
+6: 비어 있음
+7: 비어 있음
+c
+없음
+C 4
+True False
+C 3
+</pre>
+
+        <p>17, 33, 25는 모두 1번 칸에 줄을 섰다. <code>get(33)</code>은 1번 칸으로 바로 가서 17, 33 두 번만 비교하고 찾는다. 체이닝은 지우기도 단순하다. 체인에서 그 쌍만 빼면 되고, 뒤에 있던 33은 그대로 찾아진다. 이제 리사이즈를 보자.</p>
+
+<pre data-lang="python" data-title="resize_demo.py"><code>
+from hash_table import HashTable
+
+t = HashTable(capacity=4)
+t.put(17, 'a')
+t.put(13, 'b')                    # 17 % 4 == 13 % 4 == 1: 한 체인에 모인다
+t.show()
+print(len(t.buckets), t.size)
+
+t.put(9, 'c')                     # 3 &gt; 4 * 2 // 3 이므로 칸을 8개로 늘린다
+print(len(t.buckets), t.size)
+t.show()                          # 13 은 5번 칸으로 옮겨 가 체인이 갈라졌다
+</code></pre>
+<pre class="output">
+0: 비어 있음
+1: 17:a -&gt; 13:b
+2: 비어 있음
+3: 비어 있음
+4 2
+8 3
+0: 비어 있음
+1: 17:a -&gt; 9:c
+2: 비어 있음
+3: 비어 있음
+4: 비어 있음
+5: 13:b
+6: 비어 있음
+7: 비어 있음
+</pre>
+
+        <p>세 번째 키가 들어오자 표가 8칸이 되고, 13은 <code>13 % 8 == 5</code>번 칸으로 옮겨 가 체인이 갈라졌다. "칸을 늘려 충돌을 줄인다"는 말의 뜻이 이것이다.</p>
+      </section>
+
+      <section id="insertion-order">
+        <h2>딕셔너리가 순서를 기억하는 방법</h2>
+        <p>4장에서 딕셔너리는 넣은 순서대로 순회된다고 했다. 해시 테이블은 키를 칸 번호 순서로 흩어 놓는데 어떻게 넣은 순서를 알까. 3.5까지의 <code>dict</code>는 칸에 키와 값을 직접 두고 칸 번호 순서로 훑었으니 순서가 뒤죽박죽이었다. 3.6부터 구조가 바뀌었다.</p>
+        <p>새 구조는 표를 둘로 나눈다. 해시로 찾는 <strong>인덱스 표(indices)</strong>에는 "몇 번째 항목인가"라는 작은 번호만 두고, 실제 키와 값은 <strong>항목 배열(entries)</strong>에 넣은 순서대로 쌓는다. 찾기는 인덱스 표 → 항목 번호 → 항목 배열의 두 단계이고, 순회는 항목 배열을 앞에서부터 읽기만 하면 된다.</p>
+
+        <figure class="fig">
+          <div class="fig-steps">
+            <div class="fig-state">
+              <div class="cells">
+                <div class="cell" data-i="0"></div>
+                <div class="cell is-hl" data-i="1">0</div>
+                <div class="cell" data-i="2"></div>
+                <div class="cell" data-i="3"></div>
+                <div class="cell is-hl" data-i="4">1</div>
+                <div class="cell is-hl" data-i="5">2</div>
+                <div class="cell" data-i="6"></div>
+                <div class="cell" data-i="7"></div>
+              </div>
+              <span class="fig-state-label">인덱스 표: 항목 번호만</span>
+            </div>
+            <div class="fig-arrow">항목 번호로</div>
+            <div class="fig-state">
+              <div class="cells">
+                <div class="cell" data-i="0">17: a</div>
+                <div class="cell" data-i="1">12: b</div>
+                <div class="cell" data-i="2">5: c</div>
+              </div>
+              <span class="fig-state-label">항목 배열: 넣은 순서</span>
+            </div>
+          </div>
+          <figcaption><b>그림 12-3</b> 17, 12, 5를 차례로 넣은 모습. 인덱스 표의 1번, 4번, 5번 칸에는 항목 번호 0, 1, 2만 들어 있고, 키와 값은 항목 배열에 넣은 순서대로 놓인다.</figcaption>
+        </figure>
+
+<p>이 구조는 메모리도 아낀다. 인덱스 표는 칸이 적을 때 칸마다 1바이트짜리 번호만 담고, 무거운 항목은 실제 개수만큼만 쌓이기 때문이다. 3.6에서는 CPython의 구현 사정이었고, 3.7부터 언어 규칙이 되어 어떤 파이썬에서도 보장된다.</p>
+
+<pre data-lang="python" data-title="dict_order.py"><code>
+d = {'b': 1, 'a': 2, 'c': 3}
+del d['a']
+d['a'] = 9                 # 지웠다 다시 넣으면 맨 뒤로 간다
+d['b'] = 0                 # 값만 바꾸면 자리는 그대로
+print(d)
+print(d.popitem())         # 마지막에 넣은 항목부터 꺼낸다
+print(list(d))
+</code></pre>
+<pre class="output">
+{'b': 0, 'c': 3, 'a': 9}
+('a', 9)
+['b', 'c']
+</pre>
+
+        <p>지운 항목은 항목 배열에 빈 자리로 남아 순회 때 건너뛰고, 다음 리사이즈 때 정리된다. 그래서 다시 넣은 <code>'a'</code>는 맨 뒤로 가고, 값만 바꾼 <code>'b'</code>는 자리를 지킨다. <code>popitem()</code>은 배열의 끝을 떼어 낸다. 집합은 이 구조를 쓰지 않고 칸에 원소를 직접 두므로 순서가 없다.</p>
+      </section>
+
+      <section id="hash-eq-contract">
+        <h2>키의 조건: __hash__와 __eq__</h2>
+        <p>4장의 "불변이면 키가 된다"를 원리로 다시 보자. 찾기는 두 단계다. <code>hash(key)</code>로 칸 번호를 정하고, 그 칸(또는 체인)에서 <code>==</code>로 키를 비교한다. 두 단계가 서로 맞아야 하므로 파이썬은 이런 약속을 요구한다. <mark><code>a == b</code>이면 <code>hash(a) == hash(b)</code>여야 한다.</mark> 반대는 필요 없다. 해시가 같아도 다른 값일 수 있고, 그것이 바로 충돌이다.</p>
+        <p>이 약속 때문에 <code>1</code>, <code>1.0</code>, <code>True</code>는 한 키다. 세 값은 <code>==</code>로 같으므로 해시도 같아야 하고, 그래서 파이썬의 숫자 해시는 타입이 아니라 수학적인 값으로 계산한다.</p>
+
+<pre data-lang="python" data-title="hash_eq.py"><code>
+print(1 == 1.0 == True)
+print(hash(1), hash(1.0), hash(True))   # 같은 값이면 해시도 같다
+
+d = {1: 'int'}
+d[1.0] = 'float'                        # 같은 키로 취급해 값만 덮어쓴다
+d[True] = 'bool'
+print(d)                                # 키는 처음 넣은 1 이 그대로 남는다
+print(len({1, 1.0, True}))
+</code></pre>
+<pre class="output">
+True
+1 1 1
+{1: 'bool'}
+1
+</pre>
+
+        <p>직접 만든 클래스도 이 약속을 지켜야 한다. <code>__eq__</code>만 정의하면 파이썬은 <code>__hash__</code>를 <code>None</code>으로 바꾼다. "같다"의 기준은 바뀌었는데 해시가 옛 기준(객체의 주소)으로 계산되면 약속이 깨지기 때문이다. <code>__eq__</code>가 비교하는 재료로 <code>__hash__</code>를 정의하면 된다.</p>
+
+<pre data-lang="python" data-title="custom_key.py"><code>
+class Point:
+    def __init__(self, x, y):
+        self.x, self.y = x, y
+
+    def __eq__(self, other):
+        return (self.x, self.y) == (other.x, other.y)
+
+
+print(Point.__hash__)                   # __eq__ 만 정의하면 __hash__ 는 None
+try:
+    {Point(1, 2)}
+except TypeError as e:
+    print(f'{type(e).__name__}: {e}')
+
+
+class HashablePoint(Point):
+    def __hash__(self):
+        return hash((self.x, self.y))   # 같은 좌표면 같은 해시
+
+
+visited = {HashablePoint(1, 2)}
+print(HashablePoint(1, 2) in visited)   # 다른 객체지만 같은 키다
+</code></pre>
+<pre class="output">
+None
+TypeError: unhashable type: 'Point'
+True
+</pre>
+
+        <p><code>@dataclass(frozen=True)</code>를 쓰면 <code>__eq__</code>와 <code>__hash__</code>를 필드 기준으로 한꺼번에 만들어 준다. 좌표처럼 값 몇 개를 묶은 키는 그냥 튜플을 쓰는 것이 가장 간단하다(4장).</p>
+      </section>
+
+      <section id="pitfalls">
+        <h2>자주 하는 실수</h2>
+        <div class="callout callout-warn">
+          <span class="callout-title">해시 값을 저장하거나 실행 사이에 비교하기</span>
+          <p>문자열의 <code>hash()</code>는 실행마다 바뀐다. 파일이나 데이터베이스에 적어 두거나, 두 프로그램이 주고받아 비교하면 다음 실행에서 모두 어긋난다. 어디서나 같은 값이 필요하면 <code>hashlib.sha256</code>처럼 시드가 없는 해시 함수를 쓴다.</p>
+        </div>
+        <div class="callout callout-warn">
+          <span class="callout-title">실수(float)를 키로 쓰기</span>
+          <p>실수는 불변이라 키가 되지만, 계산 결과가 미세하게 어긋나면 값도 해시도 달라져 찾지 못한다. <code>0.1 + 0.2</code>를 키로 넣고 <code>0.3</code>으로 찾으면 <code>False</code>다. 돈이나 좌표처럼 자릿수가 정해진 값은 정수로 바꿔 키를 만든다.</p>
+        </div>
+
+
+        <div class="callout callout-warn">
+          <span class="callout-title">키로 넣은 객체의 내용 바꾸기</span>
+          <p>리스트는 애초에 거부되지만(4장), <code>__hash__</code>를 직접 붙인 객체는 넣은 뒤 필드를 바꿔도 막지 않는다. 해시 값이 바뀌어 다른 칸을 보게 되므로 분명히 넣었는데 <code>in</code>이 <code>False</code>를 돌려준다. 키로 쓰는 객체는 불변으로 만든다.</p>
+        </div>
+        <div class="callout callout-warn">
+          <span class="callout-title">순회하면서 넣거나 지우기</span>
+          <p>4장에서 본 <code>RuntimeError</code>의 이유가 여기에 있다. 넣다가 리사이즈가 일어나면 항목 배열이 새로 만들어져 순회 위치가 의미를 잃으므로, 파이썬은 순회 중 크기가 바뀌면 멈춘다. <code>list(d)</code>로 복사한 키 목록을 돌며 지운다.</p>
+        </div>
+      </section>
+
+      <section id="problem">
+        <h2>대표 문제</h2>
+        <div class="problem">
+          <div class="problem-head">
+            <div class="problem-kicker"><b>Problem</b><span class="chip">보통</span><span class="chip">해시</span><span class="chip">딕셔너리</span></div>
+            <h3>애너그램끼리 묶기</h3>
+          </div>
+          <div class="problem-body">
+            <p>소문자 알파벳으로만 이루어진 단어 목록 <code>words</code>가 주어진다. 글자의 종류와 개수가 같아 순서만 바꾸면 서로 같아지는 두 단어를 <strong>애너그램(anagram)</strong>이라고 한다. 애너그램끼리 묶은 리스트를 돌려주는 함수 <code>group_anagrams(words)</code>를 작성하라.</p>
+            <ul>
+              <li>묶음의 순서는 각 묶음의 첫 단어가 입력에 나온 순서를 따르고, 묶음 안의 순서도 입력 순서를 따른다.</li>
+              <li>단어는 최대 10,000개이고, 한 단어의 길이는 100 이하다.</li>
+            </ul>
+            <div class="table-wrap">
+              <table>
+                <thead><tr><th>입력</th><th>출력</th><th>이유</th></tr></thead>
+                <tbody>
+                  <tr><td><code>['race', 'care', 'note', 'acre', 'tone', 'cat']</code></td><td><code>[['race', 'care', 'acre'], ['note', 'tone'], ['cat']]</code></td><td>race·care·acre는 a, c, e, r이 하나씩이다</td></tr>
+                  <tr><td><code>['stop', 'pots', 'tops']</code></td><td><code>[['stop', 'pots', 'tops']]</code></td><td>모두 같은 글자로 되어 있다</td></tr>
+                  <tr><td><code>['a']</code></td><td><code>[['a']]</code></td><td>혼자인 단어도 한 묶음이다</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <details class="reveal">
+            <summary>접근 방법<span class="reveal-hint">먼저 생각해 보고 펼치세요</span></summary>
+            <div class="reveal-body">
+              <p>단어를 두 개씩 짝지어 확인하면 쌍만 n(n−1)/2개, 단어가 만 개면 5천만 쌍이다.</p>
+              <p>관점을 바꾸자. 애너그램은 글자의 구성이 같은 단어들이다. 그러니 <mark>구성이 같으면 같은 값이 나오는 "이름표"를 만들어 그 이름표를 키로 모으면</mark> 된다. 가장 쉬운 이름표는 글자를 정렬한 문자열이다. <code>'race'</code>, <code>'care'</code>, <code>'acre'</code>는 모두 <code>'acer'</code>가 된다.</p>
+              <ol>
+                <li>단어마다 <code>''.join(sorted(w))</code>로 이름표를 만든다.</li>
+                <li>이름표를 키로, 단어 목록을 값으로 딕셔너리에 모은다. 4장의 <code>defaultdict(list)</code>가 꼭 맞는다.</li>
+                <li>딕셔너리는 넣은 순서를 지키므로 값들을 차례로 꺼내면 묶음 순서가 저절로 입력 순서가 된다.</li>
+              </ol>
+            </div>
+          </details>
+
+          <details class="reveal">
+            <summary>풀이 코드</summary>
+            <div class="reveal-body">
+<pre data-lang="python" data-title="group_anagrams.py"><code>
+from collections import defaultdict
+
+
+def group_anagrams(words: list[str]) -&gt; list[list[str]]:
+    groups = defaultdict(list)            # 정렬한 글자열 -&gt; 단어 목록
+    for w in words:
+        key = ''.join(sorted(w))          # 'race', 'care', 'acre' -&gt; 'acer'
+        groups[key].append(w)
+    return list(groups.values())          # 딕셔너리는 넣은 순서를 지킨다
+
+
+print(group_anagrams(['race', 'care', 'note', 'acre', 'tone', 'cat']))
+print(group_anagrams(['stop', 'pots', 'tops']))
+print(group_anagrams(['a']))
+</code></pre>
+<pre class="output">
+[['race', 'care', 'acre'], ['note', 'tone'], ['cat']]
+[['stop', 'pots', 'tops']]
+[['a']]
+</pre>
+              <p>정렬 대신 글자별 개수를 이름표로 써도 된다. 알파벳 26칸을 센 리스트 <code>counts</code>를 <code>tuple(counts)</code>로 바꿔 키로 쓰면 정렬이 필요 없다. 리스트는 키가 될 수 없으니 반드시 튜플로 바꾼다(4장).</p>
+            </div>
+          </details>
+
+          <details class="reveal">
+            <summary>복잡도</summary>
+            <div class="reveal-body">
+              <dl class="cx">
+                <dt>시간</dt><dd><span class="bigo b-nlogn">O(n · k log k)</span> 단어 n개를 한 번씩 보고, 길이 k인 단어를 정렬한다. 딕셔너리 넣기는 평균 O(1)이다. 개수 튜플을 쓰면 O(n · k)다.</dd>
+                <dt>공간</dt><dd><span class="bigo b-linear">O(n · k)</span> 모든 단어와 그 이름표를 딕셔너리에 담는다.</dd>
+              </dl>
+            </div>
+          </details>
+        </div>
+      </section>
+
+      <section id="recall">
+        <h2>스스로 확인</h2>
+        <div class="recall">
+          <details>
+            <summary>딕셔너리 찾기에 "평균 O(1)"이라고 "평균"을 붙이는 이유는? 최악은 얼마인가?</summary>
+            <div class="answer"><p>충돌한 만큼 비교가 늘어나기 때문이다. 리사이즈가 적재율을 2/3 아래로 눌러 두어 평균 비교 횟수는 작은 상수다. 모든 키가 한 칸에 몰리면 최악 O(n)이다.</p></div>
+          </details>
+          <details>
+            <summary>개방 주소법에서 키를 지울 때 그 칸을 그냥 빈 칸으로 돌려놓으면 왜 안 되는가?</summary>
+            <div class="answer"><p>찾기는 빈 칸을 만나면 "없다"로 끝난다. 지운 칸 뒤로 밀려났던 키는 그 빈 칸에서 길이 끊겨 찾지 못한다. 그래서 "지워졌음" 표시를 남긴다.</p></div>
+          </details>
+          <details>
+            <summary><code>{1: 'a', 1.0: 'b', True: 'c'}</code>는 무엇이 되고, 왜 그런가?</summary>
+            <div class="answer"><p><code>{1: 'c'}</code>가 된다. 세 값은 <code>==</code>로 같으므로 약속에 따라 해시도 같고, 딕셔너리는 같은 키로 취급해 값만 덮어쓴다. 키는 처음 넣은 <code>1</code>이 남고 값은 마지막 <code>'c'</code>가 남는다.</p></div>
+          </details>
+          <details>
+            <summary><code>__eq__</code>만 정의한 클래스의 객체를 집합에 넣으면 어떻게 되는가?</summary>
+            <div class="answer"><p><code>TypeError: unhashable type</code>이 난다. <code>__eq__</code>를 정의하면 <code>__hash__</code>가 <code>None</code>이 되기 때문이다. 같은 재료로 <code>__hash__</code>를 정의하거나 <code>@dataclass(frozen=True)</code>를 쓴다.</p></div>
+          </details>
+        </div>
+      </section>
+
+      <section id="summary">
+        <h2>정리</h2>
+        <ol class="summary-list">
+          <li>해시 테이블은 <code>hash(key) % 칸 수</code>로 칸 번호를 정해 배열처럼 바로 간다. 딕셔너리와 집합의 바닥 구조다.</li>
+          <li>정수의 해시는 어디서나 같지만 문자열의 해시는 실행마다 바뀐다(시드). 출력하거나 저장하거나 실행 사이에 비교하지 않는다.</li>
+          <li>충돌은 피할 수 없다. 체이닝은 칸마다 줄을 세우고, 개방 주소법은 빈 칸을 찾아 옮긴다. 파이썬 <code>dict</code>와 <code>set</code>은 개방 주소법이다.</li>
+          <li>적재율이 2/3를 넘으면 표를 늘려 모두 다시 넣는다. 그래서 찾기는 평균 O(1), 최악 O(n)이고 넣기는 분할 상환 O(1)이다.</li>
+          <li>딕셔너리는 인덱스 표와 항목 배열을 나눠 넣은 순서를 기억한다. 집합은 그렇지 않다.</li>
+          <li><code>a == b</code>이면 <code>hash(a) == hash(b)</code>여야 한다. 그래서 <code>1</code>, <code>1.0</code>, <code>True</code>는 한 키이고, <code>__eq__</code>를 정의하면 <code>__hash__</code>도 정의해야 한다.</li>
+        </ol>
+      </section>
+
+      <nav class="pager" aria-label="이전 장과 다음 장"></nav>
+    </article>
+  </main>
+
+  <aside class="rail" aria-label="이 페이지 목차">
+    <p class="rail-title">이 페이지</p>
+    <nav id="onthispage"></nav>
+  </aside>
+</div>
+<div class="backdrop" id="backdrop"></div>
+
+<script src="assets/book.js"></script>
+<script src="assets/app.js"></script>
+<script src="assets/code.js"></script>
+</body>
+</html>

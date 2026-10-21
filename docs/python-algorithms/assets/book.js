@@ -29,7 +29,7 @@ window.BOOK = {
         { no: '09', slug: '09-linked-list', title: '연결 리스트', desc: '노드와 포인터, 삽입과 삭제, 뒤집기', isWritten: true },
         { no: '10', slug: '10-stack', title: '스택', desc: '나중에 넣은 것을 먼저 꺼내는 구조(LIFO)', isWritten: true },
         { no: '11', slug: '11-queue-and-deque', title: '큐와 데크', desc: '먼저 넣은 것을 먼저 꺼내는 구조(FIFO)와 양방향 데크', isWritten: true },
-        { no: '12', slug: '12-hash-table', title: '해시 테이블', desc: '해시 함수와 충돌 처리, 딕셔너리가 빠른 이유', isWritten: false }
+        { no: '12', slug: '12-hash-table', title: '해시 테이블', desc: '해시 함수와 충돌 처리, 딕셔너리가 빠른 이유', isWritten: true }
       ]
     },
     {
