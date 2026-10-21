@@ -461,11 +461,12 @@ print(sorted(students, key=lambda s: s[2], reverse=True))
               <tr><td>삽입 정렬</td><td><span class="bigo b-quad">O(n²)</span></td><td><span class="bigo b-quad">O(n²)</span></td><td><span class="bigo b-const">O(1)</span></td><td>그렇다</td></tr>
               <tr><td>병합 정렬</td><td><span class="bigo b-nlogn">O(n log n)</span></td><td><span class="bigo b-nlogn">O(n log n)</span></td><td><span class="bigo b-linear">O(n)</span></td><td>그렇다</td></tr>
               <tr><td>퀵 정렬</td><td><span class="bigo b-nlogn">O(n log n)</span></td><td><span class="bigo b-quad">O(n²)</span></td><td><span class="bigo b-log">O(log n)</span></td><td>아니다</td></tr>
+              <tr><td>힙 정렬</td><td><span class="bigo b-nlogn">O(n log n)</span></td><td><span class="bigo b-nlogn">O(n log n)</span></td><td><span class="bigo b-const">O(1)</span></td><td>아니다</td></tr>
               <tr><td>Timsort</td><td><span class="bigo b-nlogn">O(n log n)</span></td><td><span class="bigo b-nlogn">O(n log n)</span></td><td><span class="bigo b-linear">O(n)</span></td><td>그렇다</td></tr>
             </tbody>
           </table>
         </div>
-        <p>삽입 정렬과 Timsort는 거의 정렬된 입력에서 O(n)까지 빨라진다. 퀵 정렬의 추가 메모리는 제자리 분할 기준이다. 결국 내장 정렬은 n이 수백만이어도 쓸 수 있는 O(n log n)이고, 같은 값의 순서도 지킨다.</p>
+        <p>삽입 정렬과 Timsort는 거의 정렬된 입력에서 O(n)까지 빨라진다. 퀵 정렬의 추가 메모리는 제자리 분할 기준이다. 힙 정렬은 17장의 힙에 모두 넣었다가 작은 것부터 꺼내는 방식이라 최악에도 O(n log n)이지만, 같은 값의 순서를 지키지 못한다. O(1)은 배열 안에서 힙을 만드는 경우이고, <code>heapq</code>로 새 리스트에 담으면 O(n)이 든다. 결국 내장 정렬은 n이 수백만이어도 쓸 수 있는 O(n log n)이고, 같은 값의 순서도 지킨다.</p>
       </section>
 
       <section id="pitfalls">
