@@ -1,0 +1,631 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>11. 큐와 데크 — 파이썬 알고리즘 노트</title>
+<script src="assets/theme.js"></script>
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body data-chapter="11">
+<a class="skip-link" href="#content">본문으로 건너뛰기</a>
+<div class="progress" aria-hidden="true"><span></span></div>
+<header class="topbar" id="topbar"></header>
+
+<div class="shell">
+  <aside class="sidebar" id="sidebar" aria-label="책 목차"></aside>
+
+  <main class="main" id="content">
+    <article class="chapter">
+      <header class="chapter-head">
+        <a class="part-pill"></a>
+        <span class="chapter-label"></span>
+        <h1>큐와 데크</h1>
+        <p class="lede">줄을 서면 먼저 온 사람이 먼저 나갑니다. 이 규칙을 그대로 옮긴 자료구조가 큐이고, 파이썬에서는 <code>collections.deque</code> 하나가 큐 노릇도 하고 양쪽이 열린 데크 노릇도 합니다.</p>
+        <div class="chapter-meta">
+          <span class="chip">FIFO</span><span class="chip">deque</span><span class="chip">popleft</span><span class="chip">원형 큐</span><span class="chip">시뮬레이션</span>
+        </div>
+      </header>
+
+      <div class="goals">
+        <p class="goals-title">이 장에서 배울 것</p>
+        <ul>
+          <li>큐가 "먼저 넣은 것을 먼저 꺼내는" 구조라는 것과 front, rear의 뜻을 설명할 수 있다</li>
+          <li>리스트로 만든 큐가 느린 이유를 알고 <code>deque</code>의 <code>append</code>, <code>popleft</code>로 큐를 쓸 수 있다</li>
+          <li><code>appendleft</code>, <code>rotate</code>, <code>maxlen</code>으로 데크의 양쪽 끝을 다룰 수 있다</li>
+          <li>고정 크기 배열과 나머지 연산으로 원형 큐를 직접 만들 수 있다</li>
+          <li>문제에서 큐가 어울리는 신호를 알아보고 시뮬레이션을 큐로 풀 수 있다</li>
+        </ul>
+      </div>
+
+      <section id="what-is-queue">
+        <h2>큐란</h2>
+        <div class="callout callout-key">
+          <span class="callout-title">핵심</span>
+          <p class="callout-big">큐는 <mark>먼저 넣은 것이 먼저 나오는</mark> 자료구조다. 이 성질을 FIFO(First In, First Out)라고 부른다.</p>
+        </div>
+        <p>매표소 줄을 떠올리면 된다. 새로 온 사람은 줄 맨 뒤에 서고, 표를 사는 사람은 언제나 맨 앞 사람이다. 중간에 끼어들거나 중간에서 빠지는 일은 없다. 나중에 넣은 것을 먼저 꺼내는 스택(LIFO, 10장)과 정반대다.</p>
+        <p>그래서 큐에는 끝이 두 개 있고, 끝마다 하는 일이 정해져 있다.</p>
+        <ul>
+          <li><strong>rear</strong>(뒤) — 넣는 쪽. 넣는 일을 <strong>enqueue</strong>라고 한다</li>
+          <li><strong>front</strong>(앞) — 꺼내는 쪽. 꺼내는 일을 <strong>dequeue</strong>라고 한다</li>
+          <li>꺼내지 않고 맨 앞만 보는 일(peek)과 비었는지 확인하는 일이 덧붙는다</li>
+        </ul>
+
+        <figure class="fig">
+          <div class="fig-steps stacked">
+            <div class="fig-state">
+              <div class="cells">
+                <div class="cell" data-ptr="front">A</div>
+                <div class="cell">B</div>
+                <div class="cell" data-ptr="rear">C</div>
+              </div>
+              <span class="fig-state-label">처음</span>
+            </div>
+            <div class="fig-arrow">enqueue(D)</div>
+            <div class="fig-state">
+              <div class="cells">
+                <div class="cell" data-ptr="front">A</div>
+                <div class="cell">B</div>
+                <div class="cell">C</div>
+                <div class="cell is-hl" data-ptr="rear">D</div>
+              </div>
+              <span class="fig-state-label">D가 뒤에 선다</span>
+            </div>
+            <div class="fig-arrow">dequeue()</div>
+            <div class="fig-state">
+              <div class="cells">
+                <div class="cell is-ghost">A</div>
+                <div class="cell" data-ptr="front">B</div>
+                <div class="cell">C</div>
+                <div class="cell" data-ptr="rear">D</div>
+              </div>
+              <span class="fig-state-label">A가 앞에서 나간다</span>
+            </div>
+          </div>
+          <figcaption><b>그림 11-1</b> 넣는 일은 언제나 rear에서, 꺼내는 일은 언제나 front에서 일어난다. 꺼낸 순서(A, B, C, D)가 넣은 순서와 같다.</figcaption>
+        </figure>
+      </section>
+
+      <section id="list-vs-deque">
+        <h2>리스트로 만들면 느린 이유와 deque</h2>
+        <p>리스트의 앞을 front, 끝을 rear로 삼으면 큐가 바로 만들어진다. 동작은 맞다.</p>
+
+<pre data-lang="python" data-title="queue_with_list.py"><code>
+line = []                 # 앞이 front, 끝이 rear
+
+line.append('kim')        # enqueue: 줄 뒤에 선다
+line.append('lee')
+line.append('park')
+print(line)
+
+print(line.pop(0))        # dequeue: 맨 앞 사람이 나간다
+print(line.pop(0))
+print(line)
+</code></pre>
+<pre class="output">
+['kim', 'lee', 'park']
+kim
+lee
+['park']
+</pre>
+
+        <p>문제는 속도다. 7장에서 본 것처럼 리스트는 원소를 빈틈없이 줄지어 두므로, 맨 앞을 빼면 뒤의 원소를 모두 한 칸씩 당겨야 해서 <code>pop(0)</code>이 O(n)이다. 큐는 꺼내기를 원소 수만큼 반복하니 이 비용이 쌓인다. 리스트를 <code>pop(0)</code>으로 다 비울 때 원소가 몇 번 옮겨지는지 세어 보자.</p>
+
+<pre data-lang="python" data-title="shift_count.py"><code>
+def moves_to_drain(n: int) -&gt; int:
+    """n개짜리 리스트를 pop(0)으로 다 비울 때 원소가 옮겨지는 횟수"""
+    moves = 0
+    for remaining in range(n, 0, -1):
+        moves += remaining - 1    # 뒤의 (remaining - 1)개가 한 칸씩 당겨진다
+    return moves
+
+
+for n in (10, 1_000, 100_000):
+    print(f'{n:&gt;7,}개: {moves_to_drain(n):,}번 이동')
+</code></pre>
+<pre class="output">
+     10개: 45번 이동
+  1,000개: 499,500번 이동
+100,000개: 4,999,950,000번 이동
+</pre>
+
+        <p>n(n-1)/2번, 곧 O(n²)이다. 원소가 10만 개면 50억 번을 옮긴다. 실제로 재 보면 컴퓨터에 따라 다르지만 10만 번 꺼내는 데 리스트는 1초 가까이 걸리기도 하고, deque는 눈 깜짝할 새에 끝난다.</p>
+        <p>3장과 7장에서 "먼저 넣은 것을 먼저 꺼내려면 <code>deque</code>"라고 한 이유가 이것이다. deque는 작은 블록을 앞뒤로 이어 둔 구조라서(7장) 끝에서 넣고 빼도 다른 원소를 옮기지 않는다. <mark>큐가 필요하면 <code>deque</code>의 <code>append</code>로 넣고 <code>popleft</code>로 꺼낸다.</mark></p>
+
+<pre data-lang="python" data-title="queue_with_deque.py"><code>
+from collections import deque
+
+q = deque()               # 빈 큐
+q.append('kim')           # enqueue: 오른쪽 끝(rear)에 넣는다
+q.append('lee')
+q.append('park')
+print(q)
+
+print(q[0])               # peek: 꺼내지 않고 front만 본다
+print(q.popleft())        # dequeue: 왼쪽 끝(front)에서 꺼낸다
+print(len(q), q)
+
+while q:                  # 빈 deque 는 조건식에서 거짓이다
+    print('처리:', q.popleft())
+print(q)
+</code></pre>
+<pre class="output">
+deque(['kim', 'lee', 'park'])
+kim
+kim
+2 deque(['lee', 'park'])
+처리: lee
+처리: park
+deque([])
+</pre>
+
+        <p><code>while q:</code>는 큐 문제에서 가장 자주 쓰는 틀이다. "줄이 빌 때까지 맨 앞을 하나씩 꺼내 처리하고, 처리하다 생긴 일은 뒤에 넣는다."</p>
+
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>큐 연산</th><th>list로</th><th>deque로</th><th>왜 다른가</th></tr></thead>
+            <tbody>
+              <tr><td>enqueue</td><td><code>append(x)</code> <span class="bigo b-const">O(1)*</span></td><td><code>append(x)</code> <span class="bigo b-const">O(1)</span></td><td>둘 다 끝에 붙이기만 한다</td></tr>
+              <tr><td>dequeue</td><td><code>pop(0)</code> <span class="bigo b-linear">O(n)</span></td><td><code>popleft()</code> <span class="bigo b-const">O(1)</span></td><td>리스트는 뒤 원소를 모두 당긴다</td></tr>
+              <tr><td>front 보기</td><td><code>a[0]</code> <span class="bigo b-const">O(1)</span></td><td><code>q[0]</code> <span class="bigo b-const">O(1)</span></td><td>끝 칸은 바로 찾는다</td></tr>
+              <tr><td>비었는지·개수</td><td><code>not a</code>, <code>len(a)</code> <span class="bigo b-const">O(1)</span></td><td><code>not q</code>, <code>len(q)</code> <span class="bigo b-const">O(1)</span></td><td>개수를 따로 기억한다</td></tr>
+              <tr><td>값 찾기</td><td><code>x in a</code> <span class="bigo b-linear">O(n)</span></td><td><code>x in q</code> <span class="bigo b-linear">O(n)</span></td><td>하나씩 비교한다</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <p>* 평균으로 따진 값이다(분할 상환, 8장).</p>
+      </section>
+
+      <section id="deque">
+        <h2>데크: 양쪽 끝이 모두 열린 줄</h2>
+        <p><strong>데크(deque, double-ended queue)</strong>는 양쪽 끝에서 모두 넣고 뺄 수 있는 줄이다. 한쪽에서만 넣고 반대쪽에서만 빼면 큐, 한쪽에서만 넣고 빼면 스택이 되니, 둘을 모두 품은 더 일반적인 구조다.</p>
+
+<pre data-lang="python" data-title="deque_both_ends.py"><code>
+from collections import deque
+
+d = deque([2, 3])
+d.appendleft(1)           # 왼쪽 끝에 넣기
+d.append(4)               # 오른쪽 끝에 넣기
+print(d)
+
+print(d.popleft(), d.pop())   # 양쪽 끝에서 꺼내기
+print(d)
+
+d.extend([5, 6])          # 오른쪽에 여러 개 붙이기
+d.extendleft([0, -1])     # 왼쪽에는 하나씩 넣으므로 순서가 뒤집힌다
+print(d)
+</code></pre>
+<pre class="output">
+deque([1, 2, 3, 4])
+1 4
+deque([2, 3])
+deque([-1, 0, 2, 3, 5, 6])
+</pre>
+
+        <p><code>extendleft([0, -1])</code>는 0을 왼쪽에 넣고, 그 왼쪽에 다시 -1을 넣는다. 그래서 결과가 <code>[-1, 0, …]</code>으로 뒤집혀 보인다.</p>
+
+        <h3>rotate: 줄을 둥글게 돌리기</h3>
+        <p><code>rotate(k)</code>는 원소를 오른쪽으로 k칸 돌린다. 오른쪽 끝에서 밀려난 원소가 왼쪽 끝으로 다시 들어오고, k가 음수면 왼쪽으로 돈다. 비용은 돌린 칸 수에 비례하는 O(k)다.</p>
+
+<pre data-lang="python" data-title="deque_rotate.py"><code>
+from collections import deque
+
+d = deque([1, 2, 3, 4, 5])
+d.rotate(1)               # 오른쪽으로 한 칸: 끝 원소가 맨 앞으로
+print(d)
+d.rotate(-2)              # 왼쪽으로 두 칸: 앞의 둘이 뒤로
+print(d)
+
+a = deque([1, 2, 3])      # rotate(-1) 은 "맨 앞을 꺼내 맨 뒤에 붙이기"
+b = deque([1, 2, 3])
+a.rotate(-1)
+b.append(b.popleft())
+print(a == b, a)
+</code></pre>
+<pre class="output">
+deque([5, 1, 2, 3, 4])
+deque([2, 3, 4, 5, 1])
+True deque([2, 3, 1])
+</pre>
+
+        <p>마지막 줄이 보여 주듯 <code>rotate(-1)</code>은 <code>append(popleft())</code>와 같다. 둥글게 앉아 차례를 넘기는 문제는 이 한 줄로 표현된다. 이 장의 대표 문제가 바로 그렇다.</p>
+
+        <h3>maxlen: 길이가 정해진 줄</h3>
+        <p><code>deque(maxlen=k)</code>로 만들면 원소가 k개를 넘지 않는다. 가득 찬 상태에서 한쪽에 넣으면 반대쪽 끝이 저절로 밀려난다.</p>
+
+<pre data-lang="python" data-title="deque_maxlen.py"><code>
+from collections import deque
+
+recent = deque(maxlen=3)
+for x in (1, 2, 3, 4):
+    recent.append(x)      # 가득 찬 뒤에는 왼쪽 끝이 밀려난다
+print(recent)
+
+recent.appendleft(0)      # 왼쪽에 넣으면 오른쪽 끝이 밀려난다
+print(recent)
+</code></pre>
+<pre class="output">
+deque([2, 3, 4], maxlen=3)
+deque([0, 2, 3], maxlen=3)
+</pre>
+
+        <div class="callout callout-warn">
+          <span class="callout-title">가운데 인덱스는 느리다</span>
+          <p>deque의 인덱스 접근은 양 끝(<code>d[0]</code>, <code>d[-1]</code>)은 O(1)이지만, 가운데 원소는 가까운 끝에서부터 블록을 따라가야 해서 O(n)이다(7장). 리스트처럼 <code>d[i]</code>를 마음껏 쓰는 자료형이 아니다. 끝만 다루고, 전체를 훑을 때는 <code>for x in d:</code>로 돈다.</p>
+        </div>
+      </section>
+
+      <section id="ring-buffer">
+        <h2>원형 큐 직접 만들기</h2>
+        <p>deque가 없어도 큐를 O(1)로 만들 수 있다. 원소를 옮기지 않고 <strong>"다음에 꺼낼 위치"를 가리키는 인덱스만 옮기면</strong> 된다. 가장 간단한 방법은 리스트에 <code>head</code> 인덱스 하나를 두는 것이다.</p>
+
+<pre data-lang="python" data-title="queue_head_index.py"><code>
+q = [10, 20, 30]
+head = 0                  # 다음에 꺼낼 칸의 인덱스
+
+while head &lt; len(q):      # 읽을 칸이 남아 있으면 비지 않은 것이다
+    x = q[head]           # dequeue: 지우지 않고 읽을 위치만 옮긴다
+    head += 1
+    print('처리:', x)
+    if x == 20:
+        q.append(25)      # 처리 도중에 새로 줄을 서도 된다
+
+print(q, head)
+</code></pre>
+<pre class="output">
+처리: 10
+처리: 20
+처리: 30
+처리: 25
+[10, 20, 30, 25] 4
+</pre>
+
+        <p>꺼내기가 O(1)이 됐지만 이미 꺼낸 앞쪽 칸이 버려진 채 남는다. 넣고 빼기를 오래 반복하면 리스트가 끝없이 길어진다.</p>
+        <p>버려진 칸을 다시 쓰려면 배열의 끝과 처음을 이어 <strong>고리</strong>로 본다. 이것이 <strong>원형 큐(circular queue, 링 버퍼)</strong>다. 크기가 정해진 배열에 front(다음에 꺼낼 칸)와 rear(다음에 넣을 칸)를 두고, 인덱스를 한 칸 옮길 때마다 <code>(i + 1) % 크기</code>로 계산한다. 마지막 칸 다음이 0번 칸이 되는 것이 나머지 연산의 역할이다.</p>
+
+        <figure class="fig">
+          <div class="fig-steps stacked">
+            <div class="fig-state">
+              <div class="cells">
+                <div class="cell" data-i="0" data-ptr="front">1</div>
+                <div class="cell" data-i="1">2</div>
+                <div class="cell" data-i="2">3</div>
+                <div class="cell is-ghost" data-i="3" data-ptr="rear"></div>
+              </div>
+              <span class="fig-state-label">1, 2, 3을 넣은 뒤</span>
+            </div>
+            <div class="fig-arrow">dequeue 두 번</div>
+            <div class="fig-state">
+              <div class="cells">
+                <div class="cell is-ghost" data-i="0"></div>
+                <div class="cell is-ghost" data-i="1"></div>
+                <div class="cell" data-i="2" data-ptr="front">3</div>
+                <div class="cell is-ghost" data-i="3" data-ptr="rear"></div>
+              </div>
+              <span class="fig-state-label">앞의 두 칸이 비었다</span>
+            </div>
+            <div class="fig-arrow">enqueue(4), enqueue(5)</div>
+            <div class="fig-state">
+              <div class="cells">
+                <div class="cell is-hl" data-i="0">5</div>
+                <div class="cell is-ghost" data-i="1" data-ptr="rear"></div>
+                <div class="cell" data-i="2" data-ptr="front">3</div>
+                <div class="cell is-hl" data-i="3">4</div>
+              </div>
+              <span class="fig-state-label">5는 0번 칸으로 돌아 들어간다</span>
+            </div>
+          </div>
+          <figcaption><b>그림 11-2</b> 크기 4인 원형 큐. 4는 3번 칸에 들어가고, rear가 (3 + 1) % 4 = 0으로 돌아가므로 5는 비어 있던 0번 칸을 다시 쓴다. 큐의 순서는 front부터 3, 4, 5다.</figcaption>
+        </figure>
+
+<pre data-lang="python" data-title="ring_queue.py"><code>
+class RingQueue:
+    def __init__(self, capacity):
+        self.data = [None] * capacity
+        self.front = 0    # 다음에 꺼낼 칸
+        self.rear = 0     # 다음에 넣을 칸
+        self.size = 0     # 들어 있는 개수
+
+    def enqueue(self, x):
+        if self.size == len(self.data):
+            raise IndexError('queue is full')
+        self.data[self.rear] = x
+        self.rear = (self.rear + 1) % len(self.data)   # 끝 칸 다음은 0번 칸
+        self.size += 1
+
+    def dequeue(self):
+        if self.size == 0:
+            raise IndexError('queue is empty')
+        x, self.data[self.front] = self.data[self.front], None   # 꺼내고 칸을 비운다
+        self.front = (self.front + 1) % len(self.data)
+        self.size -= 1
+        return x
+
+
+q = RingQueue(4)
+for x in (1, 2, 3):
+    q.enqueue(x)
+print(q.dequeue(), q.dequeue())
+for x in (4, 5):
+    q.enqueue(x)
+print(q.data, q.front, q.rear, q.size)
+</code></pre>
+<pre class="output">
+1 2
+[5, None, 3, 4] 2 1 3
+</pre>
+
+        <p>출력이 그림 11-2의 마지막 상태와 같다. 넣기도 꺼내기도 인덱스 하나를 계산하고 칸 하나를 쓰는 것이 전부라 O(1)이다.</p>
+        <p><code>size</code>를 따로 두는 이유가 있다. front와 rear가 같은 칸을 가리키는 경우는 "비었을 때"와 "꽉 찼을 때" 두 가지라서, 두 인덱스만으로는 둘을 구별할 수 없다. 개수를 세어 두면 이 모호함이 사라진다.</p>
+      </section>
+
+      <section id="when-queue">
+        <h2>큐가 어울리는 신호</h2>
+        <p>문제에 다음과 같은 말이 보이면 큐를 먼저 떠올린다.</p>
+        <ul>
+          <li><strong>도착한 순서대로 처리</strong>한다 — 대기열, 주문, 프린터 작업</li>
+          <li>맨 앞을 처리하고 <strong>다시 맨 뒤로 보낸다</strong> — 카드 섞기, 차례 돌리기</li>
+          <li>매 단계 규칙대로 상태를 바꾸는 <strong>시뮬레이션</strong></li>
+          <li>가까운 것부터 차례로 넓혀 가는 탐색 — 너비 우선 탐색(BFS)이 큐로 동작한다. 13장에서 다룬다</li>
+        </ul>
+        <p>본문 예제로 카드 시뮬레이션을 풀어 보자. 1번부터 n번까지 카드가 1번이 맨 위로 오게 쌓여 있다. 카드가 한 장 남을 때까지 <strong>맨 위 카드를 버리고, 그다음 맨 위 카드를 맨 아래로 옮기기</strong>를 반복한다. 맨 위에서 꺼내고 맨 아래에 넣으니 정확히 큐다.</p>
+
+<pre data-lang="python" data-title="card_game.py"><code>
+from collections import deque
+
+n = 7
+cards = deque(range(1, n + 1))      # 왼쪽이 맨 위, 오른쪽이 맨 아래
+thrown = []
+
+while len(cards) &gt; 1:
+    thrown.append(cards.popleft())  # 맨 위 한 장을 버린다
+    cards.append(cards.popleft())   # 다음 장은 맨 아래로 보낸다
+
+print('버린 순서:', thrown)
+print('남은 카드:', cards[0])
+</code></pre>
+<pre class="output">
+버린 순서: [1, 3, 5, 7, 4, 2]
+남은 카드: 6
+</pre>
+
+        <p>한 바퀴에 카드가 한 장씩 줄고, 바퀴마다 deque 연산이 세 번이므로 전체 O(n)이다. 리스트의 <code>pop(0)</code>으로 썼다면 O(n²)이 된다.</p>
+
+        <h3>차례 돌리기: 시간을 나눠 쓰는 작업들</h3>
+        <p>작업마다 남은 시간이 있고, 한 번에 2초씩만 실행한 뒤 덜 끝난 작업은 줄 맨 뒤로 보낸다. 운영체제가 CPU를 나눠 주는 방식(라운드 로빈)과 같은 모양이다.</p>
+
+<pre data-lang="python" data-title="round_robin.py"><code>
+from collections import deque
+
+jobs = deque([('A', 5), ('B', 2), ('C', 4)])   # (이름, 남은 시간)
+time_slice = 2                                 # 한 번에 주는 시간
+clock = 0
+
+while jobs:
+    name, left = jobs.popleft()                # 맨 앞 작업을 꺼내
+    run = min(time_slice, left)
+    clock += run                               # 조금 실행하고
+    if left &gt; run:
+        jobs.append((name, left - run))        # 덜 끝났으면 맨 뒤로
+    else:
+        print(f'{name} 끝: {clock}초')
+</code></pre>
+<pre class="output">
+B 끝: 4초
+C 끝: 10초
+A 끝: 11초
+</pre>
+
+        <p>시뮬레이션 문제는 이처럼 <mark>"꺼내서 한 단계 처리하고, 남은 일은 다시 줄 세운다"</mark>는 틀 하나로 정리되는 경우가 많다.</p>
+      </section>
+
+      <section id="recent-k">
+        <h2>써먹기: 최근 k개만 기억하기</h2>
+        <p>센서 값이 하나씩 들어올 때 "최근 3개의 평균"을 계속 보여 줘야 한다고 하자. 새 값은 뒤에 넣고 가장 오래된 값은 앞에서 빼야 하니 큐이고, 길이가 정해져 있으니 <code>maxlen</code>이 딱 맞다.</p>
+
+<pre data-lang="python" data-title="moving_average.py"><code>
+from collections import deque
+
+temps = [20, 22, 25, 24, 30, 28]
+window = deque(maxlen=3)              # 최근 3개만 남는다
+
+for t in temps:
+    window.append(t)                  # 4개째부터 가장 오래된 값이 밀려난다
+    print(list(window), round(sum(window) / len(window), 1))
+</code></pre>
+<pre class="output">
+[20] 20.0
+[20, 22] 21.0
+[20, 22, 25] 22.3
+[22, 25, 24] 23.7
+[25, 24, 30] 26.3
+[24, 30, 28] 27.3
+</pre>
+
+        <p>여기서 <code>sum(window)</code>는 매번 k개를 더하므로 값마다 O(k)다. k가 크면 합계를 따로 들고 다니면서 들어오는 값은 더하고 밀려나는 값은 빼면 O(1)이 된다. <code>maxlen</code>은 밀려난 값을 알려 주지 않으므로, 넣기 <strong>전에</strong> 맨 앞 값을 빼 둔다.</p>
+
+<pre data-lang="python" data-title="moving_sum.py"><code>
+from collections import deque
+
+values = [3, 1, 4, 1, 5, 9]
+window = deque(maxlen=3)
+total = 0
+
+for x in values:
+    if len(window) == window.maxlen:
+        total -= window[0]            # 곧 밀려날 값을 먼저 뺀다
+    window.append(x)
+    total += x
+    print(list(window), total)
+</code></pre>
+<pre class="output">
+[3] 3
+[3, 1] 4
+[3, 1, 4] 8
+[1, 4, 1] 6
+[4, 1, 5] 10
+[1, 5, 9] 15
+</pre>
+      </section>
+
+      <section id="pitfalls">
+        <h2>자주 하는 실수</h2>
+        <div class="callout callout-warn">
+          <span class="callout-title">list.pop(0)으로 큐 쓰기</span>
+          <p>작은 예제에서는 티가 나지 않다가 원소가 수만 개를 넘으면 시간 초과가 난다. 꺼낼 때마다 O(n)이라 전체가 O(n²)이기 때문이다. 큐는 처음부터 <code>deque</code>와 <code>popleft()</code>로 쓴다.</p>
+        </div>
+        <div class="callout callout-warn">
+          <span class="callout-title">deque를 인덱스로 훑기</span>
+          <p><code>for i in range(len(d)): d[i]</code>는 가운데로 갈수록 한 번에 O(n)이 걸려 전체 O(n²)이 될 수 있다. 훑을 때는 <code>for x in d:</code>, 가운데를 자주 읽어야 한다면 deque가 아니라 리스트가 맞는 자료형이다.</p>
+        </div>
+        <div class="callout callout-warn">
+          <span class="callout-title">queue.Queue를 큐로 쓰기</span>
+          <p>이름 때문에 고르기 쉽지만 <code>queue.Queue</code>는 여러 스레드가 안전하게 일을 주고받도록 만든 도구다. 넣고 꺼낼 때마다 잠금을 걸고 풀어서 deque보다 몇 배 느리고, 비어 있을 때 <code>get()</code>을 부르면 에러 대신 멈춰서 기다린다. 코딩 테스트의 큐는 <code>deque</code>다.</p>
+        </div>
+        <div class="callout callout-warn">
+          <span class="callout-title">빈 deque에서 꺼내기</span>
+          <p>빈 deque에 <code>popleft()</code>나 <code>q[0]</code>을 하면 <code>IndexError</code>가 난다. <code>while q:</code>나 <code>if q:</code>로 먼저 확인한다.</p>
+        </div>
+
+<pre data-lang="python" data-title="deque_empty.py"><code>
+from collections import deque
+
+q = deque()
+try:
+    q.popleft()
+except IndexError as e:
+    print(f'{type(e).__name__}: {e}')
+
+print(q.popleft() if q else '비어 있음')   # 꺼내기 전에 확인한다
+</code></pre>
+<pre class="output">
+IndexError: pop from an empty deque
+비어 있음
+</pre>
+      </section>
+
+      <section id="problem">
+        <h2>대표 문제</h2>
+        <div class="problem">
+          <div class="problem-head">
+            <div class="problem-kicker"><b>Problem</b><span class="chip">쉬움</span><span class="chip">큐</span><span class="chip">시뮬레이션</span></div>
+            <h3>원탁에서 K번째마다 내보내기</h3>
+          </div>
+          <div class="problem-body">
+            <p>1번부터 N번까지 N명이 번호 순서대로 원탁에 둘러앉아 있다. 1번부터 시작해 시계 방향으로 한 명씩 세어, K번째로 세어진 사람을 자리에서 내보낸다. 그다음 사람부터 다시 1로 세기 시작해 K번째 사람을 내보내고, 모두 나갈 때까지 반복한다.</p>
+            <p>첫 줄에 N과 K가 공백으로 구분되어 주어질 때(1 ≤ K ≤ N ≤ 5,000), 사람이 나가는 순서를 공백으로 구분해 한 줄에 출력하라.</p>
+            <div class="table-wrap">
+              <table>
+                <thead><tr><th>입력</th><th>출력</th><th>이유</th></tr></thead>
+                <tbody>
+                  <tr><td><code>7 3</code></td><td><code>3 6 2 7 5 1 4</code></td><td>3번이 먼저 나가고, 4번부터 다시 세면 6번이 나간다</td></tr>
+                  <tr><td><code>5 2</code></td><td><code>2 4 1 5 3</code></td><td>한 명 건너 한 명씩 나간다</td></tr>
+                  <tr><td><code>4 1</code></td><td><code>1 2 3 4</code></td><td>세자마자 나가므로 번호 순서 그대로다</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <details class="reveal">
+            <summary>접근 방법<span class="reveal-hint">먼저 생각해 보고 펼치세요</span></summary>
+            <div class="reveal-body">
+              <p>원탁을 일렬로 펴서 "지금 셀 차례인 사람"이 늘 맨 앞에 오게 하면, 세는 일이 큐 연산이 된다. 차례가 지나간 사람은 맨 앞에서 빠져 맨 뒤로 간다. <mark>원을 도는 일을 "앞에서 꺼내 뒤에 붙이기"로 바꾸는 것</mark>이 핵심이다.</p>
+              <ol>
+                <li>1부터 N까지 deque에 넣는다.</li>
+                <li>K-1명은 차례를 넘긴다. <code>append(popleft())</code>를 K-1번, 또는 한 번에 <code>rotate(-(K-1))</code>.</li>
+                <li>이제 맨 앞이 K번째 사람이다. <code>popleft()</code>로 내보내 기록한다.</li>
+                <li>deque가 빌 때까지 반복한다.</li>
+              </ol>
+              <p>리스트로 원을 흉내 내 "지금 위치에서 K-1칸 뒤"를 계산해 <code>pop(i)</code>로 지울 수도 있다. 이때도 지울 때마다 뒤 원소를 당기므로 O(n)이다.</p>
+            </div>
+          </details>
+
+          <details class="reveal">
+            <summary>풀이 코드</summary>
+            <div class="reveal-body">
+<pre data-lang="python" data-title="josephus.py"><code>
+import sys
+from collections import deque
+
+n, k = map(int, sys.stdin.readline().split())
+circle = deque(range(1, n + 1))
+order = []
+
+while circle:
+    circle.rotate(-(k - 1))      # 왼쪽으로 k-1칸: k번째 사람이 맨 앞에 온다
+    order.append(circle.popleft())
+
+print(*order)
+</code></pre>
+<pre class="stdin">
+7 3
+</pre>
+<pre class="output">
+3 6 2 7 5 1 4
+</pre>
+              <p>남은 사람이 K보다 적어도 그대로 동작한다. 원을 몇 바퀴 돌든 rotate가 알아서 고리를 따라 돌기 때문이다. 게다가 CPython의 <code>rotate</code>는 돌릴 칸 수를 길이로 나눈 나머지로 줄여서 돌므로, 남은 사람이 적을 때 헛바퀴를 돌지 않는다.</p>
+            </div>
+          </details>
+
+          <details class="reveal">
+            <summary>복잡도</summary>
+            <div class="reveal-body">
+              <dl class="cx">
+                <dt>시간</dt><dd><span class="bigo b-quad">O(N × K)</span> 한 명을 내보낼 때마다 rotate가 K-1칸을 돌고, 이를 N번 한다. N, K가 5,000이면 2,500만 칸 정도다.</dd>
+                <dt>공간</dt><dd><span class="bigo b-linear">O(N)</span> deque와 결과 리스트에 N명이 들어간다.</dd>
+              </dl>
+            </div>
+          </details>
+        </div>
+      </section>
+
+      <section id="recall">
+        <h2>스스로 확인</h2>
+        <div class="recall">
+          <details>
+            <summary>원소가 n개인 큐를 리스트의 <code>pop(0)</code>으로 다 비우면 왜 O(n²)인가?</summary>
+            <div class="answer"><p>맨 앞을 뺄 때마다 남은 원소를 모두 한 칸씩 당긴다. 옮기는 횟수가 n-1, n-2, …, 0이라 합이 n(n-1)/2, 곧 O(n²)이다. deque의 <code>popleft()</code>는 아무것도 옮기지 않아 전체 O(n)이다.</p></div>
+          </details>
+          <details>
+            <summary><code>deque([1, 2, 3, 4])</code>에 <code>rotate(-1)</code>을 하면 어떻게 되고, 같은 일을 하는 다른 코드는?</summary>
+            <div class="answer"><p>왼쪽으로 한 칸 돌아 <code>deque([2, 3, 4, 1])</code>이 된다. <code>d.append(d.popleft())</code>와 같다.</p></div>
+          </details>
+          <details>
+            <summary>원형 큐에서 front와 rear만 두고 개수를 세지 않으면 어떤 문제가 생기는가?</summary>
+            <div class="answer"><p>비었을 때도 꽉 찼을 때도 front와 rear가 같은 칸을 가리켜서 둘을 구별할 수 없다. 개수를 따로 세거나, 한 칸을 일부러 비워 두어 "rear 다음 칸이 front면 꽉 참"으로 정한다.</p></div>
+          </details>
+          <details>
+            <summary>deque에서 <code>d[0]</code>은 빠른데 <code>d[len(d) // 2]</code>는 느린 이유는?</summary>
+            <div class="answer"><p>deque는 블록을 앞뒤로 이어 둔 구조라 양 끝 블록은 바로 찾지만, 가운데 원소는 가까운 끝에서부터 블록을 따라가야 한다. 그래서 양 끝은 O(1), 가운데는 O(n)이다.</p></div>
+          </details>
+        </div>
+      </section>
+
+      <section id="summary">
+        <h2>정리</h2>
+        <ol class="summary-list">
+          <li>큐는 먼저 넣은 것을 먼저 꺼내는 FIFO 구조다. rear에서 넣고(enqueue) front에서 꺼낸다(dequeue).</li>
+          <li>리스트의 <code>pop(0)</code>은 원소를 모두 당겨 O(n)이다. 큐는 <code>deque</code>의 <code>append</code>와 <code>popleft</code>로 쓰고, 둘 다 O(1)이다.</li>
+          <li>deque는 양쪽 끝에서 넣고 뺄 수 있다. <code>rotate</code>로 원을 돌리고 <code>maxlen</code>으로 최근 k개만 남긴다. 인덱스는 양 끝만 O(1)이다.</li>
+          <li>원형 큐는 고정 배열과 front, rear, 그리고 <code>% 크기</code>로 빈칸을 다시 쓰며 O(1)로 동작한다.</li>
+          <li>"도착 순서대로", "맨 뒤로 보내기", 시뮬레이션이 보이면 큐를 떠올리고, <code>while q:</code>에서 꺼내 처리하고 다시 넣는 틀로 푼다.</li>
+        </ol>
+      </section>
+
+      <nav class="pager" aria-label="이전 장과 다음 장"></nav>
+    </article>
+  </main>
+
+  <aside class="rail" aria-label="이 페이지 목차">
+    <p class="rail-title">이 페이지</p>
+    <nav id="onthispage"></nav>
+  </aside>
+</div>
+<div class="backdrop" id="backdrop"></div>
+
+<script src="assets/book.js"></script>
+<script src="assets/app.js"></script>
+<script src="assets/code.js"></script>
+</body>
+</html>
