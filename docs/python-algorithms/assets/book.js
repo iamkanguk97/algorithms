@@ -37,12 +37,12 @@ window.BOOK = {
       title: '비선형 자료구조',
       desc: '데이터가 여러 갈래로 이어지는 구조. 그래프, 트리, 힙, 트라이.',
       chapters: [
-        { no: '13', slug: '13-graph-search', title: '그래프와 탐색', desc: '그래프를 표현하는 법, DFS와 BFS', isWritten: false },
-        { no: '14', slug: '14-shortest-path', title: '최단 경로', desc: '다익스트라, 벨만-포드, 플로이드-워셜', isWritten: false },
-        { no: '15', slug: '15-tree', title: '트리', desc: '트리 용어, 이진 트리, 전위·중위·후위 순회', isWritten: false },
-        { no: '16', slug: '16-binary-search-tree', title: '이진 탐색 트리', desc: '정렬된 트리에서 찾기, 넣기, 지우기', isWritten: false },
-        { no: '17', slug: '17-heap', title: '힙과 우선순위 큐', desc: '가장 작은 값을 빠르게 꺼내는 완전 이진 트리', isWritten: false },
-        { no: '18', slug: '18-trie', title: '트라이', desc: '문자열 접두사를 빠르게 찾는 트리', isWritten: false }
+        { no: '13', slug: '13-graph-search', title: '그래프와 탐색', desc: '그래프를 표현하는 법, DFS와 BFS', isWritten: true },
+        { no: '14', slug: '14-shortest-path', title: '최단 경로', desc: '다익스트라, 벨만-포드, 플로이드-워셜', isWritten: true },
+        { no: '15', slug: '15-tree', title: '트리', desc: '트리 용어, 이진 트리, 전위·중위·후위 순회', isWritten: true },
+        { no: '16', slug: '16-binary-search-tree', title: '이진 탐색 트리', desc: '정렬된 트리에서 찾기, 넣기, 지우기', isWritten: true },
+        { no: '17', slug: '17-heap', title: '힙과 우선순위 큐', desc: '가장 작은 값을 빠르게 꺼내는 완전 이진 트리', isWritten: true },
+        { no: '18', slug: '18-trie', title: '트라이', desc: '문자열 접두사를 빠르게 찾는 트리', isWritten: true }
       ]
     },
     {

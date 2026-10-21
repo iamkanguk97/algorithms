@@ -1,0 +1,781 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>17. 힙과 우선순위 큐 — 파이썬 알고리즘 노트</title>
+<script src="assets/theme.js"></script>
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body data-chapter="17">
+<a class="skip-link" href="#content">본문으로 건너뛰기</a>
+<div class="progress" aria-hidden="true"><span></span></div>
+<header class="topbar" id="topbar"></header>
+
+<div class="shell">
+  <aside class="sidebar" id="sidebar" aria-label="책 목차"></aside>
+
+  <main class="main" id="content">
+    <article class="chapter">
+      <header class="chapter-head">
+        <a class="part-pill"></a>
+        <span class="chapter-label"></span>
+        <h1>힙과 우선순위 큐</h1>
+        <p class="lede">7장에서 <code>heapq</code>를 꺼내 썼다면, 이 장에서는 그 안이 어떻게 생겼는지 들여다봅니다. 완전 이진 트리를 배열 하나에 담고, 값을 넣고 뺄 때 log n번만 자리를 바꾸는 원리를 직접 구현하며 확인합니다.</p>
+        <div class="chapter-meta">
+          <span class="chip">완전 이진 트리</span><span class="chip">힙 속성</span><span class="chip">2i+1 · 2i+2</span><span class="chip">sift up · sift down</span><span class="chip">heapq</span>
+        </div>
+      </header>
+
+      <div class="goals">
+        <p class="goals-title">이 장에서 배울 것</p>
+        <ul>
+          <li>힙이 정렬된 구조가 아니라 "부모와 자식 사이의 약속"만 지키는 구조라는 것을 설명할 수 있다</li>
+          <li>완전 이진 트리를 배열에 담고, 인덱스 계산으로 부모와 자식을 찾을 수 있다</li>
+          <li>sift up과 sift down으로 넣기와 꺼내기를 직접 구현하고, 둘이 O(log n)인 이유를 안다</li>
+          <li><code>heapify</code>가 O(n log n)이 아니라 O(n)인 이유를 안다</li>
+          <li>두 힙으로 실시간 중앙값을 구하는 문제를 풀 수 있다</li>
+        </ul>
+      </div>
+
+      <section id="what-is-heap">
+        <h2>힙이란</h2>
+        <div class="callout callout-key">
+          <span class="callout-title">핵심</span>
+          <p class="callout-big">최소 힙은 <mark>모든 부모가 자기 자식보다 크지 않은 완전 이진 트리</mark>다. 전체를 정렬하지 않고 이 약속 하나만 지키므로, 가장 작은 값은 언제나 루트에 있다.</p>
+        </div>
+        <p>응급실은 먼저 온 순서대로 진료하지 않는다. 가장 급한 환자부터 본다. 이렇게 넣은 순서와 상관없이 <strong>우선순위가 가장 높은 것부터 꺼내는</strong> 자료구조를 <strong>우선순위 큐</strong>(priority queue)라고 한다. 힙은 우선순위 큐를 만드는 가장 흔한 방법이다.</p>
+        <p>힙은 두 가지 조건을 동시에 지킨다.</p>
+        <ul>
+          <li><strong>모양 조건</strong> — 완전 이진 트리다. 위층부터 빈틈없이 채우고, 마지막 층은 왼쪽부터 채운다(15장).</li>
+          <li><strong>힙 속성</strong> — 모든 노드에서 부모 ≤ 자식이다(최소 힙). 부모 ≥ 자식이면 최대 힙이다.</li>
+        </ul>
+        <p>힙 속성은 부모와 자식 사이에만 걸린다. 형제나 사촌끼리는 아무 약속이 없다. 그래도 루트가 최솟값인 것은 확실하다. 어느 노드에서든 부모 쪽으로 올라가면 값이 작아지거나 같아지고, 결국 모두 루트에 닿기 때문이다.</p>
+
+        <figure class="fig">
+          <svg class="graph" viewBox="0 0 340 200" role="img" aria-label="최소 힙 1, 4, 2, 9, 6, 3, 8을 그린 완전 이진 트리. 루트 1의 자식은 4와 2, 4의 자식은 9와 6, 2의 자식은 3과 8이다">
+            <g class="edges">
+              <line class="edge" x1="170" y1="30" x2="90" y2="90"/>
+              <line class="edge" x1="170" y1="30" x2="250" y2="90"/>
+              <line class="edge" x1="90" y1="90" x2="50" y2="150"/>
+              <line class="edge" x1="90" y1="90" x2="130" y2="150"/>
+              <line class="edge" x1="250" y1="90" x2="210" y2="150"/>
+              <line class="edge" x1="250" y1="90" x2="290" y2="150"/>
+            </g>
+            <g class="vertices">
+              <g class="vertex is-hl" transform="translate(170,30)"><circle r="16"/><text>1</text></g>
+              <g class="vertex" transform="translate(90,90)"><circle r="16"/><text>4</text></g>
+              <g class="vertex" transform="translate(250,90)"><circle r="16"/><text>2</text></g>
+              <g class="vertex" transform="translate(50,150)"><circle r="16"/><text>9</text></g>
+              <g class="vertex" transform="translate(130,150)"><circle r="16"/><text>6</text></g>
+              <g class="vertex" transform="translate(210,150)"><circle r="16"/><text>3</text></g>
+              <g class="vertex" transform="translate(290,150)"><circle r="16"/><text>8</text></g>
+            </g>
+            <text class="label is-hl" x="205" y="22">[0]</text>
+            <text class="label" x="125" y="82">[1]</text>
+            <text class="label" x="285" y="82">[2]</text>
+            <text class="label" x="50" y="178">[3]</text>
+            <text class="label" x="130" y="178">[4]</text>
+            <text class="label" x="210" y="178">[5]</text>
+            <text class="label" x="290" y="178">[6]</text>
+          </svg>
+          <div class="fig-steps">
+            <div class="fig-state">
+              <div class="cells">
+                <div class="cell is-hl" data-i="0">1</div>
+                <div class="cell" data-i="1">4</div>
+                <div class="cell" data-i="2">2</div>
+                <div class="cell" data-i="3">9</div>
+                <div class="cell" data-i="4">6</div>
+                <div class="cell" data-i="5">3</div>
+                <div class="cell" data-i="6">8</div>
+              </div>
+            </div>
+          </div>
+          <figcaption><b>그림 17-1</b> 같은 최소 힙을 트리와 배열로 그렸다. 트리를 위층부터, 왼쪽에서 오른쪽으로 읽은 순서가 곧 배열의 순서다.</figcaption>
+        </figure>
+
+        <p>그림의 4는 3보다 크지만 약속을 어기지 않는다. 둘은 부모와 자식 사이가 아니다.</p>
+
+<pre data-lang="python" data-title="is_min_heap.py"><code>
+def is_min_heap(a: list[int]) -&gt; bool:
+    """모든 부모가 두 자식보다 크지 않으면 True."""
+    n = len(a)
+    for i in range(n):
+        for child in (2 * i + 1, 2 * i + 2):
+            if child &lt; n and a[child] &lt; a[i]:
+                return False
+    return True
+
+
+heap = [1, 4, 2, 9, 6, 3, 8]
+print(is_min_heap(heap))                    # 힙이다
+print(heap == sorted(heap))                 # 그러나 정렬되어 있지는 않다
+print(is_min_heap([1, 2, 3, 4, 5, 6, 7]))   # 정렬된 리스트는 언제나 힙이다
+print(is_min_heap([1, 4, 2, 3, 6, 9, 8]))   # 4 아래에 3이 있어 약속이 깨진다
+</code></pre>
+<pre class="output">
+True
+False
+True
+False
+</pre>
+
+        <p>약속이 느슨한 만큼 지키는 비용이 싸서 힙이 빠르다.</p>
+      </section>
+
+      <section id="array-layout">
+        <h2>배열에 담는 완전 이진 트리</h2>
+        <p>트리라고 하면 15장처럼 <code>left</code>, <code>right</code>를 가진 노드 객체를 떠올리기 쉽다. 힙은 그런 노드를 만들지 않는다. 리스트 하나에 위층부터 차례로 담고, 부모와 자식은 <strong>인덱스 계산</strong>으로 찾는다.</p>
+        <p>0번부터 센다면 규칙은 이렇다. <mark>인덱스 i의 자식은 2i+1과 2i+2, 부모는 (i−1)//2다.</mark></p>
+
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>찾는 것</th><th>식</th><th>i = 1일 때</th><th>i = 5일 때</th></tr></thead>
+            <tbody>
+              <tr><td>왼쪽 자식</td><td><code>2 * i + 1</code></td><td>3</td><td>11</td></tr>
+              <tr><td>오른쪽 자식</td><td><code>2 * i + 2</code></td><td>4</td><td>12</td></tr>
+              <tr><td>부모</td><td><code>(i - 1) // 2</code></td><td>0</td><td>2</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+<pre data-lang="python" data-title="heap_index.py"><code>
+heap = [1, 4, 2, 9, 6, 3, 8]
+n = len(heap)
+
+for i in range(n):
+    parent = '없음' if i == 0 else heap[(i - 1) // 2]
+    children = [heap[c] for c in (2 * i + 1, 2 * i + 2) if c &lt; n]
+    print(f'인덱스 {i} (값 {heap[i]}): 부모 {parent}, 자식 {children}')
+</code></pre>
+<pre class="output">
+인덱스 0 (값 1): 부모 없음, 자식 [4, 2]
+인덱스 1 (값 4): 부모 1, 자식 [9, 6]
+인덱스 2 (값 2): 부모 1, 자식 [3, 8]
+인덱스 3 (값 9): 부모 4, 자식 []
+인덱스 4 (값 6): 부모 4, 자식 []
+인덱스 5 (값 3): 부모 2, 자식 []
+인덱스 6 (값 8): 부모 2, 자식 []
+</pre>
+
+        <h3>왜 이 식이 성립하는가</h3>
+        <p>0번 칸은 루트가 쓴다. i번보다 앞에 있는 노드 i개가 자식을 두 개씩 먼저 데려가 1번부터 2i번까지를 채운다. 그래서 i번의 자식은 바로 다음 칸인 2i+1번과 2i+2번이다. 부모 식은 이것을 거꾸로 푼 것이다. 2i+1과 2i+2에서 1을 빼고 2로 나누면(내림) 둘 다 i가 된다.</p>
+        <p>이 계산은 <strong>완전 이진 트리라서</strong> 통한다. 중간에 빈 노드가 있으면 식이 가리키는 칸에 엉뚱한 값이 온다. 힙은 언제나 끝에만 붙이고 끝에서만 떼어 내므로 빈칸이 생기지 않는다.</p>
+        <p>깊이 d의 층은 인덱스 2<sup>d</sup>−1부터 시작해 2<sup>d</sup>개를 담는다. 층마다 두 배씩 늘어나므로 노드 n개의 높이는 ⌊log₂n⌋이다. 값이 100만 개여도 높이는 19다. 다음 두 절의 넣기와 꺼내기는 이 높이만큼만 움직인다.</p>
+
+        <div class="callout callout-tip">
+          <span class="callout-title">1번부터 쓰는 책도 있다</span>
+          <p>1번부터 쓰면 자식은 2i, 2i+1, 부모는 i//2다. 원리는 같다. <code>heapq</code>가 0번부터 쓰므로 이 책도 0번 기준이다.</p>
+        </div>
+      </section>
+
+      <section id="push">
+        <h2>넣기: 끝에 붙이고 위로 올리기</h2>
+        <p>새 값은 리스트의 <strong>끝</strong>에 붙인다. 그래야 모양 조건(완전 이진 트리)이 깨지지 않는다. 대신 힙 속성이 깨질 수 있다. 새 값이 부모보다 작을 수 있기 때문이다.</p>
+        <p>그래서 새 값을 부모와 비교해, 부모보다 작으면 자리를 바꾼다. 한 칸 올라간 자리에서 다시 새 부모와 비교한다. 부모가 더 작거나 같아지거나 루트에 닿으면 멈춘다. 이렇게 위로 올리는 일을 <strong>sift up</strong>(체로 걸러 올린다는 뜻)이라고 한다.</p>
+
+        <figure class="fig">
+          <div class="fig-steps">
+            <div class="fig-state">
+              <svg class="graph" width="150" height="146" viewBox="0 0 170 165" role="img" aria-label="힙 2, 5, 3의 끝에 1을 붙인 상태. 1은 5의 왼쪽 자식이다">
+                <g class="edges">
+                  <line class="edge" x1="95" y1="28" x2="60" y2="83"/>
+                  <line class="edge" x1="95" y1="28" x2="130" y2="83"/>
+                  <line class="edge is-hl" x1="60" y1="83" x2="35" y2="138"/>
+                </g>
+                <g class="vertices">
+                  <g class="vertex" transform="translate(95,28)"><circle r="16"/><text>2</text></g>
+                  <g class="vertex" transform="translate(60,83)"><circle r="16"/><text>5</text></g>
+                  <g class="vertex" transform="translate(130,83)"><circle r="16"/><text>3</text></g>
+                  <g class="vertex is-hl" transform="translate(35,138)"><circle r="16"/><text>1</text></g>
+                </g>
+              </svg>
+              <span class="fig-state-label">끝에 붙임</span>
+            </div>
+            <div class="fig-arrow">1 ↔ 5</div>
+            <div class="fig-state">
+              <svg class="graph" width="150" height="146" viewBox="0 0 170 165" role="img" aria-label="1과 5를 바꾼 상태. 1이 루트 2의 왼쪽 자식이 되었다">
+                <g class="edges">
+                  <line class="edge is-hl" x1="95" y1="28" x2="60" y2="83"/>
+                  <line class="edge" x1="95" y1="28" x2="130" y2="83"/>
+                  <line class="edge" x1="60" y1="83" x2="35" y2="138"/>
+                </g>
+                <g class="vertices">
+                  <g class="vertex" transform="translate(95,28)"><circle r="16"/><text>2</text></g>
+                  <g class="vertex is-hl" transform="translate(60,83)"><circle r="16"/><text>1</text></g>
+                  <g class="vertex" transform="translate(130,83)"><circle r="16"/><text>3</text></g>
+                  <g class="vertex is-done" transform="translate(35,138)"><circle r="16"/><text>5</text></g>
+                </g>
+              </svg>
+              <span class="fig-state-label">한 칸 올라감</span>
+            </div>
+            <div class="fig-arrow">1 ↔ 2</div>
+            <div class="fig-state">
+              <svg class="graph" width="150" height="146" viewBox="0 0 170 165" role="img" aria-label="1과 2를 바꾼 상태. 1이 루트가 되어 멈춘다">
+                <g class="edges">
+                  <line class="edge" x1="95" y1="28" x2="60" y2="83"/>
+                  <line class="edge" x1="95" y1="28" x2="130" y2="83"/>
+                  <line class="edge" x1="60" y1="83" x2="35" y2="138"/>
+                </g>
+                <g class="vertices">
+                  <g class="vertex is-hl" transform="translate(95,28)"><circle r="16"/><text>1</text></g>
+                  <g class="vertex is-done" transform="translate(60,83)"><circle r="16"/><text>2</text></g>
+                  <g class="vertex" transform="translate(130,83)"><circle r="16"/><text>3</text></g>
+                  <g class="vertex is-done" transform="translate(35,138)"><circle r="16"/><text>5</text></g>
+                </g>
+              </svg>
+              <span class="fig-state-label">루트에 닿아 멈춤</span>
+            </div>
+          </div>
+          <figcaption><b>그림 17-2</b> 1을 넣는 과정. 끝에 붙인 1이 부모보다 작은 동안 한 층씩 올라간다.</figcaption>
+        </figure>
+
+        <p>자리를 바꿔도 다른 곳의 약속은 깨지지 않는다. 올라온 새 값은 원래 부모보다 작으니 원래 부모의 다른 자식보다도 작다. 내려간 원래 부모는 원래부터 그 아래 값들보다 작거나 같았다. 그래서 <mark>sift up은 새 값이 지나가는 한 줄의 경로만 고친다.</mark></p>
+
+<pre data-lang="python" data-title="heap_push.py"><code>
+import heapq
+
+
+def sift_up(heap: list[int], i: int) -&gt; None:
+    """i번 값이 부모보다 작은 동안 부모와 자리를 바꾸며 올린다."""
+    while i &gt; 0:
+        parent = (i - 1) // 2
+        if heap[parent] &lt;= heap[i]:          # 약속이 지켜지면 멈춘다
+            break
+        heap[parent], heap[i] = heap[i], heap[parent]
+        i = parent
+
+
+def heap_push(heap: list[int], x: int) -&gt; None:
+    heap.append(x)                           # 끝에 붙여야 완전 이진 트리가 유지된다
+    sift_up(heap, len(heap) - 1)
+
+
+heap, same = [2, 5, 3], [2, 5, 3]
+for x in [1, 4]:                             # 4는 부모 2가 더 작아 바로 멈춘다
+    heap_push(heap, x)
+    heapq.heappush(same, x)
+print(heap, heap == same)                    # heapq와 결과가 같다
+</code></pre>
+<pre class="output">
+[1, 2, 3, 5, 4] True
+</pre>
+
+        <p><code>heap_push</code>는 <code>heapq.heappush</code>처럼 넘겨받은 리스트를 그 자리에서 바꾼다. 한 번 바꿀 때마다 한 층씩 올라가고, 루트를 넘어갈 수는 없다. 그래서 교환은 많아야 트리의 높이 ⌊log₂n⌋번이다. 넣기는 <span class="bigo b-log">O(log n)</span>이다.</p>
+      </section>
+
+      <section id="pop">
+        <h2>꺼내기: 마지막을 루트로 올리고 아래로 내리기</h2>
+        <p>최솟값은 루트인 <code>heap[0]</code>에 있다. 그런데 루트를 그냥 빼면 트리가 둘로 갈라진다. 그래서 순서를 이렇게 잡는다.</p>
+        <ol>
+          <li>루트 값을 따로 챙겨 둔다.</li>
+          <li><strong>마지막 칸</strong>의 값을 떼어 내 루트 자리에 놓는다. 끝에서 떼어 내므로 모양 조건은 그대로다.</li>
+          <li>루트에 올라온 값은 대개 크다. 자식 중 더 작은 쪽과 자리를 바꾸며 내려 보낸다. 두 자식보다 작거나 같아지거나 리프에 닿으면 멈춘다.</li>
+        </ol>
+        <p>3단계처럼 아래로 내리는 일을 <strong>sift down</strong>이라고 한다.</p>
+
+        <figure class="fig">
+          <div class="fig-steps">
+            <div class="fig-state">
+              <svg class="graph" width="150" height="146" viewBox="0 0 170 165" role="img" aria-label="힙 1, 2, 6, 3, 5에서 1을 꺼내고 마지막 값 5를 루트에 놓은 상태">
+                <g class="edges">
+                  <line class="edge" x1="95" y1="28" x2="60" y2="83"/>
+                  <line class="edge" x1="95" y1="28" x2="130" y2="83"/>
+                  <line class="edge" x1="60" y1="83" x2="35" y2="138"/>
+                </g>
+                <g class="vertices">
+                  <g class="vertex is-hl" transform="translate(95,28)"><circle r="16"/><text>5</text></g>
+                  <g class="vertex" transform="translate(60,83)"><circle r="16"/><text>2</text></g>
+                  <g class="vertex" transform="translate(130,83)"><circle r="16"/><text>6</text></g>
+                  <g class="vertex" transform="translate(35,138)"><circle r="16"/><text>3</text></g>
+                </g>
+              </svg>
+              <span class="fig-state-label">1을 꺼내고 5를 루트로</span>
+            </div>
+            <div class="fig-arrow">5 ↔ 2</div>
+            <div class="fig-state">
+              <svg class="graph" width="150" height="146" viewBox="0 0 170 165" role="img" aria-label="5와 더 작은 자식 2를 바꾼 상태. 5는 이제 3의 부모다">
+                <g class="edges">
+                  <line class="edge is-hl" x1="95" y1="28" x2="60" y2="83"/>
+                  <line class="edge" x1="95" y1="28" x2="130" y2="83"/>
+                  <line class="edge" x1="60" y1="83" x2="35" y2="138"/>
+                </g>
+                <g class="vertices">
+                  <g class="vertex is-done" transform="translate(95,28)"><circle r="16"/><text>2</text></g>
+                  <g class="vertex is-hl" transform="translate(60,83)"><circle r="16"/><text>5</text></g>
+                  <g class="vertex" transform="translate(130,83)"><circle r="16"/><text>6</text></g>
+                  <g class="vertex" transform="translate(35,138)"><circle r="16"/><text>3</text></g>
+                </g>
+              </svg>
+              <span class="fig-state-label">작은 자식 2와 교환</span>
+            </div>
+            <div class="fig-arrow">5 ↔ 3</div>
+            <div class="fig-state">
+              <svg class="graph" width="150" height="146" viewBox="0 0 170 165" role="img" aria-label="5와 자식 3을 바꾼 상태. 5가 리프에 닿아 멈춘다">
+                <g class="edges">
+                  <line class="edge" x1="95" y1="28" x2="60" y2="83"/>
+                  <line class="edge" x1="95" y1="28" x2="130" y2="83"/>
+                  <line class="edge is-hl" x1="60" y1="83" x2="35" y2="138"/>
+                </g>
+                <g class="vertices">
+                  <g class="vertex is-done" transform="translate(95,28)"><circle r="16"/><text>2</text></g>
+                  <g class="vertex is-done" transform="translate(60,83)"><circle r="16"/><text>3</text></g>
+                  <g class="vertex" transform="translate(130,83)"><circle r="16"/><text>6</text></g>
+                  <g class="vertex is-hl" transform="translate(35,138)"><circle r="16"/><text>5</text></g>
+                </g>
+              </svg>
+              <span class="fig-state-label">리프에 닿아 멈춤</span>
+            </div>
+          </div>
+          <figcaption><b>그림 17-3</b> 1을 꺼내는 과정. 루트에 올린 5가 더 작은 자식과 자리를 바꾸며 한 층씩 내려간다.</figcaption>
+        </figure>
+
+        <h3>왜 더 작은 자식과 바꾸는가</h3>
+        <p>첫 장면에서 5의 자식은 2와 6이다. 큰 쪽인 6과 바꾸면 6이 루트가 되고, 그 아래에 2가 남는다. 부모 6이 자식 2보다 커서 약속이 바로 깨진다. 더 작은 2를 올리면 2는 남은 자식 6보다도 작으니 약속이 지켜진다. 그래서 <mark>sift down은 언제나 두 자식 중 더 작은 쪽과 자리를 바꾼다.</mark></p>
+
+<pre data-lang="python" data-title="heap_pop.py"><code>
+import heapq
+
+
+def sift_down(heap: list[int], i: int) -&gt; None:
+    """i번 값이 자식보다 큰 동안 더 작은 자식과 자리를 바꾸며 내린다."""
+    n = len(heap)
+    while True:
+        smallest = i
+        for child in (2 * i + 1, 2 * i + 2):
+            if child &lt; n and heap[child] &lt; heap[smallest]:
+                smallest = child
+        if smallest == i:                    # 두 자식 모두 나보다 크거나 같다
+            break
+        heap[i], heap[smallest] = heap[smallest], heap[i]
+        i = smallest
+
+
+def heap_pop(heap: list[int]) -&gt; int:
+    top, last = heap[0], heap.pop()          # 마지막 값을 떼어 낸다
+    if heap:                                 # 남은 값이 있으면 루트에 올리고 내린다
+        heap[0] = last
+        sift_down(heap, 0)
+    return top
+
+
+heap, same = [1, 2, 6, 3, 5], [1, 2, 6, 3, 5]
+for _ in range(2):                           # 가운데 값은 heapq의 결과
+    print(heap_pop(heap), heapq.heappop(same), heap)
+print(heap == same)
+</code></pre>
+<pre class="output">
+1 1 [2, 3, 6, 5]
+2 2 [3, 5, 6]
+True
+</pre>
+
+        <p><code>if heap:</code>이 빠지면 값이 하나뿐인 힙에서 <code>IndexError</code>가 난다. 마지막 값을 떼어 내면 리스트가 비는데, 그 0번에 값을 넣으려 하기 때문이다. 한 번 바꿀 때마다 한 층 내려가므로 교환은 많아야 높이만큼이다. 꺼내기도 <span class="bigo b-log">O(log n)</span>이다. 값을 모두 넣었다가 하나씩 꺼내면 작은 순서대로 나온다. 이것이 <strong>힙 정렬</strong>이고, 19장에서 다른 정렬과 비교한다.</p>
+      </section>
+
+      <section id="heapify">
+        <h2>heapify가 O(n)인 이유</h2>
+        <p>이미 모인 값 n개를 힙으로 바꿀 때 <code>heapify</code>는 <strong>리프가 아닌 마지막 노드부터 루트까지 거꾸로</strong> 돌며 sift down을 한다.</p>
+
+<pre data-lang="python" data-title="heapify.py"><code>
+import heapq
+
+
+def sift_down(heap: list[int], i: int) -&gt; None:
+    n = len(heap)
+    while True:
+        smallest = i
+        for child in (2 * i + 1, 2 * i + 2):
+            if child &lt; n and heap[child] &lt; heap[smallest]:
+                smallest = child
+        if smallest == i:
+            break
+        heap[i], heap[smallest] = heap[smallest], heap[i]
+        i = smallest
+
+
+def heapify(a: list[int]) -&gt; None:
+    for i in range(len(a) // 2 - 1, -1, -1):
+        sift_down(a, i)
+
+
+nums = [9, 4, 7, 1, 8, 3, 2]
+mine = nums[:]
+heapify(mine)
+builtin = nums[:]
+heapq.heapify(builtin)
+print(mine)
+print(builtin)
+print(mine == builtin)
+</code></pre>
+<pre class="output">
+[1, 4, 2, 9, 8, 3, 7]
+[1, 4, 2, 9, 8, 3, 7]
+True
+</pre>
+
+        <p>인덱스 <code>n // 2</code>부터 끝까지는 2i+1이 n 이상이라 자식이 없는 리프다. 리프는 그 자체로 힙이니 할 일이 없어서 <code>n // 2 - 1</code>에서 시작한다. 거꾸로 도는 이유는 sift down이 <strong>두 자식 서브트리가 이미 힙일 때</strong>만 맞게 동작하기 때문이다. 뒤에서부터 하면 i번을 다룰 때 그 아래는 이미 끝나 있다.</p>
+
+        <h3>합이 n을 넘지 않는다</h3>
+        <p>노드마다 내려갈 수 있는 거리가 다르다. 노드가 15개인 그림 17-4로 세어 본다.</p>
+
+        <figure class="fig">
+          <svg class="graph" viewBox="0 0 540 240" role="img" aria-label="노드 15개 완전 이진 트리. 맨 아래 리프 8개는 내려갈 칸이 0, 그 위 4개는 1칸, 그 위 2개는 2칸, 루트 1개는 3칸까지 내려갈 수 있다">
+            <g class="edges">
+              <line class="edge" x1="236" y1="30" x2="124" y2="90"/>
+              <line class="edge" x1="236" y1="30" x2="348" y2="90"/>
+              <line class="edge" x1="124" y1="90" x2="68" y2="150"/>
+              <line class="edge" x1="124" y1="90" x2="180" y2="150"/>
+              <line class="edge" x1="348" y1="90" x2="292" y2="150"/>
+              <line class="edge" x1="348" y1="90" x2="404" y2="150"/>
+              <line class="edge" x1="68" y1="150" x2="40" y2="210"/>
+              <line class="edge" x1="68" y1="150" x2="96" y2="210"/>
+              <line class="edge" x1="180" y1="150" x2="152" y2="210"/>
+              <line class="edge" x1="180" y1="150" x2="208" y2="210"/>
+              <line class="edge" x1="292" y1="150" x2="264" y2="210"/>
+              <line class="edge" x1="292" y1="150" x2="320" y2="210"/>
+              <line class="edge" x1="404" y1="150" x2="376" y2="210"/>
+              <line class="edge" x1="404" y1="150" x2="432" y2="210"/>
+            </g>
+            <g class="vertices">
+              <g class="vertex is-hl" transform="translate(236,30)"><circle r="16"/><text>0</text></g>
+              <g class="vertex" transform="translate(124,90)"><circle r="16"/><text>1</text></g>
+              <g class="vertex" transform="translate(348,90)"><circle r="16"/><text>2</text></g>
+              <g class="vertex" transform="translate(68,150)"><circle r="16"/><text>3</text></g>
+              <g class="vertex" transform="translate(180,150)"><circle r="16"/><text>4</text></g>
+              <g class="vertex" transform="translate(292,150)"><circle r="16"/><text>5</text></g>
+              <g class="vertex" transform="translate(404,150)"><circle r="16"/><text>6</text></g>
+              <g class="vertex is-done" transform="translate(40,210)"><circle r="16"/><text>7</text></g>
+              <g class="vertex is-done" transform="translate(96,210)"><circle r="16"/><text>8</text></g>
+              <g class="vertex is-done" transform="translate(152,210)"><circle r="16"/><text>9</text></g>
+              <g class="vertex is-done" transform="translate(208,210)"><circle r="16"/><text>10</text></g>
+              <g class="vertex is-done" transform="translate(264,210)"><circle r="16"/><text>11</text></g>
+              <g class="vertex is-done" transform="translate(320,210)"><circle r="16"/><text>12</text></g>
+              <g class="vertex is-done" transform="translate(376,210)"><circle r="16"/><text>13</text></g>
+              <g class="vertex is-done" transform="translate(432,210)"><circle r="16"/><text>14</text></g>
+            </g>
+            <text class="label is-hl" x="494" y="30">1개 × 3칸</text>
+            <text class="label" x="494" y="90">2개 × 2칸</text>
+            <text class="label" x="494" y="150">4개 × 1칸</text>
+            <text class="label" x="494" y="210">8개 × 0칸</text>
+          </svg>
+          <figcaption><b>그림 17-4</b> 노드 안의 수는 인덱스다. 아래층일수록 노드는 많지만 내려갈 거리가 짧다. 절반인 리프 8개는 할 일이 없다.</figcaption>
+        </figure>
+
+        <p>최악의 경우 교환은 1×3 + 2×2 + 4×1 + 8×0 = 11번으로, 노드 수 15보다 적다. 일반화하면 약 n/4개가 1칸, n/8개가 2칸, n/16개가 3칸을 내려간다. 합은 n × (1/4 + 2/8 + 3/16 + …)이고, 괄호 안은 1에 수렴한다. 그래서 <mark>heapify는 교환이 n번을 넘지 않는 O(n)이다.</mark> 노드가 많은 아래층일수록 할 일이 적은 덕분이다.</p>
+        <p>하나씩 push하면 반대다. 노드의 절반이 맨 아래층에 들어오고, 작은 값이면 루트까지 log n칸을 올라간다. 많은 노드가 먼 거리를 움직이니 O(n log n)이다. <code>heapq</code>가 값을 몇 번 비교하는지 세어 보면 차이가 보인다.</p>
+
+<pre data-lang="python" data-title="heapify_count.py"><code>
+import heapq
+
+
+class Counted(int):
+    """크기를 비교할 때마다 횟수를 센다."""
+    compares = 0
+
+    def __lt__(self, other: int) -&gt; bool:
+        Counted.compares += 1
+        return int(self) &lt; int(other)
+
+
+for n in [1023, 65535]:
+    nums = [Counted(x) for x in range(n, 0, -1)]   # 내림차순: 많이 움직이는 입력
+
+    Counted.compares = 0
+    heapq.heapify(nums[:])
+    by_heapify = Counted.compares
+
+    Counted.compares = 0
+    heap = []
+    for x in nums:
+        heapq.heappush(heap, x)
+    print(f'n = {n}: heapify {by_heapify}번, push {Counted.compares}번 비교')
+</code></pre>
+<pre class="output">
+n = 1023: heapify 1524번, push 8194번 비교
+n = 65535: heapify 98286번, push 917506번 비교
+</pre>
+
+        <p>heapify는 n이 커져도 n의 1.5배 언저리에 머문다. push로 쌓으면 n의 8배에서 14배로 배수 자체가 커진다. 그 배수가 log n이다.</p>
+
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>연산</th><th>시간</th><th>이유</th></tr></thead>
+            <tbody>
+              <tr><td>최솟값 보기 <code>heap[0]</code></td><td><span class="bigo b-const">O(1)</span></td><td>루트가 곧 최솟값이다</td></tr>
+              <tr><td>넣기 (sift up)</td><td><span class="bigo b-log">O(log n)</span></td><td>많아야 높이만큼 올라간다</td></tr>
+              <tr><td>꺼내기 (sift down)</td><td><span class="bigo b-log">O(log n)</span></td><td>많아야 높이만큼 내려간다</td></tr>
+              <tr><td>heapify</td><td><span class="bigo b-linear">O(n)</span></td><td>많은 아래층 노드는 조금만 움직인다</td></tr>
+              <tr><td>임의의 값 찾기</td><td><span class="bigo b-linear">O(n)</span></td><td>형제 사이에 순서가 없어 범위를 좁힐 수 없다</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section id="heapq-patterns">
+        <h2>heapq로 쓰는 패턴</h2>
+        <p>지금까지 만든 세 함수가 <code>heapq</code>의 <code>heappush</code>, <code>heappop</code>, <code>heapify</code>다. 풀이에서는 C로 만들어 더 빠른 <code>heapq</code>를 쓰고, 최대 힙은 부호를 뒤집어 만든다(7장).</p>
+
+        <h3>우선순위가 같을 때를 대비한 순번</h3>
+        <p><code>(우선순위, 데이터)</code>를 넣으면 우선순위가 같을 때 데이터끼리 비교하고, 데이터가 딕셔너리처럼 비교할 수 없는 값이면 에러가 난다. 가운데에 겹치지 않는 순번을 끼우면 비교가 데이터까지 내려가지 않는다.</p>
+
+<pre data-lang="python" data-title="priority_with_seq.py"><code>
+import heapq
+from itertools import count
+
+tasks = []
+seq = count()                                # 0, 1, 2, … 를 차례로 주는 반복자
+heapq.heappush(tasks, (2, next(seq), {'name': '빨래'}))
+heapq.heappush(tasks, (1, next(seq), {'name': '설거지'}))
+heapq.heappush(tasks, (1, next(seq), {'name': '분리수거'}))
+while tasks:
+    priority, _, task = heapq.heappop(tasks)
+    print(priority, task['name'])
+</code></pre>
+<pre class="output">
+1 설거지
+1 분리수거
+2 빨래
+</pre>
+
+        <p>우선순위가 같은 두 작업은 먼저 넣은 순서대로 나왔다. 순번이 "같으면 먼저 온 것부터"라는 규칙도 덤으로 만든다.</p>
+
+        <h3>크기 k짜리 힙으로 k번째 큰 수</h3>
+        <p>최소 힙을 <strong>크기 k로 유지</strong>하면 k번째로 큰 수를 O(n log k)에 구한다. 힙에는 지금까지 본 값 중 가장 큰 k개만 남기고, 그중 가장 작은 값인 루트가 k번째로 큰 수다.</p>
+        <p><code>heappushpop(h, x)</code>는 x를 넣은 뒤 가장 작은 값을 꺼내는 일을 한 번에 한다. x가 루트보다 작거나 같으면 힙을 건드리지 않고 x를 바로 돌려준다. <code>heapreplace(h, x)</code>는 반대로 먼저 꺼낸 뒤 넣는다. 둘 다 sift down 한 번으로 끝나 push와 pop을 따로 부르는 것보다 빠르다.</p>
+
+<pre data-lang="python" data-title="kth_largest.py"><code>
+import heapq
+
+
+def kth_largest(nums: list[int], k: int) -&gt; int:
+    """크기 k짜리 최소 힙을 유지하면 루트가 k번째로 큰 수다."""
+    heap = []
+    for x in nums:
+        if len(heap) &lt; k:
+            heapq.heappush(heap, x)
+        else:
+            heapq.heappushpop(heap, x)       # k등보다 작으면 들어갔다 바로 나온다
+    return heap[0]
+
+
+nums = [4, 9, 1, 7, 3, 8, 6]
+print(kth_largest(nums, 3))
+print(sorted(nums, reverse=True)[2])         # 정렬로 확인
+</code></pre>
+<pre class="output">
+7
+7
+</pre>
+
+
+        <h3>다른 장에서 만나는 힙</h3>
+        <p>"지금 가장 작은 것"을 계속 꺼내야 하는 곳에는 힙이 들어간다. 다익스트라(14장)는 <code>(거리, 정점)</code>을 넣어 가장 가까운 정점을 꺼낸다. 힙 정렬(19장)은 heapify O(n) 뒤에 n번 꺼내 O(n log n)이다. 그리디(24장)는 매번 가장 좋은 선택을 힙에서 고른다.</p>
+      </section>
+
+      <section id="pitfalls">
+        <h2>자주 하는 실수</h2>
+        <div class="callout callout-warn">
+          <span class="callout-title">heap[1]이 두 번째로 작다고 믿기</span>
+          <p>힙이 보장하는 것은 <code>heap[0]</code>이 최솟값이라는 것뿐이다. 두 번째로 작은 값은 루트의 두 자식 <code>heap[1]</code>, <code>heap[2]</code> 중 하나다. 그림 17-1의 힙에서 <code>heap[1]</code>은 4지만 두 번째로 작은 값은 <code>heap[2]</code>인 2다. 작은 순서대로 몇 개가 필요하면 그만큼 <code>heappop</code>하거나 <code>heapq.nsmallest</code>를 쓴다.</p>
+        </div>
+        <div class="callout callout-warn">
+          <span class="callout-title">append로 넣고 heapify하지 않기</span>
+          <p><code>append</code>는 끝에 붙이기만 하고 sift up을 하지 않는다. 힙 속성이 깨진 리스트에 <code>heappop</code>을 하면 에러 없이 틀린 값이 나온다.</p>
+        </div>
+
+<pre data-lang="python" data-title="append_pitfall.py"><code>
+import heapq
+
+heap = [1, 4, 2]
+heap.append(0)                               # heappush 대신 append
+print(heap[0], heapq.heappop(heap))          # 0이 나와야 하는데 1이 나온다
+
+heap = [1, 4, 2, 0]
+heapq.heapify(heap)                          # 약속을 되살린 뒤에는 제대로 나온다
+print(heap[0], heapq.heappop(heap))
+</code></pre>
+<pre class="output">
+1 1
+0 0
+</pre>
+
+        <p><code>append</code>로 다 모은 뒤 <code>heapify</code>를 한 번 하는 것은 괜찮다. 힙으로 쓰기 시작한 뒤에 <code>append</code>를 섞는 것이 문제다.</p>
+
+        <div class="callout callout-warn">
+          <span class="callout-title">튜플 두 번째 칸에 비교할 수 없는 값 넣기</span>
+          <p>우선순위가 같은 항목이 들어오는 순간 두 번째 값끼리 비교한다. 딕셔너리라면 그때 에러가 나서, 작은 예제에서는 멀쩡하다가 큰 입력에서만 터진다. 순번을 끼워 막는다.</p>
+        </div>
+
+<pre data-lang="python" data-title="heap_errors.py"><code>
+import heapq
+
+tasks = [(1, {'name': '빨래'})]
+try:
+    heapq.heappush(tasks, (1, {'name': '청소'}))   # 우선순위가 같아 딕셔너리를 비교
+except TypeError as e:
+    print(f'{type(e).__name__}: {e}')
+
+try:
+    heapq.heappop([])
+except IndexError as e:
+    print(f'{type(e).__name__}: {e}')
+</code></pre>
+<pre class="output">
+TypeError: '&lt;' not supported between instances of 'dict' and 'dict'
+IndexError: index out of range
+</pre>
+
+        <div class="callout callout-warn">
+          <span class="callout-title">빈 힙에서 꺼내기</span>
+          <p>위 출력의 두 번째 줄처럼 빈 리스트에 <code>heappop</code>을 하면 <code>IndexError</code>가 난다. <code>heap[0]</code>으로 보기만 해도 마찬가지다. <code>while heap:</code>이나 <code>if heap:</code>으로 먼저 확인한다.</p>
+        </div>
+        <div class="callout callout-warn">
+          <span class="callout-title">최대 힙에서 부호 되돌리기 빠뜨리기</span>
+          <p><code>-x</code>로 넣었다면 꺼낸 값에도, <code>heap[0]</code>으로 엿본 값에도 다시 <code>-</code>를 붙인다. 꺼내는 곳이 여러 군데면 한 곳쯤 빠뜨리기 쉽다. 음수가 답으로 나오면 이것부터 의심한다.</p>
+        </div>
+      </section>
+
+      <section id="problem">
+        <h2>대표 문제</h2>
+        <div class="problem">
+          <div class="problem-head">
+            <div class="problem-kicker"><b>Problem</b><span class="chip">어려움</span><span class="chip">힙</span><span class="chip">우선순위 큐</span></div>
+            <h3>실시간 중앙값</h3>
+          </div>
+          <div class="problem-body">
+            <p>정수가 하나씩 차례로 들어온다. 수가 들어올 때마다, 그때까지 들어온 수의 중앙값을 출력하라. 들어온 수가 짝수 개라면 가운데 두 수 중 작은 값을 중앙값으로 한다. 수는 최대 10만 개이고, 각 수는 −10,000 이상 10,000 이하다.</p>
+            <p>첫째 줄에 수의 개수 N이, 다음 N줄에 정수가 하나씩 주어진다. 출력은 N줄이다.</p>
+            <div class="table-wrap">
+              <table>
+                <thead><tr><th>입력</th><th>출력</th><th>이유</th></tr></thead>
+                <tbody>
+                  <tr><td><code>6</code><br><code>5</code><br><code>2</code><br><code>8</code><br><code>1</code><br><code>9</code><br><code>3</code></td><td><code>5</code><br><code>2</code><br><code>5</code><br><code>2</code><br><code>5</code><br><code>3</code></td><td>네 번째까지 모으면 1, 2, 5, 8이라 가운데 둘 중 작은 2. 마지막에는 1, 2, 3, 5, 8, 9라 3</td></tr>
+                  <tr><td><code>5</code><br><code>-3</code><br><code>4</code><br><code>0</code><br><code>-1</code><br><code>2</code></td><td><code>-3</code><br><code>-3</code><br><code>0</code><br><code>-1</code><br><code>0</code></td><td>세 번째에는 −3, 0, 4라 0. 마지막에는 −3, −1, 0, 2, 4라 0</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <details class="reveal">
+            <summary>접근 방법<span class="reveal-hint">먼저 생각해 보고 펼치세요</span></summary>
+            <div class="reveal-body">
+              <ol>
+                <li>먼저 떠오르는 방법은 매번 정렬해 가운데를 보는 것이다. 10만 개면 너무 느리다. <code>bisect.insort</code>로 정렬을 유지해도 끼워 넣기가 O(n)이라 전체 O(n²)이다.</li>
+                <li>중앙값을 구하는 데 정렬 전체가 필요하지는 않다. 필요한 것은 "작은 절반 중 가장 큰 값"과 "큰 절반 중 가장 작은 값"뿐이다.</li>
+                <li>"가장 큰 값"과 "가장 작은 값"을 계속 꺼내 보는 일은 힙이 잘한다. 작은 절반은 <mark>최대 힙</mark>(<code>left</code>)에, 큰 절반은 <mark>최소 힙</mark>(<code>right</code>)에 담는다. 그러면 두 루트가 정렬했을 때 가운데에 오는 두 값이다.</li>
+                <li>두 가지 약속을 지킨다. (가) <code>left</code>의 모든 값 ≤ <code>right</code>의 모든 값. (나) <code>left</code>의 크기는 <code>right</code>와 같거나 하나 많다. 그러면 중앙값(짝수면 작은 쪽)은 언제나 <code>left</code>의 루트다.</li>
+                <li>새 수 x는 일단 <code>left</code>에 넣고, <code>left</code>의 최댓값을 꺼내 <code>right</code>로 보낸다. 이렇게 하면 x가 어느 쪽에 속해야 하든 (가)가 지켜진다. 그 결과 <code>right</code>가 더 많아지면 <code>right</code>의 최솟값을 <code>left</code>로 하나 되돌려 (나)를 맞춘다.</li>
+              </ol>
+            </div>
+          </details>
+
+          <details class="reveal">
+            <summary>풀이 코드</summary>
+            <div class="reveal-body">
+<pre data-lang="python" data-title="running_median.py"><code>
+import heapq
+import sys
+
+input = sys.stdin.readline
+
+n = int(input())
+left = []                 # 작은 절반: 최대 힙 (부호를 뒤집어 저장)
+right = []                # 큰 절반: 최소 힙
+answers = []
+for _ in range(n):
+    x = int(input())
+    # 왼쪽에 넣고, 왼쪽 최댓값을 꺼내 오른쪽으로 보낸다
+    biggest_left = -heapq.heappushpop(left, -x)
+    heapq.heappush(right, biggest_left)
+    if len(right) &gt; len(left):    # 오른쪽이 많아지면 하나 되돌린다
+        heapq.heappush(left, -heapq.heappop(right))
+    answers.append(-left[0])      # 왼쪽 최댓값이 중앙값
+print('\n'.join(map(str, answers)))
+</code></pre>
+<pre class="stdin">
+6
+5
+2
+8
+1
+9
+3
+</pre>
+<pre class="output">
+5
+2
+5
+2
+5
+3
+</pre>
+              <p><code>heappushpop</code>은 빈 힙에서도 넣은 값을 그대로 돌려주므로 첫 수에서도 따로 처리할 필요가 없다. 출력이 10만 줄이니 리스트에 모아 한 번에 출력한다(1장).</p>
+            </div>
+          </details>
+
+          <details class="reveal">
+            <summary>복잡도</summary>
+            <div class="reveal-body">
+              <dl class="cx">
+                <dt>시간</dt><dd><span class="bigo b-nlogn">O(N log N)</span> 수 하나마다 힙 연산을 많아야 네 번 하고, 각각 O(log N)이다.</dd>
+                <dt>공간</dt><dd><span class="bigo b-linear">O(N)</span> 들어온 수를 두 힙에 나눠 모두 들고 있다.</dd>
+              </dl>
+              <p>N이 10만이면 힙 연산이 40만 번 정도라 금방 끝난다. 오히려 <code>input()</code>을 10만 번 부르는 입력 쪽이 먼저 느려지니 <code>sys.stdin.readline</code>을 꼭 쓴다.</p>
+            </div>
+          </details>
+        </div>
+      </section>
+
+      <section id="recall">
+        <h2>스스로 확인</h2>
+        <div class="recall">
+          <details>
+            <summary>0번부터 쓰는 힙 배열에서 인덱스 5의 부모와 자식은 몇 번인가? 이 계산이 가능한 이유는?</summary>
+            <div class="answer"><p>부모는 (5−1)//2 = 2번, 자식은 11번과 12번이다. 힙은 완전 이진 트리라 위층부터 빈칸 없이 채워지므로, 인덱스 계산만으로 부모와 자식의 자리가 정해진다.</p></div>
+          </details>
+          <details>
+            <summary>새 값을 루트가 아니라 리스트 끝에 붙인 뒤 위로 올리는 이유는? 넣기가 O(log n)인 이유는?</summary>
+            <div class="answer"><p>끝에 붙여야 완전 이진 트리 모양이 유지된다. 깨질 수 있는 것은 새 값과 그 조상 사이의 약속뿐이라, 새 값이 부모보다 작은 동안 한 층씩 올리면 된다. 많아야 높이 ⌊log₂n⌋번 올라가므로 O(log n)이다.</p></div>
+          </details>
+          <details>
+            <summary>sift down에서 두 자식 중 큰 쪽과 바꾸면 어떻게 되는가?</summary>
+            <div class="answer"><p>큰 자식이 부모 자리에 올라가고, 그 아래에 작은 자식이 남는다. 부모가 자식보다 커져 힙 속성이 바로 깨진다. 더 작은 자식을 올려야 남은 자식보다도 작아 약속이 지켜진다.</p></div>
+          </details>
+          <details>
+            <summary>값 n개를 하나씩 push하면 O(n log n)인데, <code>heapify</code>는 왜 O(n)인가?</summary>
+            <div class="answer"><p>heapify는 아래에서부터 sift down을 한다. 절반인 리프는 할 일이 없고, 위층으로 갈수록 노드 수는 절반씩 줄고 내려갈 거리는 한 칸씩 늘어 합이 n을 넘지 않는다. push는 노드가 많은 아래층의 값이 루트까지 멀리 올라갈 수 있어 O(n log n)이다.</p></div>
+          </details>
+        </div>
+      </section>
+
+      <section id="summary">
+        <h2>정리</h2>
+        <ol class="summary-list">
+          <li>최소 힙은 모든 부모가 자기 자식보다 크지 않은 완전 이진 트리다. 정렬되어 있지 않고, 보장되는 것은 루트가 최솟값이라는 것뿐이다.</li>
+          <li>힙은 리스트 하나에 담는다. 인덱스 i의 자식은 2i+1과 2i+2, 부모는 (i−1)//2다. 완전 이진 트리라 빈칸이 생기지 않는다.</li>
+          <li>넣기는 끝에 붙이고 sift up, 꺼내기는 마지막 값을 루트로 올리고 sift down이다. 둘 다 높이만큼만 움직여 O(log n)이다.</li>
+          <li>sift down은 언제나 두 자식 중 더 작은 쪽과 자리를 바꾼다.</li>
+          <li>heapify는 리프가 아닌 마지막 노드부터 거꾸로 sift down을 해 O(n)에 힙을 만든다. 노드가 많은 아래층일수록 움직일 거리가 짧기 때문이다.</li>
+          <li>우선순위가 같을 수 있으면 <code>(우선순위, 순번, 데이터)</code>로 넣고, k번째 큰 수는 크기 k짜리 최소 힙과 <code>heappushpop</code>으로 구한다.</li>
+          <li>중앙값처럼 "가운데"가 필요하면 작은 절반은 최대 힙, 큰 절반은 최소 힙에 나눠 담고 크기를 맞춘다.</li>
+        </ol>
+      </section>
+
+      <nav class="pager" aria-label="이전 장과 다음 장"></nav>
+    </article>
+  </main>
+
+  <aside class="rail" aria-label="이 페이지 목차">
+    <p class="rail-title">이 페이지</p>
+    <nav id="onthispage"></nav>
+  </aside>
+</div>
+<div class="backdrop" id="backdrop"></div>
+
+<script src="assets/book.js"></script>
+<script src="assets/app.js"></script>
+<script src="assets/code.js"></script>
+</body>
+</html>

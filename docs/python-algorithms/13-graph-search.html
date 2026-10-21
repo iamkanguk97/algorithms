@@ -1,0 +1,847 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>13. 그래프와 탐색 — 파이썬 알고리즘 노트</title>
+<script src="assets/theme.js"></script>
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body data-chapter="13">
+<a class="skip-link" href="#content">본문으로 건너뛰기</a>
+<div class="progress" aria-hidden="true"><span></span></div>
+<header class="topbar" id="topbar"></header>
+
+<div class="shell">
+  <aside class="sidebar" id="sidebar" aria-label="책 목차"></aside>
+
+  <main class="main" id="content">
+    <article class="chapter">
+      <header class="chapter-head">
+        <a class="part-pill"></a>
+        <span class="chapter-label"></span>
+        <h1>그래프와 탐색</h1>
+        <p class="lede">지하철 노선도나 친구 관계처럼 점과 선으로 이어진 데이터를 그래프라고 부릅니다. 그래프를 코드로 옮기는 법과, 그 위를 빠짐없이 돌아보는 두 가지 탐색인 DFS와 BFS를 다룹니다.</p>
+        <div class="chapter-meta">
+          <span class="chip">정점 · 간선</span><span class="chip">인접 리스트</span><span class="chip">DFS</span><span class="chip">BFS</span><span class="chip">격자</span>
+        </div>
+      </header>
+
+      <div class="goals">
+        <p class="goals-title">이 장에서 배울 것</p>
+        <ul>
+          <li>정점, 간선, 차수, 경로, 사이클, 연결 요소가 무엇인지 설명할 수 있다</li>
+          <li>간선 목록을 받아 인접 리스트를 만들고, 인접 행렬과 비교해 고를 수 있다</li>
+          <li>DFS를 재귀와 스택 두 가지로 짤 수 있고, 방문 순서가 왜 다를 수 있는지 안다</li>
+          <li>BFS로 간선 수 기준 최단 거리를 구하고, 그것이 왜 최단인지 설명할 수 있다</li>
+          <li>격자를 그래프로 보고 네 방향 탐색과 경계 검사를 할 수 있다</li>
+        </ul>
+      </div>
+
+      <section id="what-is-graph">
+        <h2>그래프란</h2>
+        <div class="callout callout-key">
+          <span class="callout-title">핵심</span>
+          <p class="callout-big">그래프는 <mark>무엇이 무엇과 이어져 있는가</mark>만 담는 구조다. 위치나 모양은 상관없고, 연결 관계만 중요하다.</p>
+        </div>
+        <p>지하철 노선도를 떠올리면 쉽다. 노선도의 역 위치는 실제 지도와 다르지만, 어느 역에서 어느 역으로 가는지는 정확하다. 그래프가 담는 정보가 바로 그것이다.</p>
+        <p>점을 <strong>정점</strong>(vertex), 선을 <strong>간선</strong>(edge)이라 하고, 개수를 V와 E로 적는다.</p>
+
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>용어</th><th>뜻</th><th>예</th></tr></thead>
+            <tbody>
+              <tr><td>무방향 그래프</td><td>간선 u–v로 양쪽 다 간다</td><td>친구 관계</td></tr>
+              <tr><td>방향 그래프</td><td>u→v가 있어도 v→u는 따로 있어야 한다</td><td>일방통행, 팔로우</td></tr>
+              <tr><td>가중치</td><td>간선에 붙은 비용이나 거리</td><td>역 사이 소요 시간</td></tr>
+              <tr><td>차수(degree)</td><td>한 정점에 붙은 간선 수</td><td>친구 수</td></tr>
+              <tr><td>경로(path)</td><td>간선을 따라 정점을 차례로 지나는 길</td><td>0 → 1 → 3</td></tr>
+              <tr><td>사이클(cycle)</td><td>출발한 정점으로 되돌아오는 경로</td><td>0 → 1 → 3 → 2 → 0</td></tr>
+              <tr><td>연결 요소</td><td>서로 오갈 수 있는 정점끼리 묶은 덩어리</td><td>아래 그림의 두 덩어리</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <figure class="fig">
+          <svg class="graph" viewBox="0 0 480 240" role="img" aria-label="정점 0부터 5까지 6개인 무방향 그래프. 0-1, 0-2, 1-3, 2-3, 3-4가 이어져 있고 0-1-3-2가 사이클을 이룬다. 정점 5는 아무 간선도 없어 연결 요소가 2개다.">
+            <g class="edges">
+              <line class="edge is-hl" x1="60" y1="120" x2="150" y2="60"/>
+              <line class="edge is-hl" x1="60" y1="120" x2="150" y2="180"/>
+              <line class="edge is-hl" x1="150" y1="60" x2="240" y2="120"/>
+              <line class="edge is-hl" x1="150" y1="180" x2="240" y2="120"/>
+              <line class="edge" x1="240" y1="120" x2="330" y2="120"/>
+            </g>
+            <g class="vertices">
+              <g class="vertex" transform="translate(60,120)"><circle r="16"/><text>0</text></g>
+              <g class="vertex" transform="translate(150,60)"><circle r="16"/><text>1</text></g>
+              <g class="vertex" transform="translate(150,180)"><circle r="16"/><text>2</text></g>
+              <g class="vertex" transform="translate(240,120)"><circle r="16"/><text>3</text></g>
+              <g class="vertex" transform="translate(330,120)"><circle r="16"/><text>4</text></g>
+              <g class="vertex" transform="translate(420,180)"><circle r="16"/><text>5</text></g>
+            </g>
+            <text class="label is-hl" x="150" y="120">사이클</text>
+            <text class="label" x="240" y="90">차수 3</text>
+            <text class="label" x="330" y="90">차수 1</text>
+            <text class="label" x="420" y="150">차수 0</text>
+            <text class="label" x="195" y="220">연결 요소 1</text>
+            <text class="label" x="420" y="220">연결 요소 2</text>
+          </svg>
+          <figcaption><b>그림 13-1</b> 이 장 내내 쓰는 그래프. 0–1–3–2는 사이클을 이루고, 정점 5는 혼자 떨어진 연결 요소다.</figcaption>
+        </figure>
+
+        <p>간선 하나는 양 끝 정점의 차수를 하나씩 올린다. 그래서 무방향 그래프에서 <strong>차수의 합은 간선 수의 두 배</strong>다(합 10, 간선 5개).</p>
+        <p>사이클이 있으면 같은 정점에 여러 길로 닿는다. 이미 간 정점을 기억하지 않으면 사이클을 따라 끝없이 돈다. 모든 탐색 코드에 <code>visited</code>가 붙는 이유다.</p>
+      </section>
+
+      <section id="representation">
+        <h2>그래프를 코드로 표현하기</h2>
+        <h3>인접 행렬: V × V 표</h3>
+        <p><strong>인접 행렬</strong>은 V행 V열짜리 2차원 리스트다. u와 v가 이어져 있으면 <code>matrix[u][v]</code>를 1로 둔다.</p>
+
+<pre data-lang="python" data-title="adj_matrix.py"><code>
+n = 6
+edges = [(0, 1), (0, 2), (1, 3), (2, 3), (3, 4)]
+
+matrix = [[0] * n for _ in range(n)]
+for u, v in edges:
+    matrix[u][v] = 1
+    matrix[v][u] = 1                  # 무방향이라 양쪽에 표시한다
+
+for row in matrix:
+    print(row)
+print(matrix[1][3], matrix[1][4])     # 1-3 간선은 있고, 1-4 는 없다
+</code></pre>
+<pre class="output">
+[0, 1, 1, 0, 0, 0]
+[1, 0, 0, 1, 0, 0]
+[1, 0, 0, 1, 0, 0]
+[0, 1, 1, 0, 1, 0]
+[0, 0, 0, 1, 0, 0]
+[0, 0, 0, 0, 0, 0]
+1 0
+</pre>
+
+        <p>간선이 몇 개든 V²칸을 만든다. 정점이 10만 개면 100억 칸이라 담을 수 없다.</p>
+
+        <h3>인접 리스트: 정점마다 이웃 목록</h3>
+        <p><strong>인접 리스트</strong>는 정점마다 이웃 목록을 둔다. 있는 간선만 적으니 메모리가 V + E에 비례한다.</p>
+
+<pre data-lang="python" data-title="adj_list.py"><code>
+n = 6
+edges = [(0, 1), (0, 2), (1, 3), (2, 3), (3, 4)]
+
+adj = [[] for _ in range(n)]          # [[]] * n 은 같은 리스트를 공유한다 (3장)
+for u, v in edges:
+    adj[u].append(v)
+    adj[v].append(u)                  # 무방향이라 두 번 넣는다
+
+for v in range(n):
+    print(v, adj[v], '차수', len(adj[v]))
+print(3 in adj[1])                    # 1-3 간선이 있나: 이웃 목록을 훑는다
+</code></pre>
+<pre class="output">
+0 [1, 2] 차수 2
+1 [0, 3] 차수 2
+2 [0, 3] 차수 2
+3 [1, 2, 4] 차수 3
+4 [3] 차수 1
+5 [] 차수 0
+True
+</pre>
+
+        <figure class="fig">
+          <svg class="graph" viewBox="0 0 340 245" role="img" aria-label="그림 13-1 그래프의 인접 리스트. 정점 0은 1과 2, 정점 1은 0과 3, 정점 2는 0과 3, 정점 3은 1, 2, 4, 정점 4는 3과 이어져 있고 정점 5의 리스트는 비어 있다.">
+            <g class="edges">
+              <line class="edge" x1="66" y1="50" x2="104" y2="50"/>
+              <line class="edge" x1="66" y1="82" x2="104" y2="82"/>
+              <line class="edge" x1="66" y1="114" x2="104" y2="114"/>
+              <line class="edge" x1="66" y1="146" x2="104" y2="146"/>
+              <line class="edge" x1="66" y1="178" x2="104" y2="178"/>
+              <line class="edge is-ghost" x1="66" y1="210" x2="104" y2="210"/>
+            </g>
+            <g class="vertices">
+              <g class="vertex is-hl" transform="translate(50,50)"><rect x="-16" y="-13" width="32" height="26"/><text>0</text></g>
+              <g class="vertex is-hl" transform="translate(50,82)"><rect x="-16" y="-13" width="32" height="26"/><text>1</text></g>
+              <g class="vertex is-hl" transform="translate(50,114)"><rect x="-16" y="-13" width="32" height="26"/><text>2</text></g>
+              <g class="vertex is-hl" transform="translate(50,146)"><rect x="-16" y="-13" width="32" height="26"/><text>3</text></g>
+              <g class="vertex is-hl" transform="translate(50,178)"><rect x="-16" y="-13" width="32" height="26"/><text>4</text></g>
+              <g class="vertex is-hl" transform="translate(50,210)"><rect x="-16" y="-13" width="32" height="26"/><text>5</text></g>
+              <g class="vertex" transform="translate(120,50)"><rect x="-16" y="-13" width="32" height="26"/><text>1</text></g>
+              <g class="vertex" transform="translate(152,50)"><rect x="-16" y="-13" width="32" height="26"/><text>2</text></g>
+              <g class="vertex" transform="translate(120,82)"><rect x="-16" y="-13" width="32" height="26"/><text>0</text></g>
+              <g class="vertex" transform="translate(152,82)"><rect x="-16" y="-13" width="32" height="26"/><text>3</text></g>
+              <g class="vertex" transform="translate(120,114)"><rect x="-16" y="-13" width="32" height="26"/><text>0</text></g>
+              <g class="vertex" transform="translate(152,114)"><rect x="-16" y="-13" width="32" height="26"/><text>3</text></g>
+              <g class="vertex" transform="translate(120,146)"><rect x="-16" y="-13" width="32" height="26"/><text>1</text></g>
+              <g class="vertex" transform="translate(152,146)"><rect x="-16" y="-13" width="32" height="26"/><text>2</text></g>
+              <g class="vertex" transform="translate(184,146)"><rect x="-16" y="-13" width="32" height="26"/><text>4</text></g>
+              <g class="vertex" transform="translate(120,178)"><rect x="-16" y="-13" width="32" height="26"/><text>3</text></g>
+            </g>
+            <text class="label" x="50" y="22">정점</text>
+            <text class="label" x="152" y="22">adj[정점]</text>
+            <text class="label" x="290" y="22">차수</text>
+            <text class="label" x="140" y="210">빈 리스트</text>
+            <text class="label" x="290" y="50">2</text>
+            <text class="label" x="290" y="82">2</text>
+            <text class="label" x="290" y="114">2</text>
+            <text class="label" x="290" y="146">3</text>
+            <text class="label" x="290" y="178">1</text>
+            <text class="label" x="290" y="210">0</text>
+          </svg>
+          <figcaption><b>그림 13-2</b> 그림 13-1 그래프의 인접 리스트. 리스트 길이가 곧 차수다.</figcaption>
+        </figure>
+
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>하는 일</th><th>인접 행렬</th><th>인접 리스트</th><th>이유</th></tr></thead>
+            <tbody>
+              <tr><td>메모리</td><td><span class="bigo b-quad">O(V²)</span></td><td><span class="bigo b-linear">O(V+E)</span></td><td>행렬은 없는 간선 자리도 만든다</td></tr>
+              <tr><td>u–v 간선이 있나</td><td><span class="bigo b-const">O(1)</span></td><td><span class="bigo b-linear">O(차수)</span></td><td>행렬은 칸 하나, 리스트는 u의 이웃을 훑는다</td></tr>
+              <tr><td>u의 이웃 모두 훑기</td><td><span class="bigo b-linear">O(V)</span></td><td><span class="bigo b-linear">O(차수)</span></td><td>행렬은 0인 칸까지 한 행을 다 본다</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <p>탐색은 정점마다 이웃을 훑고, 시험의 그래프는 대개 정점이 많고 간선은 그 몇 배뿐이다. 그래서 <mark>코딩 테스트에서는 거의 언제나 인접 리스트를 쓴다</mark>. 인접 행렬은 V가 수백 이하일 때(14장의 플로이드-워셜) 꺼낸다.</p>
+
+        <h3>방향과 가중치가 있을 때</h3>
+        <p>방향 그래프는 <code>adj[u].append(v)</code> 한 번만 한다. 가중치가 있으면 <code>adj[u].append((v, w))</code>처럼 튜플을 넣는다(14장). 정점이 이름이면 <code>defaultdict(list)</code>(4장)에 이름을 키로 담는다.</p>
+
+        <h3>입력에서 그래프 만들기</h3>
+        <p>정점 번호가 1부터면 리스트를 n + 1칸으로 만들고 0번 칸은 비워 둔다.</p>
+
+<pre data-lang="python" data-title="read_graph.py"><code>
+import sys
+
+input = sys.stdin.readline
+
+n, m = map(int, input().split())
+adj = [[] for _ in range(n + 1)]      # 0번 칸은 쓰지 않는다
+for _ in range(m):
+    u, v = map(int, input().split())
+    adj[u].append(v)
+    adj[v].append(u)
+
+for v in range(1, n + 1):
+    adj[v].sort()                     # "작은 번호부터 방문" 조건이 있을 때
+    print(v, adj[v])
+</code></pre>
+<pre class="stdin">
+5 5
+1 3
+1 2
+2 4
+3 4
+4 5
+</pre>
+<pre class="output">
+1 [2, 3]
+2 [1, 4]
+3 [1, 4]
+4 [2, 3, 5]
+5 [4]
+</pre>
+      </section>
+
+      <section id="dfs">
+        <h2>DFS: 한 길로 끝까지</h2>
+        <p><strong>DFS</strong>(깊이 우선 탐색, depth-first search)는 <mark>갈 수 있는 데까지 깊이 들어가고, 막히면 바로 전 갈림길로 돌아온다</mark>. 미로에서 한 통로를 끝까지 가 보고, 막히면 마지막 갈림길로 돌아가는 것과 같다.</p>
+        <p>"이웃으로 들어가 같은 일을 반복한다"가 그대로 재귀가 된다(6장). 들어오자마자 방문을 표시해야 사이클을 다시 돌지 않는다.</p>
+
+<pre data-lang="python" data-title="dfs_recursive.py"><code>
+n = 6
+edges = [(0, 1), (0, 2), (1, 3), (2, 3), (3, 4)]
+adj = [[] for _ in range(n)]
+for u, v in edges:
+    adj[u].append(v)
+    adj[v].append(u)
+
+visited = [False] * n
+order = []
+
+
+def dfs(v: int) -&gt; None:
+    visited[v] = True
+    order.append(v)
+    for nxt in adj[v]:
+        if not visited[nxt]:
+            dfs(nxt)                  # 더 깊이 들어간다
+
+
+dfs(0)
+print(order)
+</code></pre>
+<pre class="output">
+[0, 1, 3, 2, 4]
+</pre>
+
+        <figure class="fig">
+          <svg class="graph" viewBox="0 0 480 240" role="img" aria-label="정점 0에서 시작한 재귀 DFS의 방문 순서. 0, 1, 3, 2, 4 순서로 방문하고, 탐색에 쓰인 간선 0-1, 1-3, 3-2, 3-4가 강조되어 있다. 정점 5는 방문하지 않는다.">
+            <g class="edges">
+              <line class="edge is-hl" x1="60" y1="120" x2="150" y2="60"/>
+              <line class="edge" x1="60" y1="120" x2="150" y2="180"/>
+              <line class="edge is-hl" x1="150" y1="60" x2="240" y2="120"/>
+              <line class="edge is-hl" x1="150" y1="180" x2="240" y2="120"/>
+              <line class="edge is-hl" x1="240" y1="120" x2="330" y2="120"/>
+            </g>
+            <g class="vertices">
+              <g class="vertex is-done" transform="translate(60,120)"><circle r="16"/><text>0</text></g>
+              <g class="vertex is-done" transform="translate(150,60)"><circle r="16"/><text>1</text></g>
+              <g class="vertex is-done" transform="translate(150,180)"><circle r="16"/><text>2</text></g>
+              <g class="vertex is-done" transform="translate(240,120)"><circle r="16"/><text>3</text></g>
+              <g class="vertex is-done" transform="translate(330,120)"><circle r="16"/><text>4</text></g>
+              <g class="vertex" transform="translate(420,180)"><circle r="16"/><text>5</text></g>
+            </g>
+            <text class="label is-hl" x="60" y="90">①</text>
+            <text class="label is-hl" x="150" y="30">②</text>
+            <text class="label is-hl" x="240" y="90">③</text>
+            <text class="label is-hl" x="150" y="212">④</text>
+            <text class="label is-hl" x="330" y="90">⑤</text>
+            <text class="label" x="420" y="150">방문 안 함</text>
+          </svg>
+          <figcaption><b>그림 13-3</b> 재귀 DFS의 방문 순서. 0 → 1 → 3 → 2로 깊이 들어가고, 2에서 막히자 3으로 돌아와 4로 간다.</figcaption>
+        </figure>
+
+        <p>2의 이웃은 모두 방문했으므로 <code>dfs(2)</code>가 끝나고, <code>dfs(3)</code>의 반복문으로 돌아와 4로 간다. "막히면 돌아온다"는 함수가 끝나 호출한 쪽으로 돌아가는 일이다.</p>
+
+        <h3>스택으로 바꾼 DFS</h3>
+        <p>재귀는 깊이만큼 프레임이 쌓여, 정점이 한 줄로 수천 개 이어지면 <code>RecursionError</code>가 난다(6장). 그럴 때는 호출 스택이 하던 일을 리스트 스택(10장)에 맡긴다.</p>
+
+<pre data-lang="python" data-title="dfs_stack.py"><code>
+n = 6
+edges = [(0, 1), (0, 2), (1, 3), (2, 3), (3, 4)]
+adj = [[] for _ in range(n)]
+for u, v in edges:
+    adj[u].append(v)
+    adj[v].append(u)
+
+
+def dfs_stack(start: int) -&gt; list[int]:
+    visited = [False] * n
+    order = []
+    stack = [start]
+    while stack:
+        v = stack.pop()
+        if visited[v]:
+            continue                  # 같은 정점이 두 번 들어올 수 있다
+        visited[v] = True
+        order.append(v)
+        for nxt in adj[v]:
+            if not visited[nxt]:
+                stack.append(nxt)
+        print(f'방문 {v}, 스택 {stack}')
+    return order
+
+
+print(dfs_stack(0))
+</code></pre>
+<pre class="output">
+방문 0, 스택 [1, 2]
+방문 2, 스택 [1, 3]
+방문 3, 스택 [1, 1, 4]
+방문 4, 스택 [1, 1]
+방문 1, 스택 [1]
+[0, 2, 3, 4, 1]
+</pre>
+
+        <p>순서가 바뀌었다. 스택은 0의 이웃 1, 2 중 나중에 넣은 2를 먼저 꺼내기 때문이다. 둘 다 올바른 DFS다. 재귀와 순서를 맞추려면 <code>reversed(adj[v])</code> 순서로 넣는다. 그러면 <code>[0, 1, 3, 2, 4]</code>가 나온다.</p>
+        <p>스택 버전은 <strong>꺼낼 때</strong> 방문을 표시해서 1이 두 번 들어 있다. 넣을 때 표시하면 "가장 최근 갈림길로 돌아간다"는 순서가 깨질 수 있다. 중복은 많아야 간선 수만큼이라 시간은 그대로 O(V+E)다.</p>
+        <p>방문하지 않은 정점마다 새 탐색을 시작하면, 시작한 횟수가 연결 요소 수다. 대표 문제가 이 방법을 쓴다.</p>
+        <p>방향 그래프의 사이클도 재귀 DFS로 찾는다. 정점을 "아직 안 감", "탐색 중(호출이 아직 안 끝남)", "끝남" 세 상태로 나눈다. 이웃을 따라가다 탐색 중인 정점을 다시 만나면, 그 정점에서 나온 길이 자기에게 돌아온 것이라 사이클이다. 끝난 정점을 만나는 것은 다른 길로 먼저 다녀간 것일 뿐이라 사이클이 아니다.</p>
+      </section>
+
+      <section id="bfs">
+        <h2>BFS: 가까운 곳부터</h2>
+        <p><strong>BFS</strong>(너비 우선 탐색, breadth-first search)는 출발점에서 <strong>가까운 정점부터</strong> 방문한다. 물에 돌을 던지면 물결이 한 겹씩 퍼지는 것과 같다. 먼저 발견한 정점을 먼저 처리하므로 큐(<code>deque</code>, 7장·11장)를 쓴다.</p>
+
+<pre data-lang="python" data-title="bfs_order.py"><code>
+from collections import deque
+
+n = 6
+edges = [(0, 1), (0, 2), (1, 3), (2, 3), (3, 4)]
+adj = [[] for _ in range(n)]
+for u, v in edges:
+    adj[u].append(v)
+    adj[v].append(u)
+
+
+def bfs(start: int) -&gt; list[int]:
+    visited = [False] * n
+    visited[start] = True
+    queue = deque([start])
+    order = []
+    while queue:
+        v = queue.popleft()
+        order.append(v)
+        for nxt in adj[v]:
+            if not visited[nxt]:
+                visited[nxt] = True   # 넣는 순간 표시
+                queue.append(nxt)
+        print(f'방문 {v}, 큐 {list(queue)}')
+    return order
+
+
+print(bfs(0))
+</code></pre>
+<pre class="output">
+방문 0, 큐 [1, 2]
+방문 1, 큐 [2, 3]
+방문 2, 큐 [3]
+방문 3, 큐 [4]
+방문 4, 큐 []
+[0, 1, 2, 3, 4]
+</pre>
+
+        <p>2를 꺼냈을 때 3은 이미 큐에 있고, 넣을 때 표시해 두었으니 다시 넣지 않는다. 이것이 BFS의 가장 중요한 규칙이다. <mark>visited는 큐에 넣을 때 표시한다.</mark></p>
+
+        <h3>dist 배열로 최단 거리 구하기</h3>
+        <p>visited 대신 <code>dist</code>를 쓰면 거리가 함께 나온다. 못 간 정점은 -1로 두고, 넣을 때 "지금 거리 + 1"을 적는다. -1인지 보는 것이 visited 확인이다.</p>
+
+<pre data-lang="python" data-title="bfs_dist.py"><code>
+from collections import deque
+
+n = 6
+edges = [(0, 1), (0, 2), (1, 3), (2, 3), (3, 4)]
+adj = [[] for _ in range(n)]
+for u, v in edges:
+    adj[u].append(v)
+    adj[v].append(u)
+
+start = 0
+dist = [-1] * n                       # -1 = 아직 못 감
+dist[start] = 0
+queue = deque([start])
+while queue:
+    v = queue.popleft()
+    for nxt in adj[v]:
+        if dist[nxt] == -1:
+            dist[nxt] = dist[v] + 1
+            queue.append(nxt)
+
+print(dist)
+for d in range(max(dist) + 1):
+    print(f'거리 {d}:', [v for v in range(n) if dist[v] == d])
+</code></pre>
+<pre class="output">
+[0, 1, 1, 2, 3, -1]
+거리 0: [0]
+거리 1: [1, 2]
+거리 2: [3]
+거리 3: [4]
+</pre>
+
+        <figure class="fig">
+          <svg class="graph" viewBox="0 0 480 240" role="img" aria-label="정점 0에서 시작한 BFS를 층으로 나눈 그림. 거리 0은 정점 0, 거리 1은 1과 2, 거리 2는 3, 거리 3은 4다. 정점 5는 닿지 않아 거리 -1이다.">
+            <g class="edges">
+              <line class="edge is-ghost" x1="105" y1="40" x2="105" y2="210"/>
+              <line class="edge is-ghost" x1="195" y1="40" x2="195" y2="210"/>
+              <line class="edge is-ghost" x1="285" y1="40" x2="285" y2="210"/>
+              <line class="edge is-hl" x1="60" y1="120" x2="150" y2="60"/>
+              <line class="edge is-hl" x1="60" y1="120" x2="150" y2="180"/>
+              <line class="edge is-hl" x1="150" y1="60" x2="240" y2="120"/>
+              <line class="edge" x1="150" y1="180" x2="240" y2="120"/>
+              <line class="edge is-hl" x1="240" y1="120" x2="330" y2="120"/>
+            </g>
+            <g class="vertices">
+              <g class="vertex is-hl" transform="translate(60,120)"><circle r="16"/><text>0</text></g>
+              <g class="vertex is-done" transform="translate(150,60)"><circle r="16"/><text>1</text></g>
+              <g class="vertex is-done" transform="translate(150,180)"><circle r="16"/><text>2</text></g>
+              <g class="vertex is-done" transform="translate(240,120)"><circle r="16"/><text>3</text></g>
+              <g class="vertex is-done" transform="translate(330,120)"><circle r="16"/><text>4</text></g>
+              <g class="vertex" transform="translate(420,180)"><circle r="16"/><text>5</text></g>
+            </g>
+            <text class="label is-hl" x="60" y="24">거리 0</text>
+            <text class="label is-hl" x="150" y="24">거리 1</text>
+            <text class="label is-hl" x="240" y="24">거리 2</text>
+            <text class="label is-hl" x="330" y="24">거리 3</text>
+            <text class="label" x="420" y="150">닿지 않음 (-1)</text>
+          </svg>
+          <figcaption><b>그림 13-4</b> BFS는 거리 0, 1, 2, 3의 층을 차례로 넓혀 간다. 강조한 간선은 각 정점을 처음 발견할 때 탄 간선이다.</figcaption>
+        </figure>
+
+        <h3>처음 닿은 거리가 왜 최단인가</h3>
+        <p>큐에는 언제나 거리 d인 정점들 뒤에 d + 1인 정점들이 줄 서 있다. 거리 d인 정점이 넣는 이웃은 모두 d + 1이고 줄 맨 뒤에 붙는다. 그래서 층이 한 겹씩 처리된다. 어떤 정점에 d + 1층에서 처음 닿았다면, 더 가까운 층에는 그리 가는 간선이 없었다는 뜻이다. 그래서 <mark>BFS는 가까운 층부터 퍼지므로, 처음 닿은 순간의 거리가 간선 수 기준 최단 거리다</mark>. 단, 간선 비용이 모두 같을 때만 그렇다. 비용이 다르면 14장의 다익스트라를 쓴다.</p>
+      </section>
+
+      <section id="grid">
+        <h2>격자도 그래프다</h2>
+        <p>미로나 지도 같은 격자 문제도 그래프 문제다. <mark>칸이 정점이고, 상하좌우로 맞닿은 칸 사이가 간선이다.</mark> 이웃은 좌표에 네 방향을 더하면 나오므로 인접 리스트는 만들지 않는다.</p>
+
+        <figure class="fig">
+          <svg class="graph" viewBox="0 0 320 240" role="img" aria-label="3행 3열 격자를 그래프로 그린 그림. 각 칸이 정점이고 상하좌우 이웃끼리 간선으로 이어져 있다. 가운데 칸 1,1과 네 이웃을 잇는 간선이 강조되어 있고, 오른쪽 위 칸은 벽이라 점선으로 빠져 있다.">
+            <g class="edges">
+              <line class="edge" x1="90" y1="60" x2="160" y2="60"/>
+              <line class="edge is-ghost" x1="160" y1="60" x2="230" y2="60"/>
+              <line class="edge is-hl" x1="90" y1="130" x2="160" y2="130"/>
+              <line class="edge is-hl" x1="160" y1="130" x2="230" y2="130"/>
+              <line class="edge" x1="90" y1="200" x2="160" y2="200"/>
+              <line class="edge" x1="160" y1="200" x2="230" y2="200"/>
+              <line class="edge" x1="90" y1="60" x2="90" y2="130"/>
+              <line class="edge" x1="90" y1="130" x2="90" y2="200"/>
+              <line class="edge is-hl" x1="160" y1="60" x2="160" y2="130"/>
+              <line class="edge is-hl" x1="160" y1="130" x2="160" y2="200"/>
+              <line class="edge is-ghost" x1="230" y1="60" x2="230" y2="130"/>
+              <line class="edge" x1="230" y1="130" x2="230" y2="200"/>
+            </g>
+            <g class="vertices">
+              <g class="vertex" transform="translate(90,60)"><rect x="-18" y="-16" width="36" height="32"/><text>0,0</text></g>
+              <g class="vertex" transform="translate(160,60)"><rect x="-18" y="-16" width="36" height="32"/><text>0,1</text></g>
+              <g class="vertex is-ghost" transform="translate(230,60)"><rect x="-18" y="-16" width="36" height="32"/><text>#</text></g>
+              <g class="vertex" transform="translate(90,130)"><rect x="-18" y="-16" width="36" height="32"/><text>1,0</text></g>
+              <g class="vertex is-hl" transform="translate(160,130)"><rect x="-18" y="-16" width="36" height="32"/><text>1,1</text></g>
+              <g class="vertex" transform="translate(230,130)"><rect x="-18" y="-16" width="36" height="32"/><text>1,2</text></g>
+              <g class="vertex" transform="translate(90,200)"><rect x="-18" y="-16" width="36" height="32"/><text>2,0</text></g>
+              <g class="vertex" transform="translate(160,200)"><rect x="-18" y="-16" width="36" height="32"/><text>2,1</text></g>
+              <g class="vertex" transform="translate(230,200)"><rect x="-18" y="-16" width="36" height="32"/><text>2,2</text></g>
+            </g>
+            <text class="label" x="276" y="60">벽</text>
+          </svg>
+          <figcaption><b>그림 13-5</b> 칸 (1, 1)의 이웃은 위·아래·왼쪽·오른쪽 네 칸이다. 벽 칸은 정점에서 빠지고, 그 칸으로 가는 간선도 없다.</figcaption>
+        </figure>
+
+        <p>네 방향은 행 변화량 <code>dr = [-1, 1, 0, 0]</code>과 열 변화량 <code>dc = [0, 0, -1, 1]</code>로 적어 두고 반복문으로 돈다. 새 좌표가 격자 밖이면 버린다. 이것이 <strong>경계 검사</strong>다. 그래서 모서리 칸은 이웃이 둘, 가장자리 칸은 셋이다.</p>
+
+        <h3>격자 BFS로 거리 구하기</h3>
+        <p>앞 절의 BFS에서 정점을 좌표 튜플로, <code>dist</code>를 2차원 리스트로 바꾸면 된다. 왼쪽 위 칸에서 각 칸까지의 이동 횟수를 적는다. <code>#</code>은 벽이다.</p>
+
+<pre data-lang="python" data-title="grid_bfs.py"><code>
+import sys
+from collections import deque
+
+input = sys.stdin.readline
+
+rows, cols = map(int, input().split())
+grid = [input().rstrip() for _ in range(rows)]
+
+dr = [-1, 1, 0, 0]
+dc = [0, 0, -1, 1]
+dist = [[-1] * cols for _ in range(rows)]      # 2차원 visited 겸 거리표
+dist[0][0] = 0
+queue = deque([(0, 0)])                        # 칸의 좌표가 정점이다
+
+while queue:
+    r, c = queue.popleft()
+    for k in range(4):
+        nr, nc = r + dr[k], c + dc[k]
+        if not (0 &lt;= nr &lt; rows and 0 &lt;= nc &lt; cols):
+            continue                           # 격자 밖
+        if grid[nr][nc] == '#' or dist[nr][nc] != -1:
+            continue                           # 벽이거나 이미 본 칸
+        dist[nr][nc] = dist[r][c] + 1
+        queue.append((nr, nc))
+
+for r in range(rows):
+    cells = ['#' if grid[r][c] == '#' else str(dist[r][c])
+             for c in range(cols)]
+    print(' '.join(f'{cell:&gt;2}' for cell in cells))
+</code></pre>
+<pre class="stdin">
+4 5
+..##.
+#.###
+.....
+.###.
+</pre>
+<pre class="output">
+ 0  1  #  # -1
+ #  2  #  #  #
+ 4  3  4  5  6
+ 5  #  #  #  7
+</pre>
+
+        <p>오른쪽 위 칸은 벽에 막혀 -1로 남는다. 2차원 리스트를 <code>[[-1] * cols] * rows</code>로 만들면 모든 행이 같은 리스트를 가리키니 컴프리헨션으로 만든다(3장).</p>
+        <p>방문 표시는 4장처럼 좌표 튜플을 집합에 넣고 <code>(nr, nc) in visited</code>로 확인해도 된다. 크기가 정해진 격자는 2차원 리스트가 더 빠르고, 크기를 모르는 판이라면 집합이 편하다.</p>
+      </section>
+
+      <section id="choosing">
+        <h2>DFS와 BFS 고르기</h2>
+        <p>두 탐색은 순서만 다르다. 차이는 순서가 의미를 가질 때 생긴다.</p>
+
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>문제가 묻는 것</th><th>고를 것</th><th>이유</th></tr></thead>
+            <tbody>
+              <tr><td>최단 거리(간선 수, 이동 횟수)</td><td>BFS</td><td>가까운 층부터 처리해 처음 닿은 거리가 최단이다</td></tr>
+              <tr><td>모든 경로, 모든 경우 따지기</td><td>DFS</td><td>한 경로를 끝까지 만들고 되돌아온다. 백트래킹(22장)의 뼈대다</td></tr>
+              <tr><td>연결 요소 세기, 덩어리 크기</td><td>둘 다</td><td>이어진 정점을 빠짐없이 보기만 하면 된다</td></tr>
+              <tr><td>깊이가 수만을 넘을 수 있다</td><td>BFS 또는 스택 DFS</td><td>재귀 한도와 호출 스택 메모리를 피한다</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <h3>둘 다 O(V+E)인 이유</h3>
+        <p>visited 덕분에 정점마다 처리는 한 번이고, 그때 이웃 목록을 한 번 훑는다. 이웃 목록 길이의 합은 무방향이면 2E, 방향이면 E다. 그래서 <mark>둘 다 모든 정점과 간선을 한 번씩만 보므로 O(V+E)</mark>다.</p>
+
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>표현</th><th>탐색 시간</th><th>이유</th></tr></thead>
+            <tbody>
+              <tr><td>인접 리스트</td><td><span class="bigo b-linear">O(V+E)</span></td><td>정점 V개와 이웃 목록 총길이 2E</td></tr>
+              <tr><td>인접 행렬</td><td><span class="bigo b-quad">O(V²)</span></td><td>정점마다 한 행 V칸을 모두 본다</td></tr>
+              <tr><td>R × C 격자</td><td><span class="bigo b-linear">O(RC)</span></td><td>칸이 RC개이고, 칸마다 이웃이 많아야 4개다</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <p>공간은 visited와 큐(또는 스택)라서 O(V)다. 꺼낼 때 표시하는 스택 DFS는 스택이 O(E)까지, 재귀 DFS는 호출 스택이 깊이만큼 쌓인다.</p>
+      </section>
+
+      <section id="pitfalls">
+        <h2>자주 하는 실수</h2>
+        <div class="callout callout-warn">
+          <span class="callout-title">BFS에서 꺼낼 때 visited를 표시하기</span>
+          <p>꺼낼 때 표시하면 큐에서 기다리는 정점을 다른 정점이 또 넣는다. 정점 100개가 모두 이어진 그래프에서 넣은 횟수를 센다.</p>
+        </div>
+
+<pre data-lang="python" data-title="visited_timing.py"><code>
+from collections import deque
+
+n = 100
+# 모두가 서로 이어진 그래프
+adj = [[v for v in range(n) if v != u] for u in range(n)]
+
+
+def count_pushes(mark_on_push: bool) -&gt; int:
+    visited = [False] * n
+    visited[0] = mark_on_push
+    queue, pushes = deque([0]), 1
+    while queue:
+        v = queue.popleft()
+        if not mark_on_push:
+            if visited[v]:
+                continue
+            visited[v] = True         # 꺼낼 때 표시
+        for nxt in adj[v]:
+            if not visited[nxt]:
+                visited[nxt] = mark_on_push   # True 면 넣을 때 표시
+                queue.append(nxt)
+                pushes += 1
+    return pushes
+
+
+print(count_pushes(True))
+print(count_pushes(False))
+</code></pre>
+<pre class="output">
+100
+4951
+</pre>
+        <p>정점 수인 100번과 간선 수에 가까운 4951번이다. 큐가 불어 시간과 메모리를 잡아먹고, <code>continue</code> 검사까지 빠뜨리면 중복마다 이웃을 다시 훑어 시간 초과가 난다.</p>
+
+        <div class="callout callout-warn">
+          <span class="callout-title">무방향 그래프인데 한쪽만 append</span>
+          <p><code>adj[u].append(v)</code>만 하면 방향 그래프 u→v가 되고, 에러는 나지 않는다. 사슬 0–1–2–3에서 0에서 출발하면 맞는 듯 보이지만, 3에서는 아무 데도 못 간다.</p>
+        </div>
+
+        <div class="callout callout-warn">
+          <span class="callout-title">재귀 DFS의 깊이 한도</span>
+          <p>한 줄로 이어진 그래프는 DFS 깊이가 정점 수와 같다. 기본 한도 1000을 넘으면 에러가 난다.</p>
+        </div>
+
+<pre data-lang="python" data-title="dfs_recursion_error.py"><code>
+n = 5000
+adj = [[] for _ in range(n)]
+for v in range(n - 1):                # 0-1-2-…-4999 사슬
+    adj[v].append(v + 1)
+    adj[v + 1].append(v)
+
+visited = [False] * n
+
+
+def dfs(v: int) -&gt; None:
+    visited[v] = True
+    for nxt in adj[v]:
+        if not visited[nxt]:
+            dfs(nxt)
+
+
+try:
+    dfs(0)
+except RecursionError as e:
+    print(f'{type(e).__name__}: {e}')
+</code></pre>
+<pre class="output">
+RecursionError: maximum recursion depth exceeded
+</pre>
+        <p>재귀를 쓴다면 맨 위에 <code>sys.setrecursionlimit(10**6)</code>을 넣는다. 깊이가 수십만까지 갈 수 있으면 BFS나 스택 DFS가 안전하다(6장).</p>
+
+        <div class="callout callout-warn">
+          <span class="callout-title">경계 검사 없이 음수 인덱스 쓰기</span>
+          <p>(0, 0)에서 위로 가면 행이 -1이 되고, 파이썬은 이를 뒤에서부터 센다(3장). 에러 없이 마지막 행을 읽는다.</p>
+        </div>
+
+<pre data-lang="python" data-title="negative_index.py"><code>
+grid = [[1, 2, 3],
+        [4, 5, 6]]
+r, c = 0, 0
+nr = r - 1                            # 위로 한 칸
+print(grid[nr][c])                    # 에러 없이 마지막 행을 읽는다
+print(0 &lt;= nr &lt; len(grid))            # 경계 검사
+</code></pre>
+<pre class="output">
+4
+False
+</pre>
+        <p>경계 검사는 칸을 읽기 <strong>전에</strong> 한다. 오른쪽·아래쪽 끝은 <code>IndexError</code>로 드러나지만, 왼쪽·위쪽 끝은 조용히 틀린다.</p>
+
+        <div class="callout callout-warn">
+          <span class="callout-title">1번부터인 정점에 n칸 리스트</span>
+          <p>정점이 1~n번인데 리스트를 n칸으로 만들면 정점 n을 쓰는 순간 <code>IndexError: list index out of range</code>가 난다. <code>n + 1</code>칸으로 만든다.</p>
+        </div>
+      </section>
+
+      <section id="problem">
+        <h2>대표 문제</h2>
+        <div class="problem">
+          <div class="problem-head">
+            <div class="problem-kicker"><b>Problem</b><span class="chip">보통</span><span class="chip">BFS</span><span class="chip">격자</span></div>
+            <h3>격자에서 섬 개수 세기</h3>
+          </div>
+          <div class="problem-body">
+            <p>N행 M열 지도가 주어진다(1 ≤ N, M ≤ 500). 각 칸은 땅(<code>1</code>) 아니면 바다(<code>0</code>)다. 상하좌우로 맞닿은 땅은 같은 섬이고, 대각선으로만 닿은 땅은 다른 섬이다. 섬의 개수를 출력하라.</p>
+            <p>첫째 줄에 N과 M이 주어진다. 다음 N줄에 지도의 한 행이 0과 1로 공백 없이 주어진다.</p>
+            <div class="table-wrap">
+              <table>
+                <thead><tr><th>입력</th><th>출력</th><th>이유</th></tr></thead>
+                <tbody>
+                  <tr><td><code>4 5</code><br><code>11000</code><br><code>11010</code><br><code>00011</code><br><code>10000</code></td><td><code>3</code></td><td>왼쪽 위 2×2 덩어리, 가운데 오른쪽 ㄱ자 덩어리, 왼쪽 아래 한 칸</td></tr>
+                  <tr><td><code>3 4</code><br><code>1010</code><br><code>0101</code><br><code>1010</code></td><td><code>6</code></td><td>땅끼리 대각선으로만 닿아 있어 여섯 칸이 모두 따로 섬이다</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <details class="reveal">
+            <summary>접근 방법<span class="reveal-hint">먼저 생각해 보고 펼치세요</span></summary>
+            <div class="reveal-body">
+              <p>"상하좌우로 맞닿은 칸끼리 하나로 묶는다"는 격자를 그래프로 본 것이다. 땅 칸이 정점, 맞닿은 땅 사이가 간선이다. 그러면 <mark>섬 하나는 연결 요소 하나</mark>이고, 문제는 연결 요소 세기가 된다.</p>
+              <ol>
+                <li>지도를 왼쪽 위부터 한 칸씩 훑는다.</li>
+                <li>아직 방문하지 않은 땅을 만나면 새 섬을 찾은 것이다. 개수를 하나 늘린다.</li>
+                <li>그 칸에서 BFS로 이어진 땅을 모두 표시한다. 같은 섬을 다시 세지 않기 위해서다.</li>
+                <li>끝까지 훑은 뒤 개수를 출력한다.</li>
+              </ol>
+              <p>재귀 DFS로도 풀리지만, 지도 전체가 구불구불한 섬 하나면 깊이가 25만까지 간다. 재귀 한도를 피하려고 BFS로 푼다.</p>
+            </div>
+          </details>
+
+          <details class="reveal">
+            <summary>풀이 코드</summary>
+            <div class="reveal-body">
+<pre data-lang="python" data-title="count_islands.py"><code>
+import sys
+from collections import deque
+
+input = sys.stdin.readline
+
+
+def count_islands(grid: list[str]) -&gt; int:
+    rows, cols = len(grid), len(grid[0])
+    visited = [[False] * cols for _ in range(rows)]
+    dr = [-1, 1, 0, 0]
+    dc = [0, 0, -1, 1]
+
+    def flood(sr: int, sc: int) -&gt; None:
+        """한 섬에 속한 땅을 모두 표시한다."""
+        visited[sr][sc] = True
+        queue = deque([(sr, sc)])
+        while queue:
+            r, c = queue.popleft()
+            for k in range(4):
+                nr, nc = r + dr[k], c + dc[k]
+                if not (0 &lt;= nr &lt; rows and 0 &lt;= nc &lt; cols):
+                    continue
+                if grid[nr][nc] == '0' or visited[nr][nc]:
+                    continue
+                visited[nr][nc] = True
+                queue.append((nr, nc))
+
+    count = 0
+    for r in range(rows):
+        for c in range(cols):
+            if grid[r][c] == '1' and not visited[r][c]:
+                flood(r, c)                     # 처음 보는 땅 = 새 섬
+                count += 1
+    return count
+
+
+n, m = map(int, input().split())
+grid = [input().rstrip() for _ in range(n)]
+print(count_islands(grid))
+</code></pre>
+<pre class="stdin">
+4 5
+11000
+11010
+00011
+10000
+</pre>
+<pre class="output">
+3
+</pre>
+              <p>두 번째 예시는 <code>6</code>이 나온다. 땅 칸마다 상하좌우가 바다라 <code>flood</code>가 한 칸만 표시하고 끝난다. <code>rstrip()</code>을 빠뜨리면 행 끝에 <code>'\n'</code>이 붙어 열 수가 하나 늘어난다.</p>
+            </div>
+          </details>
+
+          <details class="reveal">
+            <summary>복잡도</summary>
+            <div class="reveal-body">
+              <dl class="cx">
+                <dt>시간</dt><dd><span class="bigo b-linear">O(NM)</span> 바깥 반복문이 칸마다 한 번, BFS가 땅 칸마다 한 번씩 꺼내 이웃 4칸을 본다. 칸 하나가 두 번 이상 큐에 들어가지 않는다.</dd>
+                <dt>공간</dt><dd><span class="bigo b-linear">O(NM)</span> 지도와 visited가 칸 수만큼이고, 큐도 많아야 칸 수만큼 쌓인다.</dd>
+              </dl>
+              <p>격자가 수천 × 수천으로 커지면 칸마다 튜플을 만드는 비용이 먼저 막힌다. 그때는 좌표를 정수 <code>r * cols + c</code>로 담는다.</p>
+            </div>
+          </details>
+        </div>
+      </section>
+
+      <section id="recall">
+        <h2>스스로 확인</h2>
+        <div class="recall">
+          <details>
+            <summary>정점 10만 개, 간선 20만 개인 그래프를 인접 행렬로 담으면 왜 안 되는가?</summary>
+            <div class="answer"><p>인접 행렬은 간선 수와 상관없이 V² = 100억 칸이 필요하다. 인접 리스트는 V + 2E, 약 50만 칸이면 되고 탐색도 O(V+E)다.</p></div>
+          </details>
+          <details>
+            <summary>같은 그래프에서 재귀 DFS와 스택 DFS의 방문 순서가 다르게 나온 이유는?</summary>
+            <div class="answer"><p>재귀는 이웃 목록의 첫 이웃부터 들어가지만, 스택은 마지막에 넣은 이웃을 먼저 꺼내기 때문이다. 둘 다 올바른 DFS이고, 순서를 맞춰야 하면 이웃을 거꾸로(<code>reversed</code>) 넣는다.</p></div>
+          </details>
+          <details>
+            <summary>BFS에서 어떤 정점에 처음 닿았을 때의 거리가 간선 수 기준 최단 거리인 이유는?</summary>
+            <div class="answer"><p>큐 덕분에 거리 d인 정점이 모두 처리된 뒤에야 d + 1인 정점이 처리된다. 더 짧은 길이 있었다면 앞선 층에서 먼저 발견했을 것이다.</p></div>
+          </details>
+          <details>
+            <summary>격자에서 (0, 3) 칸의 위쪽 이웃을 경계 검사 없이 읽으면 어떻게 되는가?</summary>
+            <div class="answer"><p>행이 -1이 되어 에러 없이 마지막 행의 3열 칸을 읽고, 틀린 답이 나온다. 칸을 읽기 전에 <code>0 &lt;= nr &lt; rows</code>를 검사한다.</p></div>
+          </details>
+        </div>
+      </section>
+
+      <section id="summary">
+        <h2>정리</h2>
+        <ol class="summary-list">
+          <li>그래프는 무엇이 무엇과 이어져 있는가만 담는 구조다. 정점, 간선, 차수, 경로, 사이클, 연결 요소로 말한다.</li>
+          <li>코딩 테스트에서는 거의 언제나 인접 리스트를 쓴다. 메모리 O(V+E)이고, 무방향 간선은 양쪽에 두 번 넣는다.</li>
+          <li>DFS는 갈 수 있는 데까지 깊이 들어가고, 막히면 바로 전 갈림길로 돌아온다. 재귀로 짜되, 깊으면 스택으로 바꾼다.</li>
+          <li>BFS는 <code>deque</code>로 가까운 곳부터 돈다. visited는 큐에 넣을 때 표시한다.</li>
+          <li>BFS는 가까운 층부터 퍼지므로, 처음 닿은 순간의 거리가 간선 수 기준 최단 거리다.</li>
+          <li>격자는 칸이 정점이고, 상하좌우로 맞닿은 칸 사이가 간선이다. <code>dr</code>, <code>dc</code>로 네 방향을 돌고, 읽기 전에 경계를 검사한다.</li>
+          <li>DFS와 BFS 둘 다 모든 정점과 간선을 한 번씩만 보므로 O(V+E)다. 최단 거리면 BFS, 모든 경우를 따지면 DFS를 고른다.</li>
+        </ol>
+      </section>
+
+      <nav class="pager" aria-label="이전 장과 다음 장"></nav>
+    </article>
+  </main>
+
+  <aside class="rail" aria-label="이 페이지 목차">
+    <p class="rail-title">이 페이지</p>
+    <nav id="onthispage"></nav>
+  </aside>
+</div>
+<div class="backdrop" id="backdrop"></div>
+
+<script src="assets/book.js"></script>
+<script src="assets/app.js"></script>
+<script src="assets/code.js"></script>
+</body>
+</html>

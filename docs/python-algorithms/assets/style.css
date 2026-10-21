@@ -541,3 +541,36 @@ a.pager-card:hover { border-color: var(--accent); transform: translateY(-1px); }
   .chapter { max-width: none; }
   .code, .problem, .fig, .table-wrap { break-inside: avoid; box-shadow: none; }
 }
+
+/* ---------- 노드·간선 그림 (3부: 그래프, 트리, 힙, 트라이) ----------
+   인라인 SVG 로 그린다. 색은 토큰만 쓰므로 다크 모드에서도 그대로 보인다.
+   <figure class="fig">
+     <svg class="graph" viewBox="0 0 340 200" role="img" aria-label="…">
+       <g class="edges"><line class="edge" x1 y1 x2 y2/><path class="edge is-hl" d="…"/></g>
+       <g class="vertices"><g class="vertex is-hl" transform="translate(x,y)"><circle r="16"/><text>A</text></g></g>
+       <text class="label" x y>설명</text>  <text class="weight" x y>7</text>
+     </svg>
+   </figure>
+   상태: .is-hl(강조) .is-done(처리 끝) .is-ghost(없거나 지워짐). 방향 간선은 <defs><marker class="arrow"> 를 쓴다.
+   여러 상태를 나란히 둘 때는 .fig-steps > .fig-state 안에 넣고 svg 에 width 속성을 준다. */
+.fig > svg.graph { display: block; width: 100%; max-width: 36rem; height: auto; margin: 0 auto; }
+.fig-state > svg.graph { height: auto; }
+svg.graph { font-family: var(--mono); overflow: visible; }
+.graph .edge { fill: none; stroke: var(--line-strong); stroke-width: 1.5; stroke-linecap: round; }
+.graph .edge.is-hl { stroke: var(--part); stroke-width: 2.5; }
+.graph .edge.is-ghost { stroke: var(--ink-3); stroke-dasharray: 4 4; }
+.graph .arrow path { fill: var(--line-strong); }
+.graph .arrow.is-hl path { fill: var(--part); }
+.graph .vertex circle, .graph .vertex rect { fill: var(--bg-elev); stroke: var(--line-strong); stroke-width: 1.5; }
+.graph .vertex text { fill: var(--ink); font-size: 13px; font-weight: 600; text-anchor: middle; dominant-baseline: central; }
+.graph .vertex.is-hl circle, .graph .vertex.is-hl rect { fill: color-mix(in srgb, var(--part) 14%, var(--bg-elev)); stroke: var(--part); stroke-width: 2; }
+.graph .vertex.is-done circle, .graph .vertex.is-done rect { fill: var(--surface); stroke: var(--ink-3); }
+.graph .vertex.is-done text { fill: var(--ink-2); }
+.graph .vertex.is-ghost circle, .graph .vertex.is-ghost rect { fill: var(--bg-elev); stroke: var(--ink-3); stroke-dasharray: 4 3; }
+.graph .vertex.is-ghost text { fill: var(--ink-3); }
+.graph .label { fill: var(--ink-3); font-size: 11px; font-weight: 500; text-anchor: middle; dominant-baseline: central; }
+.graph .label.is-hl { fill: var(--part); font-weight: 600; }
+.graph .weight {
+  fill: var(--ink-2); font-size: 11px; font-weight: 600; text-anchor: middle; dominant-baseline: central;
+  paint-order: stroke; stroke: var(--bg-elev); stroke-width: 4px; stroke-linejoin: round;
+}

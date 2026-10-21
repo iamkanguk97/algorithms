@@ -1,0 +1,808 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>15. 트리 — 파이썬 알고리즘 노트</title>
+<script src="assets/theme.js"></script>
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body data-chapter="15">
+<a class="skip-link" href="#content">본문으로 건너뛰기</a>
+<div class="progress" aria-hidden="true"><span></span></div>
+<header class="topbar" id="topbar"></header>
+
+<div class="shell">
+  <aside class="sidebar" id="sidebar" aria-label="책 목차"></aside>
+
+  <main class="main" id="content">
+    <article class="chapter">
+      <header class="chapter-head">
+        <a class="part-pill"></a>
+        <span class="chapter-label"></span>
+        <h1>트리</h1>
+        <p class="lede">폴더 구조, 회사 조직도, 토너먼트 대진표처럼 위에서 아래로 갈라져 내려가는 데이터를 다룹니다. 트리는 그래프의 특별한 경우라서 13장의 탐색을 그대로 쓰되, 부모와 자식이라는 방향이 하나 더 생깁니다.</p>
+        <div class="chapter-meta">
+          <span class="chip">루트 · 리프</span><span class="chip">깊이 · 높이</span><span class="chip">이진 트리</span><span class="chip">전위 · 중위 · 후위</span><span class="chip">레벨 순회</span>
+        </div>
+      </header>
+
+      <div class="goals">
+        <p class="goals-title">이 장에서 배울 것</p>
+        <ul>
+          <li>트리가 어떤 그래프인지, 왜 간선이 n−1개인지 설명할 수 있다</li>
+          <li>간선 목록으로 주어진 트리에서 부모와 깊이를 구할 수 있다</li>
+          <li>포화·완전·균형 이진 트리를 구분하고, 완전 이진 트리의 높이가 log n인 이유를 안다</li>
+          <li>전위·중위·후위·레벨 순회를 재귀와 스택으로 짤 수 있다</li>
+          <li>서브트리 크기, 높이, 리프 수를 "자식의 답으로 내 답 만들기"로 구할 수 있다</li>
+        </ul>
+      </div>
+
+      <section id="what-is-tree">
+        <h2>트리란</h2>
+        <div class="callout callout-key">
+          <span class="callout-title">핵심</span>
+          <p class="callout-big">트리는 사이클이 없고 모두 이어진 그래프다. 그래서 <mark>어느 두 정점 사이든 길이 딱 하나</mark>다.</p>
+        </div>
+        <p>트리(tree)는 13장의 그래프 중 모두 이어져 있고 사이클이 없는 것이다. 트리의 정점은 보통 <strong>노드</strong>(node)라고 부른다.</p>
+        <p>컴퓨터의 폴더를 떠올리면 쉽다. 어떤 파일이든 맨 위 폴더에서 가는 경로는 하나뿐이다. 경로가 둘이면 한 길로 갔다가 다른 길로 돌아올 수 있고, 그것이 곧 사이클이다.</p>
+
+        <h3>노드가 n개면 간선은 n−1개</h3>
+        <p>맨 위 노드 하나를 <strong>루트</strong>(root)로 정한다. 루트가 아닌 노드는 루트 쪽으로 올라가는 간선을 딱 하나 가진다. 둘이면 루트까지 가는 길이 둘이 되기 때문이다. 그래서 간선은 n−1개다. 거꾸로 간선이 n−1개이고 모두 이어져 있으면 트리다.</p>
+
+<pre data-lang="python" data-title="is_tree.py"><code>
+def is_tree(n: int, edges: list[tuple[int, int]]) -&gt; bool:
+    if len(edges) != n - 1:                 # 간선 수부터 본다
+        return False
+    graph = [[] for _ in range(n + 1)]
+    for u, v in edges:
+        graph[u].append(v)
+        graph[v].append(u)
+
+    seen = {1}
+    stack = [1]                             # 스택 DFS(13장)로 1에서 닿는 곳을 센다
+    while stack:
+        for v in graph[stack.pop()]:
+            if v not in seen:
+                seen.add(v)
+                stack.append(v)
+    return len(seen) == n                   # 모두 이어져 있어야 한다
+
+
+print(is_tree(4, [(1, 2), (2, 3), (2, 4)]))
+print(is_tree(4, [(1, 2), (2, 3), (3, 1)]))   # 사이클이 있고 4는 떨어져 있다
+print(is_tree(4, [(1, 2), (3, 4)]))           # 간선이 모자란다
+</code></pre>
+<pre class="output">
+True
+False
+False
+</pre>
+
+        <h3>루트를 정하면 생기는 이름들</h3>
+        <p>루트를 정하면 모든 간선에 위아래가 생긴다.</p>
+
+        <figure class="fig">
+          <svg class="graph" viewBox="0 0 500 270" role="img" aria-label="노드 9개짜리 트리. 1이 루트이고 2, 3, 4가 그 자식이다. 2의 서브트리인 2, 5, 6, 9가 강조되어 있고, 리프는 3, 5, 7, 8, 9다.">
+            <g class="edges">
+              <line class="edge" x1="230" y1="40" x2="110" y2="100"/>
+              <line class="edge" x1="230" y1="40" x2="230" y2="100"/>
+              <line class="edge" x1="230" y1="40" x2="350" y2="100"/>
+              <line class="edge is-hl" x1="110" y1="100" x2="70" y2="160"/>
+              <line class="edge is-hl" x1="110" y1="100" x2="150" y2="160"/>
+              <line class="edge" x1="350" y1="100" x2="310" y2="160"/>
+              <line class="edge" x1="350" y1="100" x2="390" y2="160"/>
+              <line class="edge is-hl" x1="150" y1="160" x2="150" y2="220"/>
+            </g>
+            <g class="vertices">
+              <g class="vertex" transform="translate(230,40)"><circle r="16"/><text>1</text></g>
+              <g class="vertex is-hl" transform="translate(110,100)"><circle r="16"/><text>2</text></g>
+              <g class="vertex" transform="translate(230,100)"><circle r="16"/><text>3</text></g>
+              <g class="vertex" transform="translate(350,100)"><circle r="16"/><text>4</text></g>
+              <g class="vertex is-hl" transform="translate(70,160)"><circle r="16"/><text>5</text></g>
+              <g class="vertex is-hl" transform="translate(150,160)"><circle r="16"/><text>6</text></g>
+              <g class="vertex" transform="translate(310,160)"><circle r="16"/><text>7</text></g>
+              <g class="vertex" transform="translate(390,160)"><circle r="16"/><text>8</text></g>
+              <g class="vertex is-hl" transform="translate(150,220)"><circle r="16"/><text>9</text></g>
+            </g>
+            <text class="label" x="185" y="40">root</text>
+            <text class="label is-hl" x="52" y="100">서브트리</text>
+            <text class="label" x="230" y="128">leaf</text>
+            <text class="label" x="70" y="188">leaf</text>
+            <text class="label" x="310" y="188">leaf</text>
+            <text class="label" x="390" y="188">leaf</text>
+            <text class="label" x="150" y="248">leaf</text>
+            <text class="label" x="455" y="40">깊이 0</text>
+            <text class="label" x="455" y="100">깊이 1</text>
+            <text class="label" x="455" y="160">깊이 2</text>
+            <text class="label" x="455" y="220">깊이 3</text>
+          </svg>
+          <figcaption><b>그림 15-1</b> 노드 9개, 간선 8개인 트리. 가장 깊은 리프 9가 깊이 3이라 트리의 높이는 3이다. 강조한 부분이 2의 서브트리다.</figcaption>
+        </figure>
+
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>용어</th><th>뜻</th><th>그림 15-1에서</th></tr></thead>
+            <tbody>
+              <tr><td>루트(root)</td><td>맨 위 노드. 부모가 없다</td><td>1</td></tr>
+              <tr><td>부모 · 자식</td><td>이어진 두 노드 중 루트에 가까운 쪽이 부모</td><td>2는 5와 6의 부모</td></tr>
+              <tr><td>리프(leaf)</td><td>자식이 없는 노드</td><td>3, 5, 7, 8, 9</td></tr>
+              <tr><td>깊이(depth)</td><td>루트에서 그 노드까지 간선 수</td><td>9의 깊이는 3</td></tr>
+              <tr><td>높이(height)</td><td>그 노드에서 가장 깊은 자손 리프까지 간선 수. 루트의 높이가 트리의 높이다</td><td>트리 높이 3, 2의 높이 2</td></tr>
+              <tr><td>서브트리(subtree)</td><td>어떤 노드와 그 자손 전체. 떼어 내도 트리다</td><td>2의 서브트리는 2, 5, 6, 9</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <p>루트를 바꾸면 부모와 깊이가 모두 달라진다. 그래서 간선만 주는 문제는 보통 루트를 알려 준다.</p>
+      </section>
+
+      <section id="representation">
+        <h2>트리를 코드로</h2>
+        <h3>일반 트리: 인접 리스트와 한 번의 탐색</h3>
+        <p>자식 수에 제한이 없는 일반 트리는 13장의 인접 리스트에 담는다. 입력은 대개 "노드 수 n, 이어서 간선 n−1줄"이다. 어느 쪽이 부모인지 모르므로 양쪽에 넣고, <mark>루트에서 한 번 탐색하며 부모와 깊이를 채운다.</mark></p>
+
+<pre data-lang="python" data-title="tree_parent_depth.py"><code>
+import sys
+from collections import deque
+
+input = sys.stdin.readline
+
+n = int(input())
+tree = [[] for _ in range(n + 1)]          # 정점이 1번부터라 n+1 칸
+for _ in range(n - 1):
+    a, b = map(int, input().split())
+    tree[a].append(b)
+    tree[b].append(a)
+
+root = 1
+parent = [0] * (n + 1)
+depth = [0] * (n + 1)
+parent[root] = -1                           # 루트는 부모가 없다
+order = []
+queue = deque([root])
+while queue:
+    u = queue.popleft()
+    order.append(u)
+    for v in tree[u]:
+        if v == parent[u]:                  # 부모로는 돌아가지 않는다
+            continue
+        parent[v] = u
+        depth[v] = depth[u] + 1
+        queue.append(v)
+
+print('parent', parent[1:])
+print('depth ', depth[1:])
+print('order ', order)
+</code></pre>
+<pre class="stdin">
+9
+1 2
+3 1
+1 4
+5 2
+2 6
+4 7
+8 4
+9 6
+</pre>
+<pre class="output">
+parent [-1, 1, 1, 1, 2, 2, 4, 4, 6]
+depth  [0, 1, 1, 1, 2, 2, 2, 2, 3]
+order  [1, 2, 3, 4, 5, 6, 7, 8, 9]
+</pre>
+
+        <p><code>3 1</code>처럼 자식이 앞인 줄이 있어도 결과는 그림 15-1과 같다. <code>visited</code>가 없는 이유는 사이클이 없어서다. 이웃 중 이미 본 노드는 부모 하나뿐이다. 재귀 DFS라면 부모를 인자로 넘긴다(6절).</p>
+
+        <h3>이진 트리: Node 클래스</h3>
+        <p>자식이 많아야 둘이고 왼쪽과 오른쪽을 구분하는 트리를 <strong>이진 트리</strong>(binary tree)라고 한다. 노드마다 두 칸을 따로 두는 클래스로 표현한다.</p>
+
+<pre data-lang="python" data-title="binary_node.py"><code>
+class Node:
+    def __init__(self, val: str, left=None, right=None) -&gt; None:
+        self.val = val
+        self.left = left                    # 왼쪽 자식 (없으면 None)
+        self.right = right                  # 오른쪽 자식 (없으면 None)
+
+
+#        A
+#      B   C
+#     D E    F
+root = Node('A',
+            Node('B', Node('D'), Node('E')),
+            Node('C', None, Node('F')))
+
+print(root.val, root.left.val, root.right.val)
+print(root.left.left.val, root.right.left, root.right.right.val)
+</code></pre>
+<pre class="output">
+A B C
+D None F
+</pre>
+
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>표현</th><th>이럴 때 쓴다</th><th>다루는 곳</th></tr></thead>
+            <tbody>
+              <tr><td>인접 리스트 <code>tree[u]</code></td><td>입력이 간선 목록일 때</td><td>13장 · 이 장</td></tr>
+              <tr><td>딕셔너리 <code>children[name]</code></td><td>노드 이름이 글자일 때</td><td>대표 문제</td></tr>
+              <tr><td><code>Node</code> 클래스</td><td>이진 트리, 구조를 바꿀 때</td><td>이 장 · 16장</td></tr>
+              <tr><td>리스트 하나(배열)</td><td>빈틈없는 완전 이진 트리. i의 자식은 2i+1, 2i+2</td><td>17장</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section id="binary-tree">
+        <h2>이진 트리의 종류</h2>
+        <p>이진 트리는 모양에 따라 이름이 붙는다.</p>
+        <ul>
+          <li><strong>포화 이진 트리</strong>(perfect) — 모든 층이 꽉 찼다. 리프가 모두 같은 깊이에 있다.</li>
+          <li><strong>완전 이진 트리</strong>(complete) — 마지막 층만 빼고 꽉 찼고, 마지막 층은 왼쪽부터 빈틈없이 채운다. 17장의 힙이 이 모양이다.</li>
+          <li><strong>균형 이진 트리</strong>(balanced) — 모든 노드에서 왼쪽과 오른쪽 서브트리의 높이 차가 1 이하다. 16장의 AVL 트리가 이 약속을 지킨다.</li>
+        </ul>
+        <p>용어는 책마다 다르다. full binary tree를 "포화"로 옮기기도, "자식이 0개 또는 2개인 트리"로 쓰기도 한다. 정의를 확인한다.</p>
+
+        <figure class="fig">
+          <svg class="graph" viewBox="0 0 560 205" role="img" aria-label="이진 트리 세 개. 왼쪽은 노드 7개로 꽉 찬 포화 이진 트리, 가운데는 마지막 층 오른쪽 끝 한 칸만 빈 완전 이진 트리, 오른쪽은 왼쪽 자식의 왼쪽 칸이 비어 완전은 아니지만 높이 차가 1 이하인 균형 이진 트리다.">
+            <g class="edges">
+              <line class="edge" x1="100" y1="40" x2="60" y2="95"/>
+              <line class="edge" x1="100" y1="40" x2="140" y2="95"/>
+              <line class="edge" x1="60" y1="95" x2="40" y2="150"/>
+              <line class="edge" x1="60" y1="95" x2="80" y2="150"/>
+              <line class="edge" x1="140" y1="95" x2="120" y2="150"/>
+              <line class="edge" x1="140" y1="95" x2="160" y2="150"/>
+              <line class="edge" x1="280" y1="40" x2="240" y2="95"/>
+              <line class="edge" x1="280" y1="40" x2="320" y2="95"/>
+              <line class="edge" x1="240" y1="95" x2="220" y2="150"/>
+              <line class="edge" x1="240" y1="95" x2="260" y2="150"/>
+              <line class="edge" x1="320" y1="95" x2="300" y2="150"/>
+              <line class="edge is-ghost" x1="320" y1="95" x2="340" y2="150"/>
+              <line class="edge" x1="480" y1="40" x2="440" y2="95"/>
+              <line class="edge" x1="480" y1="40" x2="520" y2="95"/>
+              <line class="edge is-ghost" x1="440" y1="95" x2="420" y2="150"/>
+              <line class="edge" x1="440" y1="95" x2="460" y2="150"/>
+            </g>
+            <g class="vertices">
+              <g class="vertex" transform="translate(100,40)"><circle r="16"/></g>
+              <g class="vertex" transform="translate(60,95)"><circle r="16"/></g>
+              <g class="vertex" transform="translate(140,95)"><circle r="16"/></g>
+              <g class="vertex" transform="translate(40,150)"><circle r="16"/></g>
+              <g class="vertex" transform="translate(80,150)"><circle r="16"/></g>
+              <g class="vertex" transform="translate(120,150)"><circle r="16"/></g>
+              <g class="vertex" transform="translate(160,150)"><circle r="16"/></g>
+              <g class="vertex" transform="translate(280,40)"><circle r="16"/></g>
+              <g class="vertex" transform="translate(240,95)"><circle r="16"/></g>
+              <g class="vertex" transform="translate(320,95)"><circle r="16"/></g>
+              <g class="vertex" transform="translate(220,150)"><circle r="16"/></g>
+              <g class="vertex" transform="translate(260,150)"><circle r="16"/></g>
+              <g class="vertex" transform="translate(300,150)"><circle r="16"/></g>
+              <g class="vertex is-ghost" transform="translate(340,150)"><circle r="16"/></g>
+              <g class="vertex" transform="translate(480,40)"><circle r="16"/></g>
+              <g class="vertex" transform="translate(440,95)"><circle r="16"/></g>
+              <g class="vertex" transform="translate(520,95)"><circle r="16"/></g>
+              <g class="vertex is-ghost" transform="translate(420,150)"><circle r="16"/></g>
+              <g class="vertex" transform="translate(460,150)"><circle r="16"/></g>
+            </g>
+            <text class="label" x="100" y="185">포화 · 7개</text>
+            <text class="label" x="280" y="185">완전 · 6개</text>
+            <text class="label" x="480" y="185">균형 · 4개</text>
+          </svg>
+          <figcaption><b>그림 15-2</b> 점선은 빈 자리다. 완전 이진 트리는 마지막 층의 오른쪽 끝만 빌 수 있다. 오른쪽 트리는 빈 자리가 중간에 있어 완전은 아니지만 균형이다.</figcaption>
+        </figure>
+
+        <h3>노드 수와 높이</h3>
+        <p>높이 h인 포화 이진 트리는 층마다 노드가 두 배로 늘어 1 + 2 + … + 2<sup>h</sup> = <strong>2<sup>h+1</sup> − 1</strong>개다. 높이 h인 완전 이진 트리는 2<sup>h</sup> ≤ n ≤ 2<sup>h+1</sup> − 1이고, log₂를 씌우면 h = ⌊log₂n⌋이다(⌊ ⌋는 내림).</p>
+
+<pre data-lang="python" data-title="binary_counts.py"><code>
+print([2 ** (h + 1) - 1 for h in range(5)])    # 높이 0~4 포화 트리의 노드 수
+
+for n in [7, 8, 1000, 1_000_000]:
+    print(n, n.bit_length() - 1)            # 완전 이진 트리의 높이 ⌊log₂ n⌋
+</code></pre>
+<pre class="output">
+[1, 3, 7, 15, 31]
+7 2
+8 3
+1000 9
+1000000 19
+</pre>
+
+        <p><code>n.bit_length()</code>는 n의 2진수 자릿수라서, 1을 빼면 실수 계산 없이 ⌊log₂n⌋이다. 노드가 100만 개여도 <mark>완전 이진 트리의 높이는 ⌊log₂n⌋, 겨우 19</mark>다. 힙이 넣고 빼기를 O(log n)에 하는 것도 이 때문이다(17장). 반대로 한쪽으로만 자식이 달린 트리는 높이가 n−1까지 늘어난다(16장).</p>
+      </section>
+
+      <section id="traversal">
+        <h2>전위·중위·후위 순회</h2>
+        <p><strong>순회</strong>(traversal)는 모든 노드를 한 번씩 방문하는 일이다. 재귀 순회는 왼쪽 서브트리 돌기, 오른쪽 서브트리 돌기, 지금 노드 방문하기를 한다. 왼쪽은 언제나 오른쪽보다 먼저이므로 <mark>루트를 언제 방문하느냐</mark>가 순회의 이름을 정한다.</p>
+
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>이름</th><th>순서</th><th>그림 15-3 결과</th><th>어디에 쓰나</th></tr></thead>
+            <tbody>
+              <tr><td>전위(preorder)</td><td><strong>루트</strong> → 왼쪽 → 오른쪽</td><td>A B D E C F</td><td>폴더 목록 출력, 트리 복사</td></tr>
+              <tr><td>중위(inorder)</td><td>왼쪽 → <strong>루트</strong> → 오른쪽</td><td>D B E A C F</td><td>이진 탐색 트리를 정렬 순서로 읽기(16장)</td></tr>
+              <tr><td>후위(postorder)</td><td>왼쪽 → 오른쪽 → <strong>루트</strong></td><td>D E B F C A</td><td>자식 결과로 부모 계산(폴더 용량)</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <figure class="fig">
+          <svg class="graph" viewBox="0 0 460 260" role="img" aria-label="루트 A 아래 B와 C, B 아래 D와 E, C의 오른쪽에 F가 있는 이진 트리. 각 노드 옆에 전위, 중위, 후위 순번이 적혀 있다. A는 1, 4, 6번째, D는 3, 1, 1번째다.">
+            <g class="edges">
+              <line class="edge" x1="230" y1="50" x2="140" y2="110"/>
+              <line class="edge" x1="230" y1="50" x2="320" y2="110"/>
+              <line class="edge" x1="140" y1="110" x2="95" y2="170"/>
+              <line class="edge" x1="140" y1="110" x2="185" y2="170"/>
+              <line class="edge is-ghost" x1="320" y1="110" x2="275" y2="170"/>
+              <line class="edge" x1="320" y1="110" x2="365" y2="170"/>
+            </g>
+            <g class="vertices">
+              <g class="vertex is-hl" transform="translate(230,50)"><circle r="16"/><text>A</text></g>
+              <g class="vertex" transform="translate(140,110)"><circle r="16"/><text>B</text></g>
+              <g class="vertex" transform="translate(320,110)"><circle r="16"/><text>C</text></g>
+              <g class="vertex" transform="translate(95,170)"><circle r="16"/><text>D</text></g>
+              <g class="vertex" transform="translate(185,170)"><circle r="16"/><text>E</text></g>
+              <g class="vertex is-ghost" transform="translate(275,170)"><circle r="16"/></g>
+              <g class="vertex" transform="translate(365,170)"><circle r="16"/><text>F</text></g>
+            </g>
+            <text class="label is-hl" x="230" y="22">1 · 4 · 6</text>
+            <text class="label" x="140" y="82">2 · 2 · 3</text>
+            <text class="label" x="320" y="82">5 · 5 · 5</text>
+            <text class="label" x="95" y="198">3 · 1 · 1</text>
+            <text class="label" x="185" y="198">4 · 3 · 2</text>
+            <text class="label" x="365" y="198">6 · 6 · 4</text>
+            <text class="label" x="230" y="234">전위 · 중위 · 후위 순번</text>
+          </svg>
+          <figcaption><b>그림 15-3</b> 노드 옆 숫자는 각 순회에서 몇 번째로 방문하는지다. 루트 A는 전위에서 처음, 중위에서 왼쪽 서브트리 다음, 후위에서 맨 마지막이다.</figcaption>
+        </figure>
+
+<pre data-lang="python" data-title="traversals.py"><code>
+class Node:                                 # 2절의 Node 를 줄여 쓴다
+    def __init__(self, val: str, left=None, right=None) -&gt; None:
+        self.val, self.left, self.right = val, left, right
+
+
+def preorder(node: Node | None, out: list[str]) -&gt; None:
+    if node is None:
+        return
+    out.append(node.val)                    # 루트를 먼저
+    preorder(node.left, out)
+    preorder(node.right, out)
+
+
+def inorder(node: Node | None, out: list[str]) -&gt; None:
+    if node is None:
+        return
+    inorder(node.left, out)
+    out.append(node.val)                    # 루트를 가운데
+    inorder(node.right, out)
+
+
+def postorder(node: Node | None, out: list[str]) -&gt; None:
+    if node is None:
+        return
+    postorder(node.left, out)
+    postorder(node.right, out)
+    out.append(node.val)                    # 루트를 마지막에
+
+
+root = Node('A', Node('B', Node('D'), Node('E')), Node('C', None, Node('F')))
+for name, visit in [('전위', preorder), ('중위', inorder), ('후위', postorder)]:
+    result = []
+    visit(root, result)
+    print(name, ' '.join(result))
+</code></pre>
+<pre class="output">
+전위 A B D E C F
+중위 D B E A C F
+후위 D E B F C A
+</pre>
+
+        <p>세 함수는 <code>out.append</code> 한 줄의 위치만 다르다. 노드마다 한 번씩 방문하니 O(n)이고, 호출 스택은 높이만큼인 O(h)다. <code>[node.val] + left + right</code>처럼 이어 붙여 반환하면 매번 복사해 치우친 트리에서 O(n²)이 된다.</p>
+      </section>
+
+      <section id="level-order">
+        <h2>레벨 순회와 재귀 없는 순회</h2>
+        <h3>레벨 순회: 층마다 한 줄씩</h3>
+        <p><strong>레벨 순회</strong>(level-order)는 깊이 순으로, 같은 깊이에서는 왼쪽부터 방문한다. 13장의 BFS 그대로다. 층을 나누려면 한 층을 시작할 때 큐에 든 노드 수만큼만 꺼낸다.</p>
+
+<pre data-lang="python" data-title="level_order.py"><code>
+from collections import deque
+
+
+class Node:
+    def __init__(self, val: str, left=None, right=None) -&gt; None:
+        self.val, self.left, self.right = val, left, right
+
+
+def level_order(root: Node) -&gt; list[list[str]]:
+    levels = []
+    queue = deque([root])
+    while queue:
+        level = []
+        for _ in range(len(queue)):          # 지금 큐에 든 것이 정확히 한 층
+            node = queue.popleft()
+            level.append(node.val)
+            for child in (node.left, node.right):
+                if child is not None:
+                    queue.append(child)
+        levels.append(level)
+    return levels
+
+
+root = Node('A', Node('B', Node('D'), Node('E')), Node('C', None, Node('F')))
+for depth, level in enumerate(level_order(root)):
+    print(depth, ' '.join(level))
+</code></pre>
+<pre class="output">
+0 A
+1 B C
+2 D E F
+</pre>
+
+        <p><code>range(len(queue))</code>는 한 번만 계산되어, 중간에 자식이 들어와도 이번 층의 개수는 그대로다.</p>
+
+        <h3>스택으로 전위 순회</h3>
+        <p>트리가 깊으면 재귀 한도(6장)가 걱정이다. 호출 스택을 리스트로 직접 만들면 한도에 걸리지 않는다. 스택은 나중에 넣은 것이 먼저 나오므로 <mark>오른쪽 자식을 먼저 넣어야 왼쪽이 먼저 나온다.</mark></p>
+
+<pre data-lang="python" data-title="preorder_stack.py"><code>
+class Node:
+    def __init__(self, val: str, left=None, right=None) -&gt; None:
+        self.val, self.left, self.right = val, left, right
+
+
+def preorder_iter(root: Node) -&gt; list[str]:
+    result = []
+    stack = [root]
+    while stack:
+        node = stack.pop()
+        result.append(node.val)
+        if node.right is not None:          # 오른쪽을 먼저 넣는다
+            stack.append(node.right)
+        if node.left is not None:
+            stack.append(node.left)
+    return result
+
+
+root = Node('A', Node('B', Node('D'), Node('E')), Node('C', None, Node('F')))
+print(' '.join(preorder_iter(root)))
+</code></pre>
+<pre class="output">
+A B D E C F
+</pre>
+
+        <p>두 <code>if</code>의 순서를 바꾸면 에러 없이 A C F B E D가 나온다. 후위 순회는 왼쪽을 먼저 넣어 "루트 → 오른쪽 → 왼쪽"으로 모은 뒤 뒤집으면 된다.</p>
+      </section>
+
+      <section id="recursive-values">
+        <h2>재귀로 트리의 값 구하기</h2>
+        <p>서브트리의 크기, 높이, 리프 수는 모두 같은 틀로 구한다. <mark>자식의 답을 받아 내 답을 만든다.</mark> 6장의 "작은 호출은 정답을 준다고 믿기"와 같다.</p>
+        <ul>
+          <li>크기 = 1 + 자식들의 크기의 합</li>
+          <li>높이 = 자식이 없으면 0, 있으면 1 + 자식들의 높이 중 최댓값</li>
+          <li>리프 수 = 자식이 없으면 1, 있으면 자식들의 리프 수의 합</li>
+        </ul>
+
+        <figure class="fig">
+          <svg class="graph" viewBox="0 0 500 270" role="img" aria-label="그림 15-1과 같은 트리에 노드마다 서브트리 크기가 적혀 있다. 루트 1은 9, 2는 4, 4는 3, 6은 2, 나머지 리프는 1이다. 2와 두 자식 5, 6을 잇는 간선이 강조되어 있다.">
+            <g class="edges">
+              <line class="edge" x1="230" y1="40" x2="110" y2="100"/>
+              <line class="edge" x1="230" y1="40" x2="230" y2="100"/>
+              <line class="edge" x1="230" y1="40" x2="350" y2="100"/>
+              <line class="edge is-hl" x1="110" y1="100" x2="70" y2="160"/>
+              <line class="edge is-hl" x1="110" y1="100" x2="150" y2="160"/>
+              <line class="edge" x1="350" y1="100" x2="310" y2="160"/>
+              <line class="edge" x1="350" y1="100" x2="390" y2="160"/>
+              <line class="edge" x1="150" y1="160" x2="150" y2="220"/>
+            </g>
+            <g class="vertices">
+              <g class="vertex" transform="translate(230,40)"><circle r="16"/><text>1</text></g>
+              <g class="vertex is-hl" transform="translate(110,100)"><circle r="16"/><text>2</text></g>
+              <g class="vertex" transform="translate(230,100)"><circle r="16"/><text>3</text></g>
+              <g class="vertex" transform="translate(350,100)"><circle r="16"/><text>4</text></g>
+              <g class="vertex is-done" transform="translate(70,160)"><circle r="16"/><text>5</text></g>
+              <g class="vertex is-done" transform="translate(150,160)"><circle r="16"/><text>6</text></g>
+              <g class="vertex" transform="translate(310,160)"><circle r="16"/><text>7</text></g>
+              <g class="vertex" transform="translate(390,160)"><circle r="16"/><text>8</text></g>
+              <g class="vertex is-done" transform="translate(150,220)"><circle r="16"/><text>9</text></g>
+            </g>
+            <text class="label" x="270" y="40">크기 9</text>
+            <text class="label is-hl" x="68" y="100">크기 4</text>
+            <text class="label" x="270" y="100">크기 1</text>
+            <text class="label" x="390" y="100">크기 3</text>
+            <text class="label" x="70" y="188">크기 1</text>
+            <text class="label" x="190" y="160">크기 2</text>
+            <text class="label" x="310" y="188">크기 1</text>
+            <text class="label" x="390" y="188">크기 1</text>
+            <text class="label" x="150" y="248">크기 1</text>
+          </svg>
+          <figcaption><b>그림 15-4</b> 서브트리 크기. 2의 크기 4는 자기 1에 자식 5의 답 1과 6의 답 2를 더한 값이다.</figcaption>
+        </figure>
+
+<pre data-lang="python" data-title="subtree_values.py"><code>
+import sys
+
+sys.setrecursionlimit(10**6)                # 사슬 모양이면 깊이가 n 까지 간다
+
+n = 9
+edges = [(1, 2), (1, 3), (1, 4), (2, 5), (2, 6), (4, 7), (4, 8), (6, 9)]
+tree = [[] for _ in range(n + 1)]
+for a, b in edges:
+    tree[a].append(b)
+    tree[b].append(a)
+
+size = [0] * (n + 1)
+height = [0] * (n + 1)
+leaves = [0] * (n + 1)
+
+
+def dfs(u: int, par: int) -&gt; None:
+    size[u] = 1
+    for v in tree[u]:
+        if v == par:
+            continue
+        dfs(v, u)                           # 자식의 답을 먼저 구한다
+        size[u] += size[v]
+        height[u] = max(height[u], height[v] + 1)
+        leaves[u] += leaves[v]
+    if leaves[u] == 0:                      # 자식이 없으면 나 자신이 리프
+        leaves[u] = 1
+
+
+dfs(1, 0)                                   # 루트의 부모는 없는 번호 0
+print('size  ', size[1:])
+print('height', height[1:])
+print('leaves', leaves[1:])
+</code></pre>
+<pre class="output">
+size   [9, 4, 1, 3, 1, 2, 1, 1, 1]
+height [3, 2, 0, 1, 0, 1, 0, 0, 0]
+leaves [5, 2, 1, 2, 1, 1, 1, 1, 1]
+</pre>
+
+        <p>내 답을 만드는 줄이 모두 <code>dfs(v, u)</code> <strong>다음</strong>에 있어 후위 순회와 같은 모양이고, 전체 O(n)이다. 이진 트리라면 답을 반환값으로 올린다. 높이는 <code>max(height(left), height(right)) + 1</code>이고, <code>None</code>에서 −1을 돌려주면 리프의 높이가 0이 된다.</p>
+
+        <h3>재귀 없이: BFS 순서를 거꾸로</h3>
+        <p>BFS 방문 순서에서는 부모가 언제나 자식보다 앞에 있다. 그러니 거꾸로 훑으며 자식의 답을 부모에게 더하면 재귀 없이 같은 값이 나온다.</p>
+
+<pre data-lang="python" data-title="subtree_size_iter.py"><code>
+from collections import deque
+
+
+def subtree_sizes(n: int, edges: list[tuple[int, int]],
+                  root: int) -&gt; list[int]:
+    tree = [[] for _ in range(n + 1)]
+    for a, b in edges:
+        tree[a].append(b)
+        tree[b].append(a)
+
+    parent = [0] * (n + 1)
+    parent[root] = -1
+    order = []
+    queue = deque([root])
+    while queue:
+        u = queue.popleft()
+        order.append(u)
+        for v in tree[u]:
+            if v != parent[u]:
+                parent[v] = u
+                queue.append(v)
+
+    size = [1] * (n + 1)
+    for u in reversed(order):               # 깊은 노드부터: 자식이 먼저 끝난다
+        if parent[u] &gt; 0:
+            size[parent[u]] += size[u]
+    return size
+
+
+edges = [(1, 2), (1, 3), (1, 4), (2, 5), (2, 6), (4, 7), (4, 8), (6, 9)]
+print(subtree_sizes(9, edges, 1)[1:])               # 재귀 버전과 같다
+print(subtree_sizes(100_000, [(i, i + 1) for i in range(1, 100_000)], 1)[1])
+</code></pre>
+<pre class="output">
+[9, 4, 1, 3, 1, 2, 1, 1, 1]
+100000
+</pre>
+
+        <p>깊이 10만짜리 사슬도 재귀 한도와 상관없이 처리한다. 이 틀에 "이 노드를 고르는가" 같은 상태를 더하면 트리 위의 다이나믹 프로그래밍이 된다(26장).</p>
+      </section>
+
+      <section id="pitfalls">
+        <h2>자주 하는 실수</h2>
+        <div class="callout callout-warn">
+          <span class="callout-title">부모로 되돌아가 무한 재귀</span>
+          <p>무방향 인접 리스트에는 부모도 이웃으로 들어 있다. 부모를 건너뛰지 않으면 자식과 부모가 서로를 끝없이 부른다. 부모를 인자로 넘기거나 <code>visited</code>를 쓴다.</p>
+        </div>
+
+<pre data-lang="python" data-title="parent_loop.py"><code>
+tree = {1: [2, 3], 2: [1, 4], 3: [1], 4: [2]}     # 간선 1-2, 1-3, 2-4
+
+
+def count_wrong(u: int) -&gt; int:
+    return 1 + sum(count_wrong(v) for v in tree[u])   # 부모로도 내려간다
+
+
+def count_right(u: int, par: int) -&gt; int:
+    return 1 + sum(count_right(v, u) for v in tree[u] if v != par)
+
+
+try:
+    print(count_wrong(1))
+except RecursionError as e:
+    print(f'{type(e).__name__}: {e}')
+print(count_right(1, 0))
+</code></pre>
+<pre class="output">
+RecursionError: maximum recursion depth exceeded
+4
+</pre>
+
+        <div class="callout callout-warn">
+          <span class="callout-title">사슬 모양 트리에서 RecursionError</span>
+          <p>노드 10만 개가 한 줄로 이어지면 재귀 깊이도 10만이라 기본 한도 1000(6장)에 걸려 <code>RecursionError</code>가 난다. <code>sys.setrecursionlimit(10**6)</code>을 넣거나 6절의 BFS 역순 방식을 쓴다.</p>
+        </div>
+        <div class="callout callout-warn">
+          <span class="callout-title">순회 이름 헷갈리기</span>
+          <p>왼쪽이 언제나 오른쪽보다 먼저라는 것만 기억하고, 이름은 <strong>루트의 위치</strong>로 읽는다. 앞이면 전위, 가운데면 중위, 뒤면 후위다.</p>
+        </div>
+        <div class="callout callout-warn">
+          <span class="callout-title">높이를 간선으로 셀지 노드로 셀지</span>
+          <p>이 책은 높이를 간선 수로 세서 노드 하나짜리 트리의 높이가 0이다. 노드 수로 세는 문제도 많아 답이 1씩 어긋난다. 예시로 정의를 맞추고, 빈 트리를 −1로 둘지 0으로 둘지 정한다.</p>
+        </div>
+        <div class="callout callout-warn">
+          <span class="callout-title">간선의 앞쪽을 부모로 단정하기</span>
+          <p>입력이 <code>a b</code> 꼴의 간선이면, 문제가 밝히지 않는 한 어느 쪽이 부모인지 정해져 있지 않다. <code>parent[b] = a</code>로 바로 적으면 2절 입력의 <code>3 1</code>에서 루트 1에 부모가 생긴다. 양쪽에 넣고 루트에서 탐색한다.</p>
+        </div>
+      </section>
+
+      <section id="problem">
+        <h2>대표 문제</h2>
+        <div class="problem">
+          <div class="problem-head">
+            <div class="problem-kicker"><b>Problem</b><span class="chip">쉬움</span><span class="chip">이진 트리</span><span class="chip">순회</span></div>
+            <h3>이진 트리 세 가지 순회</h3>
+          </div>
+          <div class="problem-body">
+            <p>노드가 N개(1 ≤ N ≤ 26)인 이진 트리가 있다. 노드 이름은 서로 다른 영어 대문자이고, 루트는 언제나 <code>A</code>다. 이 트리를 전위, 중위, 후위로 순회한 결과를 한 줄에 하나씩, 노드 이름을 붙여 써서 출력하라.</p>
+            <p>첫째 줄에 N이 주어진다. 다음 N줄에는 "노드 왼쪽자식 오른쪽자식"이 공백으로 구분되어 주어지고, 자식이 없으면 <code>.</code>이다. 줄의 순서는 정해져 있지 않다.</p>
+            <div class="table-wrap">
+              <table>
+                <thead><tr><th>입력</th><th>출력</th><th>이유</th></tr></thead>
+                <tbody>
+                  <tr><td><code>6</code><br><code>A B C</code><br><code>B D E</code><br><code>C . F</code><br><code>D . .</code><br><code>E . .</code><br><code>F . .</code></td><td><code>ABDECF</code><br><code>DBEACF</code><br><code>DEBFCA</code></td><td>그림 15-3의 트리다</td></tr>
+                  <tr><td><code>5</code><br><code>C D E</code><br><code>A . B</code><br><code>E . .</code><br><code>B C .</code><br><code>D . .</code></td><td><code>ABCDE</code><br><code>ADCEB</code><br><code>DECBA</code></td><td>A의 왼쪽이 비어 중위에서도 A가 맨 앞이다. 루트 줄이 첫 줄이 아니다</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <details class="reveal">
+            <summary>접근 방법<span class="reveal-hint">먼저 생각해 보고 펼치세요</span></summary>
+            <div class="reveal-body">
+              <p>이름으로 자식을 찾아가야 하니 <mark>노드 이름을 키로, (왼쪽, 오른쪽)을 값으로 하는 딕셔너리</mark>가 곧 트리다. 그다음은 4절의 세 순회 그대로다.</p>
+              <ol>
+                <li>줄의 순서가 섞여 있으므로 읽는 대로 딕셔너리에 담는다. 루트는 <code>A</code>로 정해져 있다.</li>
+                <li>빈 자리는 <code>'.'</code>로 들어오니 기저 조건을 "노드가 <code>'.'</code>이면 돌아간다"로 쓴다.</li>
+                <li>세 순회는 방문 줄의 위치만 다르다. 순서를 인자로 받는 함수 하나로 묶어 세 번 부른다.</li>
+                <li>노드가 많아야 26개라 재귀 한도는 걱정하지 않는다.</li>
+              </ol>
+            </div>
+          </details>
+
+          <details class="reveal">
+            <summary>풀이 코드</summary>
+            <div class="reveal-body">
+<pre data-lang="python" data-title="three_traversals.py"><code>
+import sys
+
+input = sys.stdin.readline
+
+EMPTY = '.'
+
+
+def traverse(node: str, order: str,
+             children: dict[str, tuple[str, str]],
+             out: list[str]) -&gt; None:
+    if node == EMPTY:                        # 빈 자리면 돌아간다
+        return
+    left, right = children[node]
+    if order == 'pre':
+        out.append(node)
+    traverse(left, order, children, out)
+    if order == 'in':
+        out.append(node)
+    traverse(right, order, children, out)
+    if order == 'post':
+        out.append(node)
+
+
+n = int(input())
+children = {}
+for _ in range(n):
+    node, left, right = input().split()
+    children[node] = (left, right)
+
+for order in ('pre', 'in', 'post'):
+    out = []
+    traverse('A', order, children, out)
+    print(''.join(out))
+</code></pre>
+<pre class="stdin">
+5
+C D E
+A . B
+E . .
+B C .
+D . .
+</pre>
+<pre class="output">
+ABCDE
+ADCEB
+DECBA
+</pre>
+            </div>
+          </details>
+
+          <details class="reveal">
+            <summary>복잡도</summary>
+            <div class="reveal-body">
+              <dl class="cx">
+                <dt>시간</dt><dd><span class="bigo b-linear">O(N)</span> 순회마다 노드와 빈 자리(N+1개)를 한 번씩 본다. 세 번 돌아도 O(N)이다.</dd>
+                <dt>공간</dt><dd><span class="bigo b-linear">O(N)</span> 딕셔너리와 결과 리스트가 N칸씩 쓴다. 호출 스택은 트리 높이만큼이다.</dd>
+              </dl>
+              <p>노드가 수십만 개면 사슬 모양 트리에서 재귀 깊이가 N이 되어 막힌다.</p>
+            </div>
+          </details>
+        </div>
+      </section>
+
+      <section id="recall">
+        <h2>스스로 확인</h2>
+        <div class="recall">
+          <details>
+            <summary>노드가 n개이고 간선이 n−1개인 그래프는 언제나 트리인가?</summary>
+            <div class="answer"><p>아니다. 모두 이어져 있어야 트리다. 간선이 n−1개인데 사이클이 있으면 어딘가 떨어진 노드가 생긴다. 간선 수를 센 뒤 한 번 탐색해 모든 노드에 닿는지 본다.</p></div>
+          </details>
+          <details>
+            <summary>루트 A에 왼쪽 자식 B, 오른쪽 자식 C만 있는 트리의 전위·중위·후위 순회 결과는? 이름은 무엇을 기준으로 붙었나?</summary>
+            <div class="answer"><p>전위 A B C, 중위 B A C, 후위 B C A다. 이름은 루트를 앞·가운데·뒤 중 어디서 방문하느냐로 붙는다.</p></div>
+          </details>
+          <details>
+            <summary>스택으로 전위 순회할 때 오른쪽 자식을 왼쪽 자식보다 먼저 넣는 이유는?</summary>
+            <div class="answer"><p>스택은 나중에 넣은 것이 먼저 나온다. 왼쪽을 먼저 꺼내려면 오른쪽을 먼저 넣어야 한다. 반대로 넣으면 에러 없이 오른쪽부터 방문한다.</p></div>
+          </details>
+          <details>
+            <summary>서브트리 크기를 구하는 재귀는 세 순회 중 어느 것과 모양이 같은가? BFS 순서를 거꾸로 훑어도 되는 이유는?</summary>
+            <div class="answer"><p>후위 순회다. 자식의 답이 모두 나와야 내 답을 만들 수 있어 내 계산이 자식 호출 뒤에 온다. BFS 순서에서는 부모가 자식보다 앞이니, 거꾸로 훑으면 자식이 언제나 먼저 끝난다.</p></div>
+          </details>
+        </div>
+      </section>
+
+      <section id="summary">
+        <h2>정리</h2>
+        <ol class="summary-list">
+          <li>트리는 사이클이 없고 모두 이어진 그래프다. 어느 두 노드 사이든 길이 딱 하나이고, 노드가 n개면 간선은 n−1개다.</li>
+          <li>루트를 정하면 부모·자식·리프·깊이·높이·서브트리가 정해진다. 이 책은 깊이와 높이를 간선 수로 센다.</li>
+          <li>일반 트리는 인접 리스트에 양방향으로 담고, 루트에서 한 번 탐색해 부모와 깊이를 채운다.</li>
+          <li>완전 이진 트리의 높이는 ⌊log₂n⌋이다. 노드 100만 개도 높이가 19다.</li>
+          <li>전위·중위·후위는 루트를 언제 방문하느냐로 이름이 정해진다. 레벨 순회는 BFS다.</li>
+          <li>스택으로 전위 순회할 때는 오른쪽 자식을 먼저 넣어야 왼쪽이 먼저 나온다.</li>
+          <li>서브트리 값은 자식의 답을 받아 내 답을 만든다. 재귀가 걱정되면 BFS 순서를 거꾸로 훑는다.</li>
+        </ol>
+      </section>
+
+      <nav class="pager" aria-label="이전 장과 다음 장"></nav>
+    </article>
+  </main>
+
+  <aside class="rail" aria-label="이 페이지 목차">
+    <p class="rail-title">이 페이지</p>
+    <nav id="onthispage"></nav>
+  </aside>
+</div>
+<div class="backdrop" id="backdrop"></div>
+
+<script src="assets/book.js"></script>
+<script src="assets/app.js"></script>
+<script src="assets/code.js"></script>
+</body>
+</html>

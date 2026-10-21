@@ -1,0 +1,755 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>14. 최단 경로 — 파이썬 알고리즘 노트</title>
+<script src="assets/theme.js"></script>
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body data-chapter="14">
+<a class="skip-link" href="#content">본문으로 건너뛰기</a>
+<div class="progress" aria-hidden="true"><span></span></div>
+<header class="topbar" id="topbar"></header>
+
+<div class="shell">
+  <aside class="sidebar" id="sidebar" aria-label="책 목차"></aside>
+
+  <main class="main" id="content">
+    <article class="chapter">
+      <header class="chapter-head">
+        <a class="part-pill"></a>
+        <span class="chapter-label"></span>
+        <h1>최단 경로</h1>
+        <p class="lede">간선에 거리나 요금 같은 비용이 붙는 순간, 간선 수만 세는 BFS로는 가장 싼 길을 찾을 수 없습니다. 다익스트라, 벨만-포드, 플로이드-워셜이 어떤 원리로 동작하고 각각 언제 꺼내 쓰는지 정리합니다.</p>
+        <div class="chapter-meta">
+          <span class="chip">다익스트라</span><span class="chip">heapq</span><span class="chip">벨만-포드</span><span class="chip">플로이드-워셜</span><span class="chip">완화(relax)</span>
+        </div>
+      </header>
+
+      <div class="goals">
+        <p class="goals-title">이 장에서 배울 것</p>
+        <ul>
+          <li>가중치가 있는 그래프에서 BFS가 왜 틀리는지 설명할 수 있다</li>
+          <li><code>heapq</code>로 다익스트라를 짜고, 오래된 힙 항목을 건너뛰는 이유를 안다</li>
+          <li>최단 거리와 함께 실제 경로를 복원할 수 있다</li>
+          <li>벨만-포드로 음수 간선을 다루고 음수 사이클을 찾을 수 있다</li>
+          <li>플로이드-워셜에서 <code>k</code>가 가장 바깥 반복문이어야 하는 이유를 안다</li>
+        </ul>
+      </div>
+
+      <section id="overview">
+        <h2>최단 경로 문제 세 가지</h2>
+        <div class="callout callout-key">
+          <span class="callout-title">핵심</span>
+          <p class="callout-big">가중치가 모두 같으면 BFS, <mark>음수 간선이 없으면 다익스트라, 음수 간선이 있으면 벨만-포드</mark>, 모든 쌍이 필요하고 정점이 적으면 플로이드-워셜을 쓴다.</p>
+        </div>
+        <p>최단 경로 문제는 두 질문으로 갈린다. 출발점이 하나인가, 모든 쌍인가. 그리고 음수 가중치가 있는가. 두 답이 정해지면 쓸 알고리즘도 정해진다(비교표는 6절).</p>
+
+        <h3>BFS로는 모자란 이유</h3>
+        <p>BFS는 가까운 층부터 퍼지므로 <strong>간선 수</strong>가 가장 적은 길을 찾는다(13장). 간선마다 비용이 다르면 간선 수가 적은 길이 꼭 싼 길은 아니다.</p>
+
+        <figure class="fig">
+          <svg class="graph" viewBox="0 0 360 240" role="img" aria-label="정점 0부터 4까지 5개와 가중치 있는 방향 간선 7개. 가장 싼 경로 0, 1, 2, 3, 4가 강조되어 있다">
+            <defs>
+              <marker id="arrow-14-1" class="arrow" viewBox="0 0 10 10" refX="26" refY="5" markerWidth="10" markerHeight="10" markerUnits="userSpaceOnUse" orient="auto"><path d="M0 0 L10 5 L0 10 z"/></marker>
+              <marker id="arrow-14-1-hl" class="arrow is-hl" viewBox="0 0 10 10" refX="26" refY="5" markerWidth="10" markerHeight="10" markerUnits="userSpaceOnUse" orient="auto"><path d="M0 0 L10 5 L0 10 z"/></marker>
+            </defs>
+            <g class="edges">
+              <line class="edge is-hl" x1="50" y1="120" x2="160" y2="60" marker-end="url(#arrow-14-1-hl)"/>
+              <line class="edge" x1="50" y1="120" x2="160" y2="180" marker-end="url(#arrow-14-1)"/>
+              <line class="edge is-hl" x1="160" y1="60" x2="160" y2="180" marker-end="url(#arrow-14-1-hl)"/>
+              <line class="edge" x1="160" y1="60" x2="290" y2="60" marker-end="url(#arrow-14-1)"/>
+              <line class="edge is-hl" x1="160" y1="180" x2="290" y2="60" marker-end="url(#arrow-14-1-hl)"/>
+              <line class="edge" x1="160" y1="180" x2="290" y2="180" marker-end="url(#arrow-14-1)"/>
+              <line class="edge is-hl" x1="290" y1="60" x2="290" y2="180" marker-end="url(#arrow-14-1-hl)"/>
+            </g>
+            <text class="weight" x="97" y="82">2</text>
+            <text class="weight" x="97" y="158">5</text>
+            <text class="weight" x="148" y="120">1</text>
+            <text class="weight" x="225" y="48">6</text>
+            <text class="weight" x="233" y="127">2</text>
+            <text class="weight" x="225" y="192">7</text>
+            <text class="weight" x="302" y="120">3</text>
+            <g class="vertices">
+              <g class="vertex is-hl" transform="translate(50,120)"><circle r="16"/><text>0</text></g>
+              <g class="vertex" transform="translate(160,60)"><circle r="16"/><text>1</text></g>
+              <g class="vertex" transform="translate(160,180)"><circle r="16"/><text>2</text></g>
+              <g class="vertex" transform="translate(290,60)"><circle r="16"/><text>3</text></g>
+              <g class="vertex" transform="translate(290,180)"><circle r="16"/><text>4</text></g>
+            </g>
+            <text class="label" x="50" y="152">출발</text>
+            <text class="label is-hl" x="225" y="218">강조한 길: 2+1+2+3 = 8</text>
+          </svg>
+          <figcaption><b>그림 14-1</b> 가중 방향 그래프. BFS는 간선 2개짜리 0→2→4를 고르지만, 가장 싼 길은 간선 4개짜리 0→1→2→3→4다.</figcaption>
+        </figure>
+
+<pre data-lang="python" data-title="bfs_is_not_enough.py"><code>
+# 그림 14-1 의 간선 가중치. (출발, 도착): 비용
+weight = {(0, 1): 2, (0, 2): 5, (1, 2): 1, (1, 3): 6,
+          (2, 3): 2, (2, 4): 7, (3, 4): 3}
+
+
+def cost(path: list[int]) -&gt; int:
+    return sum(weight[u, v] for u, v in zip(path, path[1:]))
+
+
+print(cost([0, 2, 4]))           # BFS 가 고르는 길: 간선 2개
+print(cost([0, 1, 2, 3, 4]))     # 간선 4개지만 더 싸다
+</code></pre>
+<pre class="output">
+12
+8
+</pre>
+
+        <p>이 그래프의 간선은 <strong>방향</strong>이 있다. 0→1은 갈 수 있어도 1→0은 못 간다. 그래서 인접 리스트(13장)에 한쪽만 넣고, 이웃은 <code>(도착 정점, 가중치)</code> 튜플로 담는다.</p>
+
+        <h3>완화: 세 알고리즘의 공통 동작</h3>
+        <p><strong>완화</strong>(relax)는 더 짧은 경로를 찾으면 거리를 갱신하는 일이다. 출발점에서 지금까지 찾은 가장 짧은 거리를 <code>dist</code>에 적어 두고, 간선 u→v를 볼 때마다 "u를 거쳐 가면 더 짧은가"를 확인한다.</p>
+
+<pre data-lang="python" data-title="relax.py"><code>
+INF = float('inf')
+dist = [0, INF, INF]                     # 0 번이 시작점
+
+
+def relax(u: int, v: int, w: int) -&gt; None:
+    if dist[u] + w &lt; dist[v]:            # u 를 거치는 길이 더 짧으면
+        dist[v] = dist[u] + w
+
+
+relax(0, 1, 7); print(dist)              # 처음 찾은 길: INF → 7
+relax(0, 1, 4); print(dist)              # 더 짧은 길: 7 → 4
+relax(0, 1, 9); print(dist)              # 더 긴 길: 그대로
+relax(1, 2, 2); print(dist)              # 1 을 거쳐 2 로
+</code></pre>
+<pre class="output">
+[0, 7, inf]
+[0, 4, inf]
+[0, 4, inf]
+[0, 4, 6]
+</pre>
+
+        <p>처음에는 시작점만 0이고 나머지는 "길을 모른다"는 뜻의 <code>INF</code>다. 완화를 거듭할수록 <code>dist</code>는 줄어들기만 한다. 세 알고리즘은 <mark>어떤 순서로, 몇 번 완화하느냐</mark>만 다르다.</p>
+      </section>
+
+      <section id="dijkstra">
+        <h2>다익스트라: 가까운 정점부터 확정</h2>
+        <p>다익스트라 알고리즘은 출발점에서 가까운 정점부터 차례로 거리를 <strong>확정</strong>하고, 확정한 정점에서 나가는 간선을 완화한다. 이 방법이 맞는 이유는 음수 간선이 없어서다. 아직 확정하지 않은 정점 중 <code>dist</code>가 가장 작은 정점을 u라고 하자. u로 가는 다른 길은 확정 안 된 어떤 정점 x를 지나야 한다. x까지만 해도 이미 <code>dist[u]</code> 이상이고, 음수가 없으니 더 가면 늘어날 뿐이다. 그래서 <mark>확정 안 된 정점 중 가장 가까운 정점은 더 짧아질 수 없다.</mark></p>
+        <p>"가장 가까운 정점"을 매번 빨리 꺼내려고 힙을 쓴다. <code>heapq</code>(7장)에 <code>(거리, 정점)</code> 튜플을 넣으면 첫 값인 거리가 작은 것부터 나온다.</p>
+
+<pre data-lang="python" data-title="dijkstra.py"><code>
+import heapq
+
+
+def dijkstra(graph: list[list[tuple[int, int]]], start: int) -&gt; list[float]:
+    dist = [float('inf')] * len(graph)
+    dist[start] = 0
+    heap = [(0, start)]                  # (거리, 정점)
+    while heap:
+        d, u = heapq.heappop(heap)
+        if d &gt; dist[u]:                  # 오래된 항목이면 건너뛴다
+            continue
+        for v, w in graph[u]:
+            if d + w &lt; dist[v]:          # 완화
+                dist[v] = d + w
+                heapq.heappush(heap, (d + w, v))
+    return dist
+
+
+edges = [(0, 1, 2), (0, 2, 5), (1, 2, 1), (1, 3, 6),
+         (2, 3, 2), (2, 4, 7), (3, 4, 3)]
+graph = [[] for _ in range(5)]
+for u, v, w in edges:
+    graph[u].append((v, w))              # 방향 그래프: 한쪽만 넣는다
+
+print(dijkstra(graph, 0))
+</code></pre>
+<pre class="output">
+[0, 2, 3, 5, 8]
+</pre>
+
+        <h3>dist가 바뀌는 모습</h3>
+        <p>그림 14-1의 그래프에서 단계별 <code>dist</code>다. 굵은 칸이 그 단계에 확정된 정점이고, 6·8단계도 4단계처럼 건너뛴 항목이다.</p>
+
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>단계</th><th>꺼낸 항목</th><th>0</th><th>1</th><th>2</th><th>3</th><th>4</th></tr></thead>
+            <tbody>
+              <tr><td>시작</td><td>—</td><td>0</td><td>INF</td><td>INF</td><td>INF</td><td>INF</td></tr>
+              <tr><td>1</td><td><code>(0, 0)</code></td><td><strong>0</strong></td><td>2</td><td>5</td><td>INF</td><td>INF</td></tr>
+              <tr><td>2</td><td><code>(2, 1)</code></td><td>0</td><td><strong>2</strong></td><td>3</td><td>8</td><td>INF</td></tr>
+              <tr><td>3</td><td><code>(3, 2)</code></td><td>0</td><td>2</td><td><strong>3</strong></td><td>5</td><td>10</td></tr>
+              <tr><td>4</td><td><code>(5, 2)</code></td><td colspan="5">2번은 이미 3으로 확정. 건너뜀</td></tr>
+              <tr><td>5</td><td><code>(5, 3)</code></td><td>0</td><td>2</td><td>3</td><td><strong>5</strong></td><td>8</td></tr>
+              <tr><td>7</td><td><code>(8, 4)</code></td><td>0</td><td>2</td><td>3</td><td>5</td><td><strong>8</strong></td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <figure class="fig">
+          <svg class="graph" viewBox="0 0 360 240" role="img" aria-label="다익스트라 3단계. 정점 0과 1은 확정되었고, 정점 2를 확정하며 2에서 3과 4로 가는 간선을 완화해 3은 8에서 5로, 4는 INF에서 10으로 줄어든다">
+            <defs>
+              <marker id="arrow-14-2" class="arrow" viewBox="0 0 10 10" refX="26" refY="5" markerWidth="10" markerHeight="10" markerUnits="userSpaceOnUse" orient="auto"><path d="M0 0 L10 5 L0 10 z"/></marker>
+              <marker id="arrow-14-2-hl" class="arrow is-hl" viewBox="0 0 10 10" refX="26" refY="5" markerWidth="10" markerHeight="10" markerUnits="userSpaceOnUse" orient="auto"><path d="M0 0 L10 5 L0 10 z"/></marker>
+            </defs>
+            <g class="edges">
+              <line class="edge" x1="50" y1="120" x2="160" y2="60" marker-end="url(#arrow-14-2)"/>
+              <line class="edge" x1="50" y1="120" x2="160" y2="180" marker-end="url(#arrow-14-2)"/>
+              <line class="edge" x1="160" y1="60" x2="160" y2="180" marker-end="url(#arrow-14-2)"/>
+              <line class="edge" x1="160" y1="60" x2="290" y2="60" marker-end="url(#arrow-14-2)"/>
+              <line class="edge is-hl" x1="160" y1="180" x2="290" y2="60" marker-end="url(#arrow-14-2-hl)"/>
+              <line class="edge is-hl" x1="160" y1="180" x2="290" y2="180" marker-end="url(#arrow-14-2-hl)"/>
+              <line class="edge" x1="290" y1="60" x2="290" y2="180" marker-end="url(#arrow-14-2)"/>
+            </g>
+            <text class="weight" x="97" y="82">2</text>
+            <text class="weight" x="97" y="158">5</text>
+            <text class="weight" x="148" y="120">1</text>
+            <text class="weight" x="225" y="48">6</text>
+            <text class="weight" x="233" y="127">2</text>
+            <text class="weight" x="225" y="192">7</text>
+            <text class="weight" x="302" y="120">3</text>
+            <g class="vertices">
+              <g class="vertex is-done" transform="translate(50,120)"><circle r="16"/><text>0</text></g>
+              <g class="vertex is-done" transform="translate(160,60)"><circle r="16"/><text>1</text></g>
+              <g class="vertex is-hl" transform="translate(160,180)"><circle r="16"/><text>2</text></g>
+              <g class="vertex" transform="translate(290,60)"><circle r="16"/><text>3</text></g>
+              <g class="vertex" transform="translate(290,180)"><circle r="16"/><text>4</text></g>
+            </g>
+            <text class="label" x="50" y="152">d=0</text>
+            <text class="label" x="160" y="28">d=2</text>
+            <text class="label is-hl" x="160" y="212">d=3 확정</text>
+            <text class="label is-hl" x="290" y="28">d=8 → 5</text>
+            <text class="label is-hl" x="290" y="212">d=INF → 10</text>
+          </svg>
+          <figcaption><b>그림 14-2</b> 3단계. 회색 정점은 이미 확정되었다. 2번을 확정하며 2에서 나가는 간선 두 개를 완화한다.</figcaption>
+        </figure>
+
+        <h3>오래된 항목 건너뛰기</h3>
+        <p><code>heapq</code>에는 "힙 안의 값을 줄이는" 기능이 없다. 그래서 거리가 줄 때마다 새 튜플을 하나 더 넣고, 옛 거리 항목은 힙에 남는다. 표의 4단계 <code>(5, 2)</code>가 그런 항목이다.</p>
+        <p><mark><code>if d &gt; dist[u]: continue</code>는 꺼낸 거리가 이미 아는 거리보다 크면 버리는 줄이다.</mark> 없어도 답은 맞다(오래된 거리로는 더 짧아지지 않는다). 하지만 같은 정점의 이웃을 또 훑어 느려진다.</p>
+
+<pre data-lang="python" data-title="stale_entries.py"><code>
+import heapq
+
+
+def count_scans(graph: list[list[tuple[int, int]]], skip_stale: bool) -&gt; int:
+    dist = [float('inf')] * len(graph)
+    dist[0] = 0
+    heap = [(0, 0)]
+    scans = 0                            # 이웃을 훑은 횟수
+    while heap:
+        d, u = heapq.heappop(heap)
+        if skip_stale and d &gt; dist[u]:
+            continue
+        for v, w in graph[u]:
+            scans += 1
+            if d + w &lt; dist[v]:
+                dist[v] = d + w
+                heapq.heappush(heap, (d + w, v))
+    return scans
+
+
+# i 에서 모든 j &gt; i 로 가는 간선. 멀리 뛸수록 비싸서 dist 가 자주 줄어든다.
+graph = [[(j, (j - i) ** 2) for j in range(i + 1, 12)] for i in range(12)]
+print(count_scans(graph, True), count_scans(graph, False))
+</code></pre>
+<pre class="output">
+66 231
+</pre>
+
+        <p>건너뛰면 간선 66개를 한 번씩만 보고, 아니면 231번 본다. 그래프가 커질수록 차이는 더 벌어진다.</p>
+
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>부분</th><th>시간</th><th>이유</th></tr></thead>
+            <tbody>
+              <tr><td>간선 완화</td><td><span class="bigo b-linear">O(E)</span></td><td>정점마다 확정할 때 한 번만 이웃을 훑는다</td></tr>
+              <tr><td>힙 연산</td><td><span class="bigo b-nlogn">O(E log V)</span></td><td>완화에 성공할 때만 넣으니 많아야 E번, 한 번에 O(log E)다. E ≤ V²이라 log E ≤ 2 log V다</td></tr>
+              <tr><td>전체</td><td><span class="bigo b-nlogn">O((V+E) log V)</span></td><td>정점을 꺼내는 일과 간선마다 힙에 넣는 일의 합</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section id="path">
+        <h2>경로까지 복원하기</h2>
+        <p>"어떤 길로 가는지"도 필요하면, 완화에 성공할 때마다 <code>prev[v] = u</code>로 "v에는 u를 거쳐 왔다"고 적어 둔다. 끝난 뒤 도착점에서 <code>prev</code>를 따라 거꾸로 올라가고, 모은 목록을 뒤집는다.</p>
+
+<pre data-lang="python" data-title="dijkstra_path.py"><code>
+import heapq
+
+edges = [(0, 1, 2), (0, 2, 5), (1, 2, 1), (1, 3, 6),
+         (2, 3, 2), (2, 4, 7), (3, 4, 3)]
+graph = [[] for _ in range(5)]
+for u, v, w in edges:
+    graph[u].append((v, w))
+
+dist = [float('inf')] * 5
+prev = [-1] * 5                          # 어느 정점에서 왔는지
+dist[0] = 0
+heap = [(0, 0)]
+while heap:
+    d, u = heapq.heappop(heap)
+    if d &gt; dist[u]:
+        continue
+    for v, w in graph[u]:
+        if d + w &lt; dist[v]:
+            dist[v] = d + w
+            prev[v] = u                  # v 로는 u 를 거쳐 오는 것이 가장 짧다
+            heapq.heappush(heap, (d + w, v))
+
+
+def build_path(goal: int) -&gt; list[int]:
+    path = []
+    while goal != -1:                    # 시작점의 prev 는 -1
+        path.append(goal)
+        goal = prev[goal]
+    return path[::-1]                    # 거꾸로 모았으니 뒤집는다
+
+
+print(prev)
+print(build_path(4), dist[4])
+print(build_path(3), dist[3])
+</code></pre>
+<pre class="output">
+[-1, 0, 1, 2, 3]
+[0, 1, 2, 3, 4] 8
+[0, 1, 2, 3] 5
+</pre>
+
+        <figure class="fig">
+          <div class="fig-steps">
+            <div class="fig-state">
+              <div class="cells">
+                <div class="cell" data-i="0">-1</div>
+                <div class="cell is-hl" data-i="1">0</div>
+                <div class="cell is-hl" data-i="2">1</div>
+                <div class="cell is-hl" data-i="3">2</div>
+                <div class="cell is-hl" data-i="4">3</div>
+              </div>
+              <span class="fig-state-label">prev</span>
+            </div>
+          </div>
+          <figcaption><b>그림 14-3</b> 4번에서 <code>prev</code>를 따라가면 4 → 3 → 2 → 1 → 0, 그리고 -1에서 멈춘다. 모은 목록을 뒤집으면 경로다.</figcaption>
+        </figure>
+
+        <p><code>prev[v]</code>는 거리가 줄 때마다 덮어쓰므로, 끝났을 때 남은 값이 가장 짧은 길의 바로 앞 정점이다. 배열 하나에 모든 정점까지의 최단 경로가 담기며, 이것을 <strong>최단 경로 트리</strong>라고 한다. 갈 수 없는 정점도 <code>prev</code>가 -1이니 먼저 <code>dist[goal]</code>이 INF인지 확인한다.</p>
+      </section>
+
+      <section id="bellman-ford">
+        <h2>벨만-포드: 음수 간선이 있을 때</h2>
+        <p>지나가면 돈을 받는 길처럼 가중치가 음수이면, 나중에 음수 간선을 타고 돌아와 더 짧아질 수 있어 다익스트라의 전제가 깨진다. 벨만-포드 알고리즘은 순서를 따지지 않고 <strong>모든 간선을 한 바퀴씩 완화하는 일을 V−1번</strong> 되풀이한다.</p>
+
+        <figure class="fig">
+          <svg class="graph" viewBox="0 0 360 240" role="img" aria-label="정점 5개와 방향 간선 6개. 2에서 1로 가는 간선의 가중치가 -4이다. 최단 경로 트리 0→2, 2→1, 1→3, 3→4가 강조되어 있다">
+            <defs>
+              <marker id="arrow-14-4" class="arrow" viewBox="0 0 10 10" refX="26" refY="5" markerWidth="10" markerHeight="10" markerUnits="userSpaceOnUse" orient="auto"><path d="M0 0 L10 5 L0 10 z"/></marker>
+              <marker id="arrow-14-4-hl" class="arrow is-hl" viewBox="0 0 10 10" refX="26" refY="5" markerWidth="10" markerHeight="10" markerUnits="userSpaceOnUse" orient="auto"><path d="M0 0 L10 5 L0 10 z"/></marker>
+            </defs>
+            <g class="edges">
+              <line class="edge" x1="50" y1="120" x2="160" y2="60" marker-end="url(#arrow-14-4)"/>
+              <line class="edge is-hl" x1="50" y1="120" x2="160" y2="180" marker-end="url(#arrow-14-4-hl)"/>
+              <line class="edge is-hl" x1="160" y1="180" x2="160" y2="60" marker-end="url(#arrow-14-4-hl)"/>
+              <line class="edge is-hl" x1="160" y1="60" x2="290" y2="60" marker-end="url(#arrow-14-4-hl)"/>
+              <line class="edge" x1="160" y1="180" x2="290" y2="60" marker-end="url(#arrow-14-4)"/>
+              <line class="edge is-hl" x1="290" y1="60" x2="290" y2="180" marker-end="url(#arrow-14-4-hl)"/>
+            </g>
+            <text class="weight" x="97" y="82">1</text>
+            <text class="weight" x="97" y="158">3</text>
+            <text class="weight" x="145" y="120">−4</text>
+            <text class="weight" x="225" y="48">2</text>
+            <text class="weight" x="233" y="127">6</text>
+            <text class="weight" x="302" y="120">1</text>
+            <g class="vertices">
+              <g class="vertex is-hl" transform="translate(50,120)"><circle r="16"/><text>0</text></g>
+              <g class="vertex" transform="translate(160,60)"><circle r="16"/><text>1</text></g>
+              <g class="vertex" transform="translate(160,180)"><circle r="16"/><text>2</text></g>
+              <g class="vertex" transform="translate(290,60)"><circle r="16"/><text>3</text></g>
+              <g class="vertex" transform="translate(290,180)"><circle r="16"/><text>4</text></g>
+            </g>
+            <text class="label" x="50" y="152">d=0</text>
+            <text class="label" x="160" y="28">d=−1</text>
+            <text class="label" x="160" y="212">d=3</text>
+            <text class="label" x="290" y="28">d=1</text>
+            <text class="label" x="290" y="212">d=2</text>
+          </svg>
+          <figcaption><b>그림 14-4</b> 음수 간선이 있는 그래프. 0에서 1로 바로 가면 1이지만, 2를 거쳐 돌아가면 3 + (−4) = −1로 더 싸다.</figcaption>
+        </figure>
+
+        <h3>V−1번이면 충분한 이유</h3>
+        <p>음수 사이클이 없다면 최단 경로는 같은 정점을 두 번 지나지 않으므로 간선이 많아야 V−1개다. 그리고 <mark>모든 간선을 k바퀴 완화하면, 간선 k개 이하인 최단 경로는 모두 맞게 구해진다.</mark> 첫 바퀴에 경로의 첫 간선이, 둘째 바퀴에 둘째 간선이 완화되듯 한 바퀴마다 한 칸씩 확실해지기 때문이다.</p>
+        <p>돌 때마다 비용이 줄어드는 고리를 <strong>음수 사이클</strong>이라고 한다. 거기에 닿을 수 있으면 고리를 돌수록 거리가 한없이 줄어 최단 거리가 없다. 음수 사이클이 없으면 V−1바퀴 뒤에는 줄어들 것이 없다. 그러니 <mark>V번째 바퀴에서도 줄어드는 간선이 있으면 음수 사이클이 있다.</mark></p>
+
+<pre data-lang="python" data-title="bellman_ford.py"><code>
+def bellman_ford(n: int, edges: list[tuple[int, int, int]]) -&gt; str:
+    INF = float('inf')
+    dist = [INF] * n
+    dist[0] = 0                          # 0 번에서 출발
+    for round_no in range(1, n):         # 많아야 n-1 바퀴
+        updated = False
+        for u, v, w in edges:
+            if dist[u] == INF:           # 못 간 정점에서는 완화하지 않는다
+                continue
+            if dist[u] + w &lt; dist[v]:
+                dist[v] = dist[u] + w
+                updated = True
+        print(f'{round_no}바퀴: {dist}')
+        if not updated:                  # 한 바퀴 내내 변화가 없으면 끝
+            break
+    for u, v, w in edges:                # 한 바퀴 더: 줄어들면 음수 사이클
+        if dist[u] != INF and dist[u] + w &lt; dist[v]:
+            return '음수 사이클이 있다'
+    return f'결과: {dist}'
+
+
+# 그림 14-4. 간선 순서를 일부러 나쁘게 두었다.
+edges = [(3, 4, 1), (1, 3, 2), (2, 1, -4), (0, 2, 3), (0, 1, 1), (2, 3, 6)]
+print(bellman_ford(5, edges))
+# 1 → 2 → 1 을 한 번 돌 때마다 비용이 2 씩 준다
+print(bellman_ford(4, [(0, 1, 1), (1, 2, -1), (2, 1, -1), (2, 3, 2)]))
+</code></pre>
+<pre class="output">
+1바퀴: [0, 1, 3, 9, inf]
+2바퀴: [0, -1, 3, 3, 10]
+3바퀴: [0, -1, 3, 1, 4]
+4바퀴: [0, -1, 3, 1, 2]
+결과: [0, -1, 3, 1, 2]
+1바퀴: [0, -1, 0, 2]
+2바퀴: [0, -3, -2, 0]
+3바퀴: [0, -5, -4, -2]
+음수 사이클이 있다
+</pre>
+
+        <p>첫 그래프의 최단 경로 0→2→1→3→4는 간선이 4개라, 바퀴마다 한 칸씩 맞춰져 정확히 4바퀴(V−1)째에 4번이 2가 된다. 둘째 그래프는 V−1바퀴 뒤에도 줄어드는 간선이 남아 음수 사이클로 판정된다. 음수 간선만으로는 괜찮고, 닿을 수 있는 음수 사이클이 있을 때만 답이 없다.</p>
+        <p><code>if dist[u] == INF: continue</code>는 정수 INF를 쓸 때 꼭 필요하다(자주 하는 실수). 시간은 <span class="bigo b-quad">O(VE)</span>다. 간선 E개를 훑는 바퀴를 많아야 V번 돈다.</p>
+      </section>
+
+      <section id="floyd-warshall">
+        <h2>플로이드-워셜: 모든 쌍을 한 번에</h2>
+        <p>모든 쌍의 최단 거리가 필요하면 플로이드-워셜 알고리즘이 가장 짧게 짜인다. 2차원 표 <code>dist[i][j]</code>에 처음에는 대각선에 0, 간선이 있는 칸에 가중치, 나머지에 INF를 넣는다.</p>
+
+        <figure class="fig">
+          <svg class="graph" viewBox="0 0 340 240" role="img" aria-label="정점 4개 방향 그래프. 0에서 1로 바로 가는 간선은 10이지만, 0에서 3, 3에서 2, 2에서 1로 돌아가는 길은 1씩 더해 3이다. 돌아가는 길이 강조되어 있다">
+            <defs>
+              <marker id="arrow-14-5" class="arrow" viewBox="0 0 10 10" refX="26" refY="5" markerWidth="10" markerHeight="10" markerUnits="userSpaceOnUse" orient="auto"><path d="M0 0 L10 5 L0 10 z"/></marker>
+              <marker id="arrow-14-5-hl" class="arrow is-hl" viewBox="0 0 10 10" refX="26" refY="5" markerWidth="10" markerHeight="10" markerUnits="userSpaceOnUse" orient="auto"><path d="M0 0 L10 5 L0 10 z"/></marker>
+            </defs>
+            <g class="edges">
+              <line class="edge" x1="70" y1="60" x2="270" y2="60" marker-end="url(#arrow-14-5)"/>
+              <line class="edge is-hl" x1="70" y1="60" x2="70" y2="180" marker-end="url(#arrow-14-5-hl)"/>
+              <line class="edge is-hl" x1="70" y1="180" x2="270" y2="180" marker-end="url(#arrow-14-5-hl)"/>
+              <path class="edge is-hl" d="M270 180 Q245 120 270 60" marker-end="url(#arrow-14-5-hl)"/>
+              <path class="edge" d="M270 60 Q295 120 270 180" marker-end="url(#arrow-14-5)"/>
+            </g>
+            <text class="weight" x="170" y="48">10</text>
+            <text class="weight" x="58" y="120">1</text>
+            <text class="weight" x="170" y="192">1</text>
+            <text class="weight" x="244" y="120">1</text>
+            <text class="weight" x="296" y="120">4</text>
+            <g class="vertices">
+              <g class="vertex is-hl" transform="translate(70,60)"><circle r="16"/><text>0</text></g>
+              <g class="vertex is-hl" transform="translate(270,60)"><circle r="16"/><text>1</text></g>
+              <g class="vertex" transform="translate(270,180)"><circle r="16"/><text>2</text></g>
+              <g class="vertex" transform="translate(70,180)"><circle r="16"/><text>3</text></g>
+            </g>
+            <text class="label is-hl" x="170" y="218">0→3→2→1 = 3</text>
+          </svg>
+          <figcaption><b>그림 14-5</b> 0에서 1로 가는 가장 싼 길은 3과 2를 거쳐 가는 길이다. 1과 2 사이에는 방향이 다른 간선이 두 개 있다.</figcaption>
+        </figure>
+
+<pre data-lang="python" data-title="floyd_warshall.py"><code>
+INF = float('inf')
+n = 4
+edges = [(0, 1, 10), (0, 3, 1), (3, 2, 1), (2, 1, 1), (1, 2, 4)]
+
+dist = [[INF] * n for _ in range(n)]     # 행마다 새 리스트 (3장)
+for i in range(n):
+    dist[i][i] = 0
+for u, v, w in edges:
+    dist[u][v] = min(dist[u][v], w)      # 같은 쌍의 간선이 여럿이면 가장 싼 것
+
+for k in range(n):                       # k: 거쳐 가도 되는 정점. 가장 바깥
+    for i in range(n):
+        for j in range(n):
+            if dist[i][k] + dist[k][j] &lt; dist[i][j]:
+                dist[i][j] = dist[i][k] + dist[k][j]
+
+for row in dist:
+    print(*('INF' if d == INF else d for d in row))
+</code></pre>
+<pre class="output">
+0 3 2 1
+INF 0 4 INF
+INF 1 0 INF
+INF 2 1 0
+</pre>
+
+        <p>i행 j열이 i에서 j까지의 최단 거리다. 1에서 0이나 3으로 가는 길은 없어 INF로 남았다.</p>
+
+        <h3>k가 가장 바깥에 있는 이유</h3>
+        <p>바깥 <code>k</code> 반복이 한 번 끝날 때마다 표의 뜻이 넓어진다. <mark><code>k</code>번 반복이 끝나면 <code>dist[i][j]</code>는 "0번부터 k번까지의 정점만 거쳐 갈 때"의 최단 거리가 된다.</mark></p>
+        <p>k번 정점을 새로 허락하면, i에서 j로 가는 길은 k를 거치지 않거나(지금 값), k를 한 번 거친다(<code>dist[i][k] + dist[k][j]</code>). 이때 i→k와 k→j는 이미 "k−1번까지만 거치는 최단"으로 표에 완성되어 있다. 그러니 둘 중 작은 값을 고르면 된다. 위 예에서는 k=2일 때 3→2→1이 2로 생기고, 마지막 k=3일 때 그 앞에 0→3을 붙여 0→1이 10에서 3으로 준다. <code>k</code>를 안쪽에 두면 이 순서가 깨진다.</p>
+
+        <h3>얼마나 큰 V까지 버티나</h3>
+        <p>시간은 <span class="bigo b-quad">O(V³)</span>(세 겹 반복이 각각 V번), 공간은 <span class="bigo b-quad">O(V²)</span>(표 하나)다. 이 노트를 쓴 환경(Python 3.13)에서 재 보니 V = 100이면 0.1초, 200이면 0.6초, 400이면 5초쯤 걸렸다(<code>dist[i]</code>, <code>dist[k]</code>를 지역 변수에 담으면 3초쯤). 200 안팎까지가 편하다.</p>
+      </section>
+
+      <section id="choosing">
+        <h2>어떤 것을 고를까</h2>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>알고리즘</th><th>쓰는 조건</th><th>시간</th><th>전형적인 크기</th></tr></thead>
+            <tbody>
+              <tr><td>BFS (13장)</td><td>가중치가 모두 같다</td><td><span class="bigo b-linear">O(V+E)</span></td><td>V, E가 100만 안팎</td></tr>
+              <tr><td>다익스트라</td><td>출발점 하나, 음수 없음</td><td><span class="bigo b-nlogn">O((V+E) log V)</span></td><td>V, E가 10만~수십만</td></tr>
+              <tr><td>벨만-포드</td><td>출발점 하나, 음수 있음, 음수 사이클 판정</td><td><span class="bigo b-quad">O(VE)</span></td><td>V×E가 수백만 이하</td></tr>
+              <tr><td>플로이드-워셜</td><td>모든 쌍 (음수 간선 있어도 됨)</td><td><span class="bigo b-quad">O(V³)</span></td><td>V가 200 안팎 이하</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <p>모든 쌍이 필요해도 V가 크고 음수가 없으면, 정점마다 다익스트라를 한 번씩 돌리는 편이 빠를 수 있다.</p>
+
+        <h3>INF는 무엇으로 둘까</h3>
+        <p>무한대는 <code>float('inf')</code>나 <code>math.inf</code>(7장, 둘은 같은 값)가 가장 안전하다. 어떤 정수보다 크고, 더하거나 빼도 무한대로 남는다. 다만 <code>print([0, 3, INF])</code>는 <code>[0, 3, inf]</code>를 찍으니, 출력할 때 <code>'INF' if d == INF else d</code>처럼 형식에 맞춰 바꾼다. 정수 INF(<code>10**9</code>, <code>10**18</code>)를 쓴다면 두 가지를 지킨다. 나올 수 있는 가장 긴 거리(가중치 최댓값 × (V−1))보다 크게 잡고, INF인 정점에서는 완화하지 않는다.</p>
+      </section>
+
+      <section id="pitfalls">
+        <h2>자주 하는 실수</h2>
+        <div class="callout callout-warn">
+          <span class="callout-title">음수 간선에 다익스트라 쓰기</span>
+          <p>에러 없이 답만 틀린다. 확정한 정점을 <code>done</code> 배열로 막는 흔한 꼴은, 음수 간선 때문에 나중에 줄어든 거리를 뒤쪽 정점에 퍼뜨리지 못한다.</p>
+        </div>
+
+<pre data-lang="python" data-title="dijkstra_negative.py"><code>
+import heapq
+
+# 그림 14-4 의 그래프: 2 → 1 이 -4
+edges = [(0, 1, 1), (0, 2, 3), (2, 1, -4), (1, 3, 2), (3, 4, 1), (2, 3, 6)]
+graph = [[] for _ in range(5)]
+for u, v, w in edges:
+    graph[u].append((v, w))
+
+dist = [float('inf')] * 5
+dist[0] = 0
+done = [False] * 5
+heap = [(0, 0)]
+while heap:
+    d, u = heapq.heappop(heap)
+    if done[u]:
+        continue
+    done[u] = True                       # 한 번 확정하면 다시 보지 않는다
+    for v, w in graph[u]:
+        if d + w &lt; dist[v]:
+            dist[v] = d + w
+            heapq.heappush(heap, (d + w, v))
+print(dist)                              # 정답은 [0, -1, 3, 1, 2]
+</code></pre>
+<pre class="output">
+[0, -1, 3, 3, 4]
+</pre>
+        <p>1번이 거리 1로 먼저 확정되어 3번을 3으로 만들었다. 뒤에 2→1(−4)로 1번이 −1이 되었지만 다시 꺼내지 않아 3번과 4번이 틀린 채 남았다.</p>
+
+        <div class="callout callout-warn">
+          <span class="callout-title">오래된 힙 항목을 건너뛰지 않기</span>
+          <p>빠뜨려도 답은 맞아서 예제로는 못 잡는다. <code>stale_entries.py</code>처럼 같은 간선을 여러 번 훑어 큰 입력에서 시간 초과가 난다.</p>
+        </div>
+        <div class="callout callout-warn">
+          <span class="callout-title">플로이드-워셜에서 k를 안쪽에 두기</span>
+          <p><code>for i</code> / <code>for j</code> / <code>for k</code> 순서로 쓰면 i→j를 계산할 때 필요한 i→k, k→j가 아직 완성되지 않았을 수 있다. 에러 없이 일부 칸만 틀린다.</p>
+        </div>
+
+<pre data-lang="python" data-title="floyd_k_inner.py"><code>
+INF = float('inf')
+n = 4
+dist = [[0 if i == j else INF for j in range(n)] for i in range(n)]
+for u, v, w in [(0, 1, 10), (0, 3, 1), (3, 2, 1), (2, 1, 1), (1, 2, 4)]:
+    dist[u][v] = w
+
+for i in range(n):
+    for j in range(n):
+        for k in range(n):               # k 가 가장 안쪽: 틀린 순서
+            if dist[i][k] + dist[k][j] &lt; dist[i][j]:
+                dist[i][j] = dist[i][k] + dist[k][j]
+print(dist[0])                           # 정답은 [0, 3, 2, 1]
+</code></pre>
+<pre class="output">
+[0, 10, 2, 1]
+</pre>
+        <p><code>dist[0][1]</code>을 계산할 때 <code>dist[3][1]</code>(실제로는 2)이 아직 INF라 0→3→2→1을 못 찾았다. 순서는 언제나 k, i, j다.</p>
+
+        <div class="callout callout-warn">
+          <span class="callout-title">방향 그래프에 간선을 양쪽으로 넣기</span>
+          <p>13장의 무방향 그래프 코드를 그대로 가져와 <code>graph[v].append((u, w))</code>까지 쓰면, 없는 역방향 길이 생겨 거리가 실제보다 짧게 나온다. 문제가 "u에서 v로 가는"이라고 했는지, "u와 v를 잇는"이라고 했는지 먼저 확인한다.</p>
+        </div>
+        <div class="callout callout-warn">
+          <span class="callout-title">정수 INF에서 완화하기</span>
+          <p>INF를 <code>10**9</code>로 두고 갈 수 없는 정점에서도 완화하면, 음수 간선을 더한 값이 INF보다 작아져 갈 수 없는 정점이 갈 수 있는 정점처럼 보인다. <code>if dist[u] == INF: continue</code>로 막는다.</p>
+        </div>
+
+<pre data-lang="python" data-title="int_inf.py"><code>
+INF = 10**9
+dist = [0, INF, INF]
+for u, v, w in [(1, 2, -3)]:             # 1 번에는 아직 못 갔다
+    if dist[u] + w &lt; dist[v]:            # 10**9 - 3 &lt; 10**9 라서 참
+        dist[v] = dist[u] + w
+print(dist)
+</code></pre>
+<pre class="output">
+[0, 1000000000, 999999997]
+</pre>
+      </section>
+
+      <section id="problem">
+        <h2>대표 문제</h2>
+        <div class="problem">
+          <div class="problem-head">
+            <div class="problem-kicker"><b>Problem</b><span class="chip">보통</span><span class="chip">다익스트라</span></div>
+            <h3>한 정점에서 모든 정점까지</h3>
+          </div>
+          <div class="problem-body">
+            <p>정점 V개(1번부터 V번)와 간선 E개로 이루어진 방향 그래프가 있다. 간선 u v w는 u에서 v로 가는 비용이 w라는 뜻이고, w는 양의 정수다. 같은 두 정점 사이에 간선이 여러 개 있을 수 있다. 시작 정점 S에서 1번부터 V번까지 각 정점으로 가는 최소 비용을 한 줄에 하나씩 출력하라. 갈 수 없으면 <code>INF</code>를 출력한다.</p>
+            <p>첫째 줄에 V와 E(1 ≤ V ≤ 20,000, 0 ≤ E ≤ 200,000), 둘째 줄에 S가 주어진다. 다음 E줄에 u v w(1 ≤ w ≤ 10)가 주어진다.</p>
+            <div class="table-wrap">
+              <table>
+                <thead><tr><th>입력</th><th>출력</th><th>이유</th></tr></thead>
+                <tbody>
+                  <tr><td><code>4 4</code><br><code>2</code><br><code>2 1 3</code><br><code>2 3 4</code><br><code>3 4 1</code><br><code>1 4 9</code></td><td><code>3</code><br><code>0</code><br><code>4</code><br><code>5</code></td><td>4번은 2→1→4(12)보다 2→3→4(5)가 싸다</td></tr>
+                  <tr><td><code>6 7</code><br><code>1</code><br><code>1 2 4</code><br><code>1 3 1</code><br><code>3 2 2</code><br><code>2 4 5</code><br><code>3 4 8</code><br><code>4 5 3</code><br><code>6 5 1</code></td><td><code>0</code><br><code>3</code><br><code>1</code><br><code>8</code><br><code>11</code><br><code>INF</code></td><td>2번은 바로 가는 4보다 1→3→2(3)가 싸다. 6번으로 들어오는 간선은 없다</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <details class="reveal">
+            <summary>접근 방법<span class="reveal-hint">먼저 생각해 보고 펼치세요</span></summary>
+            <div class="reveal-body">
+              <p>출발점이 하나이고 가중치가 모두 양수다. <mark>출발점 하나 + 음수 없음이면 다익스트라</mark>다.</p>
+              <ol>
+                <li>가중치가 서로 다르니 BFS는 아니다. 예시 1의 4번처럼 간선 수가 적은 길이 더 비쌀 수 있다.</li>
+                <li>음수가 없으니 벨만-포드는 필요 없다. V × E가 40억이라 시간 안에 끝나지도 않는다.</li>
+                <li>방향 그래프이므로 <code>graph[u]</code>에만 넣는다. 같은 쌍의 간선이 여럿이어도 모두 넣으면 다익스트라가 싼 것을 고른다.</li>
+                <li>정점 번호가 1부터이므로 리스트를 V+1칸으로 만든다. 끝나고 INF로 남은 정점은 문자열 <code>INF</code>로 바꿔 출력한다.</li>
+              </ol>
+            </div>
+          </details>
+
+          <details class="reveal">
+            <summary>풀이 코드</summary>
+            <div class="reveal-body">
+<pre data-lang="python" data-title="shortest_from_start.py"><code>
+import heapq
+import sys
+
+input = sys.stdin.readline
+INF = float('inf')
+
+v_count, e_count = map(int, input().split())
+start = int(input())
+graph = [[] for _ in range(v_count + 1)]   # 정점 번호가 1부터라 한 칸 더
+for _ in range(e_count):
+    u, v, w = map(int, input().split())
+    graph[u].append((v, w))                # 방향 그래프: u → v 만
+
+dist = [INF] * (v_count + 1)
+dist[start] = 0
+heap = [(0, start)]
+while heap:
+    d, u = heapq.heappop(heap)
+    if d &gt; dist[u]:                        # 오래된 항목
+        continue
+    for v, w in graph[u]:
+        if d + w &lt; dist[v]:
+            dist[v] = d + w
+            heapq.heappush(heap, (d + w, v))
+
+lines = ['INF' if dist[i] == INF else str(dist[i])
+         for i in range(1, v_count + 1)]
+print('\n'.join(lines))                    # 한 번에 모아 출력한다 (1장)
+</code></pre>
+<pre class="stdin">
+6 7
+1
+1 2 4
+1 3 1
+3 2 2
+2 4 5
+3 4 8
+4 5 3
+6 5 1
+</pre>
+<pre class="output">
+0
+3
+1
+8
+11
+INF
+</pre>
+            </div>
+          </details>
+
+          <details class="reveal">
+            <summary>복잡도</summary>
+            <div class="reveal-body">
+              <dl class="cx">
+                <dt>시간</dt><dd><span class="bigo b-nlogn">O((V+E) log V)</span> 정점마다 한 번 확정하며 이웃을 훑고, 완화에 성공할 때마다 힙에 O(log V)로 넣는다.</dd>
+                <dt>공간</dt><dd><span class="bigo b-linear">O(V+E)</span> 인접 리스트에 간선 E개, <code>dist</code>에 V칸, 힙에는 많아야 E개가 들어간다.</dd>
+              </dl>
+              <p>입력이 더 커지면 입력 읽기와 힙에 쌓이는 튜플 수에서 먼저 막힌다.</p>
+            </div>
+          </details>
+        </div>
+      </section>
+
+      <section id="recall">
+        <h2>스스로 확인</h2>
+        <div class="recall">
+          <details>
+            <summary>가중치가 1과 10뿐인 그래프에서 BFS로 최소 비용을 구하면 왜 틀릴 수 있는가?</summary>
+            <div class="answer"><p>BFS는 간선 <strong>수</strong>가 적은 순서로 거리를 정한다. 10짜리 간선 하나로 가는 길(비용 10)을 1짜리 간선 세 개로 가는 길(비용 3)보다 먼저 확정해 버린다. 가중치가 다르면 다익스트라를 쓴다.</p></div>
+          </details>
+          <details>
+            <summary>다익스트라에서 <code>if d &gt; dist[u]: continue</code>를 지우면 답이 틀리는가?</summary>
+            <div class="answer"><p>틀리지 않는다. 오래된 거리로 완화해 봐야 이미 더 짧은 값이 있어 바뀌는 것이 없다. 하지만 같은 정점의 이웃을 여러 번 다시 훑으므로 간선이 많으면 시간 초과가 난다.</p></div>
+          </details>
+          <details>
+            <summary>벨만-포드가 모든 간선을 V−1번 완화하면 충분한 이유와, V번째에도 값이 줄면 무엇을 뜻하는가?</summary>
+            <div class="answer"><p>음수 사이클이 없으면 최단 경로의 간선은 많아야 V−1개이고, 한 바퀴마다 경로의 한 칸씩이 확실해진다. 그런데도 V번째에 줄어든다면 돌수록 짧아지는 음수 사이클이 있다는 뜻이다.</p></div>
+          </details>
+          <details>
+            <summary>플로이드-워셜에서 바깥 <code>k</code> 반복이 한 번 끝날 때마다 <code>dist[i][j]</code>는 무엇을 뜻하는가?</summary>
+            <div class="answer"><p>"0번부터 k번까지의 정점만 거쳐 갈 때의 최단 거리"다. k를 새로 허락할 때 i→k와 k→j가 이미 앞 단계의 답으로 완성되어 있어야 하므로 k가 가장 바깥에 온다.</p></div>
+          </details>
+        </div>
+      </section>
+
+      <section id="summary">
+        <h2>정리</h2>
+        <ol class="summary-list">
+          <li>가중치가 모두 같으면 BFS, 음수 간선이 없으면 다익스트라, 음수 간선이 있으면 벨만-포드, 모든 쌍이 필요하고 정점이 적으면 플로이드-워셜을 쓴다.</li>
+          <li>세 알고리즘은 모두 완화(더 짧은 길을 찾으면 거리를 고치는 일)를 되풀이하고, 어떤 순서로 몇 번 완화하느냐만 다르다.</li>
+          <li>다익스트라는 확정 안 된 정점 중 가장 가까운 정점은 더 짧아질 수 없다는 사실(음수가 없으니까)에 기댄다. <code>heapq</code>에 <code>(거리, 정점)</code>을 넣고 O((V+E) log V)다.</li>
+          <li><code>if d &gt; dist[u]: continue</code>로 오래된 힙 항목을 건너뛴다. 빠뜨려도 답은 맞지만 느려진다.</li>
+          <li>완화할 때 <code>prev[v] = u</code>를 적어 두면, 도착점부터 거꾸로 따라가 뒤집어 경로를 복원한다.</li>
+          <li>벨만-포드는 모든 간선을 V−1번 완화한다. V번째 바퀴에서도 줄어드는 간선이 있으면 음수 사이클이다. 시간은 O(VE)다.</li>
+          <li>플로이드-워셜은 k, i, j 순서로 돈다. k번 반복 뒤 표는 "k번까지의 정점만 거쳐 가는 최단 거리"다. O(V³)이라 파이썬에서는 V가 200 안팎까지가 편하다.</li>
+        </ol>
+      </section>
+
+      <nav class="pager" aria-label="이전 장과 다음 장"></nav>
+    </article>
+  </main>
+
+  <aside class="rail" aria-label="이 페이지 목차">
+    <p class="rail-title">이 페이지</p>
+    <nav id="onthispage"></nav>
+  </aside>
+</div>
+<div class="backdrop" id="backdrop"></div>
+
+<script src="assets/book.js"></script>
+<script src="assets/app.js"></script>
+<script src="assets/code.js"></script>
+</body>
+</html>
