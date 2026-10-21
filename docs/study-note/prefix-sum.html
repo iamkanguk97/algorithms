@@ -1,0 +1,415 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>누적합과 차분 배열 — 구간 쿼리를 점 쿼리로</title>
+<style>
+:root {
+  --bg: #ffffff;
+  --surface: #fafafa;
+  --ink: #0a0a0a;
+  --ink-soft: #6b7280;
+  --line: #e5e7eb;
+  --accent: #4f46e5;
+  --accent-soft: #eef2ff;
+  --danger: #dc2626;
+  --radius: 8px;
+  --sans: 'Pretendard', 'Inter', system-ui, -apple-system, 'Segoe UI', 'Apple SD Gothic Neo', 'Noto Sans KR', sans-serif;
+  --mono: 'SF Mono', ui-monospace, 'JetBrains Mono', 'Roboto Mono', Menlo, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #0a0a0a; --surface: #111114; --ink: #ededed; --ink-soft: #9ca3af;
+    --line: #262629; --accent: #818cf8; --accent-soft: #1e1b34; --danger: #f87171;
+  }
+}
+:root[data-theme="light"] {
+  --bg: #ffffff; --surface: #fafafa; --ink: #0a0a0a; --ink-soft: #6b7280;
+  --line: #e5e7eb; --accent: #4f46e5; --accent-soft: #eef2ff; --danger: #dc2626;
+}
+:root[data-theme="dark"] {
+  --bg: #0a0a0a; --surface: #111114; --ink: #ededed; --ink-soft: #9ca3af;
+  --line: #262629; --accent: #818cf8; --accent-soft: #1e1b34; --danger: #f87171;
+}
+
+* { box-sizing: border-box; }
+html { -webkit-text-size-adjust: 100%; }
+body {
+  margin: 0; background: var(--bg); color: var(--ink);
+  font-family: var(--sans); line-height: 1.7; letter-spacing: -0.011em;
+  -webkit-font-smoothing: antialiased;
+}
+.wrap { max-width: 68rem; margin: 0 auto; padding: 4.5rem 2rem 6rem; }
+
+.eyebrow {
+  font-family: var(--mono); font-size: .72rem; font-weight: 500;
+  text-transform: uppercase; letter-spacing: .14em; color: var(--ink-soft);
+  margin: 0;
+}
+h1 {
+  font-size: clamp(2rem, 5.5vw, 2.9rem); font-weight: 700;
+  letter-spacing: -0.03em; line-height: 1.15; margin: .6rem 0 0; text-wrap: balance;
+}
+.lede { font-size: 1.15rem; color: var(--ink-soft); margin: 1rem 0 0; text-wrap: pretty; }
+h2 { font-size: 1.35rem; font-weight: 650; letter-spacing: -0.02em; margin: 0 0 1rem; }
+h3 { font-size: 1.05rem; font-weight: 650; margin: 1.8rem 0 .6rem; }
+section { border-top: 1px solid var(--line); padding: 2.6rem 0; }
+section:last-of-type { border-bottom: 1px solid var(--line); }
+p { margin: 0 0 1rem; }
+p:last-child { margin-bottom: 0; }
+strong { font-weight: 650; }
+a { color: var(--accent); }
+ul { margin: 0 0 1rem; padding-left: 1.2rem; }
+li { margin-bottom: .3rem; }
+
+.answer {
+  border-left: 2px solid var(--accent); background: var(--accent-soft);
+  padding: 1.1rem 1.3rem; border-radius: 0 var(--radius) var(--radius) 0; margin: 1.5rem 0;
+}
+.answer .k {
+  font-family: var(--mono); font-size: .7rem; text-transform: uppercase;
+  letter-spacing: .12em; color: var(--accent); display: block; margin-bottom: .4rem;
+}
+
+.callout {
+  border: 1px solid var(--line); border-radius: var(--radius);
+  padding: 1.1rem 1.3rem; margin: 1.5rem 0; background: var(--surface);
+}
+.callout .lbl { font-weight: 650; }
+.callout.warn { border-color: var(--danger); }
+.callout.warn .lbl { color: var(--danger); }
+
+.table-scroll { overflow-x: auto; margin: 1.5rem 0; }
+table { width: 100%; border-collapse: collapse; font-size: .95rem; }
+th, td { text-align: left; padding: .7rem .9rem; border-bottom: 1px solid var(--line); vertical-align: top; }
+thead th {
+  font-family: var(--mono); font-size: .7rem; text-transform: uppercase;
+  letter-spacing: .08em; color: var(--ink-soft); font-weight: 500; border-bottom: 1px solid var(--ink-soft);
+}
+/* numeric array tables: compact, centered, mono */
+table.arr { width: auto; font-family: var(--mono); font-size: .85rem; }
+table.arr th, table.arr td { text-align: center; padding: .4rem .65rem; }
+table.arr th[scope="row"] { text-align: right; color: var(--ink-soft); font-weight: 500; padding-right: 1rem; }
+table.arr .hl { color: var(--accent); font-weight: 650; }
+
+.steps { list-style: none; margin: 1.5rem 0 0; padding: 0; counter-reset: s; }
+.steps li { position: relative; padding: 0 0 1.4rem 2.6rem; counter-increment: s; margin: 0; }
+.steps li:last-child { padding-bottom: 0; }
+.steps li::before {
+  content: counter(s, decimal-leading-zero); position: absolute; left: 0; top: .05rem;
+  font-family: var(--mono); font-size: .8rem; color: var(--accent); font-weight: 600;
+}
+.steps li:not(:last-child)::after {
+  content: ''; position: absolute; left: .55rem; top: 1.5rem; bottom: 0; width: 1px; background: var(--line);
+}
+.steps b { font-weight: 650; }
+
+.tag {
+  display: inline-block; font-family: var(--mono); font-size: .68rem; text-transform: uppercase;
+  letter-spacing: .06em; padding: .15rem .5rem; border: 1px solid var(--line);
+  border-radius: 999px; color: var(--ink-soft); white-space: nowrap;
+}
+.tag-change { color: var(--danger); border-color: var(--danger); }
+.tag-polish { color: var(--ink-soft); }
+
+code {
+  font-family: var(--mono); font-size: .88em; background: var(--surface);
+  border: 1px solid var(--line); padding: .1rem .35rem; border-radius: 5px;
+}
+pre {
+  font-family: var(--mono); font-size: .85rem; line-height: 1.6; background: var(--surface);
+  border: 1px solid var(--line); border-radius: var(--radius); padding: 1rem 1.1rem; overflow-x: auto;
+}
+pre code { background: none; border: none; padding: 0; }
+
+.recall { display: grid; gap: .8rem; margin-top: 1rem; }
+.q { border: 1px solid var(--line); border-radius: var(--radius); padding: 1rem 1.2rem; display: flex; gap: .9rem; }
+.q .qn { font-family: var(--mono); color: var(--accent); font-weight: 600; }
+
+footer {
+  margin-top: 3rem; padding-top: 1.5rem; border-top: 1px solid var(--line);
+  font-family: var(--mono); font-size: .72rem; color: var(--ink-soft);
+  text-transform: uppercase; letter-spacing: .08em;
+}
+
+@media (max-width: 620px) { .wrap { padding: 3rem 1.2rem 4rem; } }
+</style>
+</head>
+<body>
+<main class="wrap">
+
+<p class="eyebrow">CONCEPT · 알고리즘 · 누적합</p>
+<h1>누적합과 차분 배열</h1>
+<p class="lede">수정이 없는 구간 조회는 누적합으로, 한꺼번에 몰아서 하는 구간 수정은 차분 배열로 처리한다. 두 기술은 서로 거울처럼 대칭이다.</p>
+
+<div class="answer">
+  <span class="k">한 줄 정리</span>
+  누적합은 <strong>구간 get을 점 get 두 번</strong>으로, 차분 배열은 <strong>구간 update를 점 update 두 번</strong>으로 바꾼다.
+</div>
+
+<!-- 용어 -->
+<section>
+  <h2>용어 먼저 — get / update, 점 / 구간</h2>
+  <p>이 단원 전체가 네 단어의 조합으로 설명된다.</p>
+  <ul>
+    <li><strong>get</strong> = 값을 <strong>읽는</strong> 작업(조회). 배열은 바뀌지 않는다.</li>
+    <li><strong>update</strong> = 값을 <strong>고치는</strong> 작업(수정). 배열이 바뀐다.</li>
+    <li><strong>점</strong> = 칸 <strong>하나</strong>. 예) <code>arr[3]</code></li>
+    <li><strong>구간</strong> = <strong>연속된 여러 칸</strong>. 예) <code>arr[2] ~ arr[4]</code>, 줄여서 <code>arr[2..4]</code></li>
+  </ul>
+  <p>배열 <code>arr = [3, 1, 4, 1, 5]</code>(1번 ~ 5번)로 네 가지 조합을 보면 이렇다.</p>
+  <div class="table-scroll"><table>
+    <thead><tr><th>작업</th><th>예시</th><th>결과</th><th>그냥 배열에서 드는 시간</th></tr></thead>
+    <tbody>
+      <tr><td><strong>점 get</strong></td><td><code>arr[3]</code>은?</td><td>4</td><td>O(1) — 칸 하나만 본다</td></tr>
+      <tr><td><strong>구간 get</strong></td><td><code>arr[2..4]</code>의 합은?</td><td>1 + 4 + 1 = 6</td><td>O(N) — 구간을 다 훑는다</td></tr>
+      <tr><td><strong>점 update</strong></td><td><code>arr[3]</code>에 2 더하기</td><td>[3, 1, <strong>6</strong>, 1, 5]</td><td>O(1) — 칸 하나만 고친다</td></tr>
+      <tr><td><strong>구간 update</strong></td><td><code>arr[2..4]</code>에 모두 2 더하기</td><td>[3, <strong>3</strong>, <strong>6</strong>, <strong>3</strong>, 5]</td><td>O(N) — 구간을 다 고친다</td></tr>
+    </tbody>
+  </table></div>
+  <p>그냥 배열은 <strong>점 작업은 빠르고 구간 작업은 느리다.</strong> 구간 작업이 Q번 들어오면 O(Q·N)이 되어 시간 초과가 난다.</p>
+  <h3>"구간 get을 점 get으로 바꾼다"의 뜻</h3>
+  <p>이 단원의 두 기술은 배열을 <strong>다른 모양으로 한 번 바꿔 저장</strong>해서, 느린 구간 작업을 빠른 점 작업 두 번으로 만든다.</p>
+  <div class="table-scroll"><table>
+    <thead><tr><th>기술</th><th>원래 배열에서는</th><th>바꾼 배열에서는</th></tr></thead>
+    <tbody>
+      <tr><td><strong>누적합</strong></td><td><code>arr[2..4]</code>의 합 = <strong>구간 get</strong>, O(N)</td><td><code>prefix[4] - prefix[1]</code> = <strong>점 get 두 번</strong>, O(1)</td></tr>
+      <tr><td><strong>차분 배열</strong></td><td><code>arr[2..4]</code>에 +2 = <strong>구간 update</strong>, O(N)</td><td><code>diff[2] += 2</code>, <code>diff[5] -= 2</code> = <strong>점 update 두 번</strong>, O(1)</td></tr>
+    </tbody>
+  </table></div>
+  <p>대신 공짜는 아니다. 한쪽이 빨라지면 반대쪽 작업이 느려진다. 이 대가는 각 절에서 다시 다룬다.</p>
+</section>
+
+<!-- 0. 큰 그림 -->
+<section>
+  <h2>큰 그림 — 쿼리 문제의 두 상황</h2>
+  <p>"<code>arr[s] ~ arr[e]</code>의 합(최대, 최소, xor, gcd, k보다 큰 원소 수 …)은?" 같은 <strong>구간 질문</strong>이 여러 번 들어오는 문제를 다룬다. 매번 구간을 직접 훑으면 질문 하나에 O(N)이 들어서, 질문이 많으면 시간 초과가 난다.</p>
+  <div class="table-scroll"><table>
+    <thead><tr><th>상황</th><th>도구</th><th>무엇을 바꾸나</th><th>대가</th></tr></thead>
+    <tbody>
+      <tr><td>수정 없이 조회만 있음</td><td><strong>누적합</strong></td><td>구간 get → 점 get</td><td>점 update가 구간 update로 바뀜</td></tr>
+      <tr><td>수정을 다 끝낸 뒤 조회만 함</td><td><strong>차분 배열</strong></td><td>구간 update → 점 update</td><td>조회 전에 누적합을 한 번 돌려야 함</td></tr>
+      <tr><td>수정과 조회가 섞여서 들어옴</td><td>펜윅 트리 / 세그먼트 트리</td><td>둘 다 O(log N)</td><td>이 강의 범위 밖</td></tr>
+    </tbody>
+  </table></div>
+</section>
+
+<!-- 1. 1차원 누적합 -->
+<section>
+  <h2>1차원 누적합</h2>
+  <p><code>prefix[i]</code>는 1번부터 i번까지의 합이다. 0번 칸은 0으로 비워 두면 경계 처리가 편하다.</p>
+  <div class="table-scroll"><table class="arr">
+    <tbody>
+      <tr><th scope="row">i</th><td>0</td><td>1</td><td>2</td><td>3</td><td>4</td><td>5</td><td>6</td><td>7</td><td>8</td><td>9</td><td>10</td></tr>
+      <tr><th scope="row">arr</th><td>0</td><td>7</td><td>3</td><td>2</td><td>4</td><td>-5</td><td>1</td><td>6</td><td>-3</td><td>0</td><td>9</td></tr>
+      <tr><th scope="row">prefix</th><td>0</td><td>7</td><td class="hl">10</td><td>12</td><td>16</td><td>11</td><td class="hl">12</td><td>18</td><td>15</td><td>15</td><td>24</td></tr>
+    </tbody>
+  </table></div>
+  <p>구간 합은 큰 앞부분에서 작은 앞부분을 빼서 구한다.</p>
+<pre><code>arr[s] + ... + arr[e] = prefix[e] - prefix[s - 1]
+
+예) arr[3..6] = prefix[6] - prefix[2] = 12 - 10 = 2   (2 + 4 - 5 + 1 = 2)</code></pre>
+  <p><strong>왜 s−1인가:</strong> <code>prefix[e]</code>에는 <code>arr[1..e]</code>가 들어 있다. 여기서 <code>arr[1..s-1]</code>만 지워야 <code>arr[s]</code>가 답에 남는다. <code>prefix[s]</code>를 빼면 <code>arr[s]</code>까지 지워진다.</p>
+<pre><code>prefix = [0] * (n + 1)
+for i in range(1, n + 1):
+    prefix[i] = prefix[i - 1] + arr[i]
+
+def range_sum(s, e):
+    return prefix[e] - prefix[s - 1]</code></pre>
+  <div class="callout">
+    <span class="lbl">대가: 점 update가 구간 update가 된다.</span>
+    <code>arr</code>에서는 칸 하나를 고치는 <strong>점 update</strong>였던 작업이, <code>prefix</code>에서는 <code>prefix[i] ~ prefix[N]</code>을 전부 고치는 <strong>구간 update</strong>가 된다. 예를 들어 <code>arr[3]</code>에 2를 더하면 3번 이후의 누적합이 모두 2씩 커진다. 그래서 누적합은 <strong>수정이 없을 때만</strong> 쓴다.
+  </div>
+  <p>같은 방식으로 뒤에서부터 쌓으면 <code>suffix_sum[i]</code>(i번부터 N번까지의 합)이 된다.</p>
+</section>
+
+<!-- 2. 응용: 길이 k 구간 -->
+<section>
+  <h2>응용 — 길이 k인 연속 구간의 최대 합</h2>
+  <p><code>arr[1..3]</code>, <code>arr[2..4]</code>, …, <code>arr[N-2..N]</code> 중 합이 가장 큰 구간을 찾는 문제다. 누적합을 한 번 만들어 두면 구간 하나의 합이 O(1)에 나오므로, N번 조회해도 전체가 O(N)이다.</p>
+<pre><code>best = max(prefix[i] - prefix[i - k] for i in range(k, n + 1))</code></pre>
+  <p>관련 문제: 백준 2559 수열.</p>
+</section>
+
+<!-- 3. 이름의 함정 -->
+<section>
+  <h2>"누적합"이라는 이름의 함정</h2>
+  <p>영어로는 prefix sum, 즉 "접두사 합"이다. 그런데 둘 다 고정된 조건이 아니다.</p>
+  <ul>
+    <li><strong>꼭 합일 필요가 없다.</strong> 최대, 최소, 곱, xor로도 만들 수 있다.</li>
+    <li><strong>꼭 앞에서부터일 필요가 없다.</strong> 뒤에서부터 쌓으면 suffix(접미사)다.</li>
+  </ul>
+<pre><code># prefix_max[i] := arr[1..i] 중 최댓값
+# suffix_max[i] := arr[i..N] 중 최댓값
+NEG_INF = float('-inf')
+prefix_max = [NEG_INF] * (n + 2)
+suffix_max = [NEG_INF] * (n + 2)
+
+for i in range(1, n + 1):
+    prefix_max[i] = max(prefix_max[i - 1], arr[i])
+
+for i in range(n, 0, -1):
+    suffix_max[i] = max(suffix_max[i + 1], arr[i])</code></pre>
+  <div class="callout warn">
+    <span class="lbl">주의: 임의 구간은 "되돌릴 수 있는" 연산만 된다.</span>
+    <code>prefix[e] - prefix[s-1]</code>처럼 앞부분을 지우려면 연산에 역연산이 있어야 한다. 합은 빼기로, xor는 xor로 되돌릴 수 있다. 하지만 max·min·gcd는 되돌릴 수 없어서 <code>prefix_max</code>로는 <strong>1 ~ i 같은 앞부분 구간만</strong> 답할 수 있다. 임의 구간의 최댓값이 필요하면 희소 테이블이나 세그먼트 트리를 쓴다.
+  </div>
+  <div class="table-scroll"><table>
+    <thead><tr><th>연산</th><th>임의 구간 [s, e]</th><th>이유</th></tr></thead>
+    <tbody>
+      <tr><td>합</td><td>가능</td><td>빼기로 앞부분을 지운다</td></tr>
+      <tr><td>xor</td><td>가능</td><td>같은 값을 다시 xor하면 지워진다</td></tr>
+      <tr><td>곱</td><td>0이 없을 때만</td><td>나누기로 지우는데, 0으로는 나눌 수 없다</td></tr>
+      <tr><td>max / min / gcd</td><td>불가 (앞부분·뒷부분만)</td><td>역연산이 없다</td></tr>
+    </tbody>
+  </table></div>
+</section>
+
+<!-- 4. 창고 다각형 -->
+<section>
+  <h2>예제 — 창고 다각형 (백준 2304)</h2>
+  <p>폭 1인 기둥들 위에 빗물이 고이지 않는 지붕을 씌울 때 창고 다각형의 넓이를 구하는 문제다. 강의에서는 세 가지 풀이를 소개했다.</p>
+  <ol class="steps">
+    <li><b>가장 높은 기둥 기준, O(N)</b> — 가장 높은 기둥을 찾는다. 그 왼쪽은 왼쪽 끝부터, 오른쪽은 오른쪽 끝부터 읽으면서 "지금까지 본 최댓값"을 넓이에 더한다.</li>
+    <li><b>칸마다 min(왼쪽 최대, 오른쪽 최대), O(N²) → O(N)</b> — 각 칸의 지붕 높이는 "내 왼쪽(나 포함)의 최고 높이"와 "내 오른쪽(나 포함)의 최고 높이" 중 낮은 쪽이다. 칸마다 양쪽을 훑으면 O(N²)이지만, <code>prefix_max</code>와 <code>suffix_max</code>를 미리 만들어 두면 O(N)이다. <strong>누적합 단원에서 다루는 핵심 풀이</strong>다.</li>
+    <li><b>높이별로 자르기</b> — 높이 h마다 h 이상인 기둥만 남기고, 가장 오른쪽 기둥과 가장 왼쪽 기둥 사이의 폭을 더한다. 기둥 폭이 1이므로 폭은 <code>오른쪽 − 왼쪽 + 1</code>이다.</li>
+  </ol>
+<pre><code># 풀이 2 — heights[x] = 위치 x의 기둥 높이 (없으면 0), x = 1..W
+prefix_max = [0] * (W + 2)
+suffix_max = [0] * (W + 2)
+for x in range(1, W + 1):
+    prefix_max[x] = max(prefix_max[x - 1], heights[x])
+for x in range(W, 0, -1):
+    suffix_max[x] = max(suffix_max[x + 1], heights[x])
+
+area = sum(min(prefix_max[x], suffix_max[x]) for x in range(1, W + 1))</code></pre>
+  <p>백준 예제(기둥 7개)에 넣으면 정답 98이 나온다.</p>
+</section>
+
+<!-- 5. 2차원 누적합 -->
+<section>
+  <h2>2차원 누적합</h2>
+  <p><code>prefix[i][j]</code>는 (1,1)부터 (i,j)까지 직사각형 안의 합이다. 겹치는 영역을 한 번 빼고 한 번 더하는 <strong>포함-배제</strong>로 만든다.</p>
+<pre><code># 만들기: 위 + 왼쪽 - 겹친 왼쪽위 + 자기 자신
+prefix[i][j] = prefix[i-1][j] + prefix[i][j-1] - prefix[i-1][j-1] + arr[i][j]
+
+# (x1, y1) ~ (x2, y2) 직사각형의 합
+total = (prefix[x2][y2]
+         - prefix[x1-1][y2]
+         - prefix[x2][y1-1]
+         + prefix[x1-1][y1-1])</code></pre>
+  <p><strong>왜 마지막에 더하나:</strong> <code>prefix[x1-1][y1-1]</code> 영역(왼쪽 위 모서리)은 두 번 빼기에 모두 포함되어 두 번 빠진다. 그래서 한 번 다시 더해 준다.</p>
+  <p>관련 문제: 백준 11660 구간 합 구하기 5.</p>
+</section>
+
+<!-- 6. 차분 배열 -->
+<section>
+  <h2>구간 update — 차분 배열</h2>
+  <p>"l ~ r에 v를 더하라"는 수정이 여러 번 들어오고, 수정이 모두 끝난 뒤에 결과를 묻는 상황이다. 구간 전체를 고치는 대신 <strong>시작점과 끝 다음 칸만 기록</strong>한다.</p>
+<pre><code>diff[l] += v       # 여기서부터 v만큼 올라간다
+diff[r + 1] -= v   # 여기서부터 다시 원래대로</code></pre>
+  <p>수정을 모두 기록한 뒤 <code>diff</code>를 누적합하면, 각 칸에 "지금까지 켜져 있는 +v"가 모두 더해져 실제 배열이 된다.</p>
+  <div class="table-scroll"><table>
+    <thead><tr><th>수정</th><th>기록</th></tr></thead>
+    <tbody>
+      <tr><td>2 ~ 4에 +1</td><td><code>diff[2] += 1</code>, <code>diff[5] -= 1</code></td></tr>
+      <tr><td>1 ~ 5에 +1</td><td><code>diff[1] += 1</code>, <code>diff[6] -= 1</code></td></tr>
+      <tr><td>3 ~ 4에 +3</td><td><code>diff[3] += 3</code>, <code>diff[5] -= 3</code></td></tr>
+    </tbody>
+  </table></div>
+  <div class="table-scroll"><table class="arr">
+    <tbody>
+      <tr><th scope="row">i</th><td>0</td><td>1</td><td>2</td><td>3</td><td>4</td><td>5</td><td>6</td></tr>
+      <tr><th scope="row">diff</th><td>0</td><td>1</td><td>1</td><td>3</td><td>0</td><td>-4</td><td>-1</td></tr>
+      <tr><th scope="row">누적합</th><td>0</td><td class="hl">1</td><td class="hl">2</td><td class="hl">5</td><td class="hl">5</td><td class="hl">1</td><td>0</td></tr>
+    </tbody>
+  </table></div>
+<pre><code>diff = [0] * (n + 2)
+for l, r, v in updates:
+    diff[l] += v
+    diff[r + 1] -= v
+
+result = [0] * (n + 1)
+for i in range(1, n + 1):
+    result[i] = result[i - 1] + diff[i]</code></pre>
+  <div class="callout">
+    <span class="lbl">대가: 점 get이 구간 get이 된다.</span>
+    <code>arr</code>에서는 칸 하나를 읽는 <strong>점 get</strong>이었던 작업이, <code>diff</code>에서는 <code>diff[1] ~ diff[i]</code>를 전부 더하는 <strong>구간 get</strong>이 된다. 그래서 수정 도중에 값을 하나씩 읽지 않고, <strong>수정을 모두 모은 뒤</strong> 누적합을 한 번 돌려 전체 값을 한꺼번에 얻는다.
+  </div>
+</section>
+
+<!-- 7. 개똥벌레 -->
+<section>
+  <h2>예제 — 개똥벌레 (백준 3020)</h2>
+  <p>길이 N, 높이 H인 동굴에 장애물이 번갈아 있다. <strong>홀수 번째는 바닥에서 솟은 석순, 짝수 번째는 천장에 매달린 종유석</strong>이다. 높이 1 ~ H 중 하나를 골라 직선으로 날 때, 부딪히는 장애물 수의 최솟값과 그 높이의 개수를 구한다.</p>
+  <p><strong>핵심 관찰:</strong> 장애물 하나는 "높이 구간에 +1"하는 구간 update다. 수정을 다 끝낸 뒤 높이별 값을 조회하니 차분 배열 상황 그대로다.</p>
+  <ul>
+    <li>길이 L인 석순 → 높이 <code>1 ~ L</code>에 +1</li>
+    <li>길이 L인 종유석 → 높이 <code>H−L+1 ~ H</code>에 +1</li>
+  </ul>
+<pre><code>diff = [0] * (H + 2)
+for idx, length in enumerate(obstacles):
+    if idx % 2 == 0:              # 1, 3, 5 ... 번째: 석순 (바닥부터)
+        diff[1] += 1
+        diff[length + 1] -= 1
+    else:                         # 2, 4, 6 ... 번째: 종유석 (천장부터)
+        diff[H - length + 1] += 1
+        diff[H + 1] -= 1
+
+hits, current = [], 0
+for h in range(1, H + 1):
+    current += diff[h]
+    hits.append(current)
+
+print(min(hits), hits.count(min(hits)))</code></pre>
+  <p>예제(N=14, H=5, <code>1 3 4 2 2 4 3 4 3 3 3 2 3 3</code>)를 넣으면 높이별로 부딪히는 수가 <code>7 8 10 8 7</code>이고, 출력은 정답과 같은 <code>7 2</code>다. N개 장애물마다 O(1), 높이 H개를 한 번 훑으니 O(N + H)다.</p>
+</section>
+
+<!-- 8. 대칭 -->
+<section>
+  <h2>정리 — 두 기술의 대칭</h2>
+  <div class="table-scroll"><table>
+    <thead><tr><th></th><th>누적합</th><th>차분 배열</th></tr></thead>
+    <tbody>
+      <tr><td>빨라지는 것</td><td>구간 get → 점 get 두 번</td><td>구간 update → 점 update 두 번</td></tr>
+      <tr><td>느려지는 것</td><td>점 update → 구간 update (<code>prefix[i..N]</code> 전부)</td><td>점 get → 구간 get (<code>diff[1..i]</code>의 합)</td></tr>
+      <tr><td>쓰는 상황</td><td>수정 없음, 조회 많음</td><td>수정을 모두 모은 뒤 조회</td></tr>
+      <tr><td>관계</td><td colspan="2">차분 배열을 누적합하면 원래 배열, 원래 배열을 차분하면 차분 배열. 서로 역연산이다.</td></tr>
+    </tbody>
+  </table></div>
+  <p>수정과 조회가 번갈아 들어오면 둘 다 한쪽이 O(N)이 되어 버린다. 그때 필요한 것이 펜윅 트리와 세그먼트 트리다.</p>
+</section>
+
+<!-- 9. 메모 보정 -->
+<section>
+  <h2>원본 메모에서 고친 곳</h2>
+  <div class="table-scroll"><table>
+    <thead><tr><th>구분</th><th>위치</th><th>내용</th></tr></thead>
+    <tbody>
+      <tr><td><span class="tag tag-change">FIX</span></td><td>구간 합 유도식</td><td>빼는 값은 <code>prefix[s]</code>가 아니라 <code>prefix[s-1]</code>이다.</td></tr>
+      <tr><td><span class="tag tag-change">FIX</span></td><td><code>suffix_max</code> 코드</td><td><code>min(...)</code>을 <code>max(...)</code>로 고쳤다.</td></tr>
+      <tr><td><span class="tag tag-polish">NOTE</span></td><td>"합 말고 다른 것도 된다"</td><td>앞부분·뒷부분 구간에는 맞다. 임의 구간은 역연산이 있는 연산(합, xor)만 된다.</td></tr>
+      <tr><td><span class="tag tag-polish">NOTE</span></td><td>창고 다각형 풀이 3</td><td>기둥 폭이 1이라 폭은 <code>오른쪽 − 왼쪽 + 1</code>이다.</td></tr>
+      <tr><td><span class="tag tag-polish">NOTE</span></td><td>"높이 1~5 / 2 1 2 3 2"</td><td>개똥벌레 예제 결과(<code>7 8 10 8 7</code>)와 맞지 않는다. 강사님이 따로 든 작은 예시로 보이며, 맥락을 알 수 없어 본문에서는 뺐다.</td></tr>
+    </tbody>
+  </table></div>
+</section>
+
+<!-- 10. 스스로 확인 -->
+<section>
+  <h2>스스로 확인</h2>
+  <div class="recall">
+    <div class="q"><span class="qn">01</span><span>누적합을 만든 뒤 <code>arr[5]</code>를 바꾸면 prefix 배열의 어디까지 다시 계산해야 하나? 그래서 누적합은 언제 못 쓰나?</span></div>
+    <div class="q"><span class="qn">02</span><span><code>prefix_max</code>로 <code>arr[3..7]</code>의 최댓값을 구할 수 없는 이유는? 합은 왜 되는가?</span></div>
+    <div class="q"><span class="qn">03</span><span>2차원 구간 합 공식에서 <code>prefix[x1-1][y1-1]</code>을 마지막에 더하는 이유를 그림으로 설명해 보라.</span></div>
+    <div class="q"><span class="qn">04</span><span>차분 배열에서 <code>diff[r]</code>이 아니라 <code>diff[r+1]</code>에서 빼는 이유는?</span></div>
+    <div class="q"><span class="qn">05</span><span>개똥벌레를 차분 배열 없이 "길이별 개수 + 뒤에서부터 누적합"으로 풀 수도 있다. 어떻게 하면 될까?</span></div>
+  </div>
+</section>
+
+<footer>강의 노트 · 누적합 · html-report</footer>
+
+</main>
+</body>
+</html>
